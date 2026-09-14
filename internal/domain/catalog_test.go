@@ -31,6 +31,21 @@ func TestParseReleaseFixtures(t *testing.T) {
 	}
 }
 
+func TestParseReleaseSeasonSpanNeedsExplicitSeasonSuffix(t *testing.T) {
+	// HorribleSubs absolute episode numbering ("S2 - 26" = season 2, absolute
+	// episode 26) must not read as a season span 2-26. Phantom spans polluted
+	// title pages with empty seasons up to the largest episode number.
+	p := ParseRelease(TorrentRelease{Name: "[HorribleSubs] Shingeki no Kyojin S2 - 26 [720p].mkv"})
+	if p.SeasonStart != 2 || p.SeasonEnd != 2 || p.EpisodeStart != 0 {
+		t.Fatalf("S2 - 26 parsed as %+v, want season 2 only with no episode", p)
+	}
+	// Explicit season suffixes stay multi-season packs.
+	pack := ParseRelease(TorrentRelease{Name: "The.New.Fred.and.Barney.Show.S01-S04.1080p.WEB-DL"})
+	if pack.SeasonStart != 1 || pack.SeasonEnd != 4 || pack.EpisodeStart != 0 {
+		t.Fatalf("S01-S04 pack parsed as %+v, want seasons 1-4", pack)
+	}
+}
+
 func TestCatalogTitleIDPrefersIMDb(t *testing.T) {
 	a := TorrentRelease{Name: "Film.2020.1080p", IMDbID: "tt123"}
 	b := TorrentRelease{Name: "Completely.Different.2160p", IMDbID: "tt123"}
