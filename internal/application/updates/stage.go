@@ -3,6 +3,7 @@ package updates
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
 	"debug/buildinfo"
@@ -30,6 +31,10 @@ const (
 	// maxArchiveEntries bounds the member count of one archive. Real release
 	// payloads hold a handful of members; anything near this bound is hostile.
 	maxArchiveEntries = 4096
+	// maxGzipTailBytes bounds zero-byte tar record padding past the
+	// end-of-archive marker. Standard tar blocks pad up to 10240 bytes;
+	// 64 KiB provides headroom while rejecting arbitrary trailers.
+	maxGzipTailBytes = 64 << 10
 
 	// payloadBaseName is the executable name inside every file-flavor release
 	// archive, before the Windows ".exe" suffix.
@@ -376,12 +381,21 @@ func extractTarGz(archivePath, dir string, target Target, limits Limits) error {
 	for {
 		header, err := reader.Next()
 		if errors.Is(err, io.EOF) {
-			// The tar stream ended; the gzip wrapper must also end cleanly.
-			// A missing or corrupt trailer means the download was truncated
-			// inside the final padding, which member parsing cannot see.
-			var probe [1]byte
-			if _, err := gz.Read(probe[:]); !errors.Is(err, io.EOF) {
+			// The tar stream ended; the gzip wrapper must end cleanly too.
+			// Published archives carry tar record padding (zero bytes) past
+			// the end-of-archive marker, so drain the tail and accept only
+			// zeros: a missing or corrupt trailer means the download was
+			// truncated inside the final padding, which member parsing
+			// cannot see, and any nonzero tail means appended content.
+			remainder, err := io.ReadAll(io.LimitReader(gz, maxGzipTailBytes+1))
+			if err != nil {
 				return fmt.Errorf("%w: gzip stream ends prematurely: %v", ErrArchiveInvalid, err)
+			}
+			if len(remainder) > maxGzipTailBytes {
+				return fmt.Errorf("%w: gzip tail exceeds %d bytes", ErrArchiveInvalid, maxGzipTailBytes)
+			}
+			if !bytes.Equal(remainder, make([]byte, len(remainder))) {
+				return fmt.Errorf("%w: gzip tail carries nonzero bytes", ErrArchiveInvalid)
 			}
 			return nil
 		}

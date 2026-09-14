@@ -351,6 +351,96 @@ func TestExtractRejectsTruncatedArchive(t *testing.T) {
 	}
 }
 
+func TestExtractAcceptsTarGzWithRecordPadding(t *testing.T) {
+	dest := t.TempDir()
+	payload := fileBytes(t, fixtureBinary(t, "linux", "amd64", 0, nil, "0.4.0"))
+	// Standard tar archives (e.g. from GNU tar in release packaging) pad
+	// records to 10240-byte boundaries with zero blocks. The extractor must
+	// drain this zero padding cleanly and accept the archive.
+	archive := buildTarGzWithTrailing(t, happyTarMembers(payload), make([]byte, 4096))
+	sel := testSelection(tarAssetName("0.4.0", "amd64"), "0.4.0", archive)
+
+	staged := stageData(t, dest, archive, sel, defaultTestLimits())
+	result, err := staged.Extract(dest, Identity{GOOS: "linux", GOARCH: "amd64", Flavor: FlavorGUI}.Target(), defaultTestLimits())
+	if err != nil {
+		t.Fatalf("Extract error = %v, want clean extraction with zero padding", err)
+	}
+	if result == nil || result.Executable == "" {
+		t.Fatalf("expected extracted payload result, got %+v", result)
+	}
+}
+
+func TestExtractRejectsTarGzWithNonzeroTrailingContent(t *testing.T) {
+	dest := t.TempDir()
+	payload := fileBytes(t, fixtureBinary(t, "linux", "amd64", 0, nil, "0.4.0"))
+	// Trailing bytes with any nonzero data indicate an appended/corrupted payload.
+	badTrailing := append(make([]byte, 512), []byte("malicious-trailing-data")...)
+	archive := buildTarGzWithTrailing(t, happyTarMembers(payload), badTrailing)
+	sel := testSelection(tarAssetName("0.4.0", "amd64"), "0.4.0", archive)
+
+	staged := stageData(t, dest, archive, sel, defaultTestLimits())
+	_, err := staged.Extract(dest, Identity{GOOS: "linux", GOARCH: "amd64", Flavor: FlavorGUI}.Target(), defaultTestLimits())
+	if !errors.Is(err, ErrArchiveInvalid) {
+		t.Fatalf("Extract error = %v, want ErrArchiveInvalid for nonzero trailing content", err)
+	}
+}
+
+func TestExtractRejectsTarGzWithExcessivePadding(t *testing.T) {
+	dest := t.TempDir()
+	payload := fileBytes(t, fixtureBinary(t, "linux", "amd64", 0, nil, "0.4.0"))
+	// Excessive zero padding exceeding maxGzipTailBytes must be rejected.
+	hugePadding := make([]byte, maxGzipTailBytes+1024)
+	archive := buildTarGzWithTrailing(t, happyTarMembers(payload), hugePadding)
+	sel := testSelection(tarAssetName("0.4.0", "amd64"), "0.4.0", archive)
+
+	staged := stageData(t, dest, archive, sel, defaultTestLimits())
+	_, err := staged.Extract(dest, Identity{GOOS: "linux", GOARCH: "amd64", Flavor: FlavorGUI}.Target(), defaultTestLimits())
+	if !errors.Is(err, ErrArchiveInvalid) {
+		t.Fatalf("Extract error = %v, want ErrArchiveInvalid for excessive padding", err)
+	}
+}
+
+func buildTarGzWithTrailing(t *testing.T, members []tarMember, trailing []byte) []byte {
+	t.Helper()
+	var tarBuffer bytes.Buffer
+	writer := tar.NewWriter(&tarBuffer)
+	for _, member := range members {
+		header := &tar.Header{Name: member.name, Mode: member.mode}
+		if member.typ == 0 {
+			member.typ = tar.TypeReg
+		}
+		header.Typeflag = member.typ
+		if member.typ == tar.TypeReg {
+			header.Size = int64(len(member.data))
+		}
+		if err := writer.WriteHeader(header); err != nil {
+			t.Fatalf("tar header %q: %v", member.name, err)
+		}
+		if member.typ == tar.TypeReg && len(member.data) > 0 {
+			if _, err := writer.Write(member.data); err != nil {
+				t.Fatalf("tar data %q: %v", member.name, err)
+			}
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+	if len(trailing) > 0 {
+		if _, err := tarBuffer.Write(trailing); err != nil {
+			t.Fatalf("write trailing: %v", err)
+		}
+	}
+	var gzBuffer bytes.Buffer
+	gzipWriter := gzip.NewWriter(&gzBuffer)
+	if _, err := gzipWriter.Write(tarBuffer.Bytes()); err != nil {
+		t.Fatalf("gzip: %v", err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatalf("close gzip: %v", err)
+	}
+	return gzBuffer.Bytes()
+}
+
 func TestExtractRejectsTraversalAbsoluteAndDeviceMembers(t *testing.T) {
 	payload := fileBytes(t, fixtureBinary(t, "linux", "amd64", 0, nil, "0.4.0"))
 	cases := []struct {
