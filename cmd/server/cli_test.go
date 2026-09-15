@@ -38,7 +38,7 @@ func TestRestartRequiredMovedFromHandler(t *testing.T) {
 func TestRootRejectsMinimizedOutsideGUI(t *testing.T) {
 	root := newRootCommand(func(opts guiOptions) error {
 		return errFakeGUI
-	}, func(dataDir string, update bool, l logger) error { return errFakeServe })
+	}, func(dataDir string, update bool, l logger) error { return errFakeServe }, nil)
 	root.SetArgs([]string{"--minimized"})
 	var out bytes.Buffer
 	root.SetOut(&out)
@@ -58,7 +58,7 @@ func TestServeResolvesDataDirBeforeRunner(t *testing.T) {
 	root := newRootCommand(func(guiOptions) error { return errFakeGUI }, func(dataDir string, update bool, l logger) error {
 		got = dataDir
 		return errFakeServe
-	})
+	}, nil)
 	root.SetArgs([]string{"serve", "--data-dir", flagDir})
 	if err := root.Execute(); !errors.Is(err, errFakeServe) {
 		t.Fatalf("serve must run the injected serve runner, got err=%v", err)
@@ -88,7 +88,7 @@ func TestServeForwardsUpdateFlag(t *testing.T) {
 			root := newRootCommand(func(guiOptions) error { return errFakeGUI }, func(dataDir string, update bool, l logger) error {
 				got = update
 				return errFakeServe
-			})
+			}, nil)
 			root.SetArgs(append([]string{"serve", "--data-dir", filepath.Join(t.TempDir(), "data")}, testCase.args...))
 			if err := root.Execute(); !errors.Is(err, errFakeServe) {
 				t.Fatalf("serve must run the injected runner, got err=%v", err)
@@ -97,6 +97,24 @@ func TestServeForwardsUpdateFlag(t *testing.T) {
 				t.Fatalf("runServe update flag = %v, want %v", got, testCase.want)
 			}
 		})
+	}
+}
+
+// TestGUIFailureIsReported pins the Windows observability hook: a GUI
+// startup error reaches the startup-failure reporter before returning —
+// under the windowsgui subsystem the cobra print in main goes to a void,
+// so the report is the only trace a double-launched exe leaves.
+func TestGUIFailureIsReported(t *testing.T) {
+	var reported error
+	root := newRootCommand(func(guiOptions) error { return errFakeGUI },
+		func(string, bool, logger) error { return errFakeServe },
+		func(err error) { reported = err })
+	root.SetArgs([]string{})
+	if err := root.Execute(); !errors.Is(err, errFakeGUI) {
+		t.Fatalf("bare run must return the GUI error, got %v", err)
+	}
+	if !errors.Is(reported, errFakeGUI) {
+		t.Fatalf("GUI startup failure must reach the reporter, got %v", reported)
 	}
 }
 

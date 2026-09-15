@@ -19,6 +19,7 @@ import (
 	"github.com/mihaiflorentin88/torrent-tv/internal/platform/datadir"
 	"github.com/mihaiflorentin88/torrent-tv/internal/platform/listenaddr"
 	"github.com/mihaiflorentin88/torrent-tv/internal/platform/singleinstance"
+	"github.com/mihaiflorentin88/torrent-tv/internal/platform/startupfail"
 )
 
 // Run assembles and runs the Wails desktop app: data-dir resolution,
@@ -55,11 +56,15 @@ func Run(opts Options) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create data dir %s: %w", dir, err)
 	}
+	reporter := startupfail.Default()
+	reporter.SetDir(dir)
+	reporter.Log(fmt.Sprintf("launch: data dir %s (%s)", dir, source))
 	settingsPath := settingsPathFor(dir)
 	settings, err := config.LoadAt(settingsPath)
 	if err != nil {
 		return err
 	}
+	reporter.Log(fmt.Sprintf("settings loaded (missing required: %d)", len(settings.MissingRequired())))
 
 	lock, err := singleinstance.Acquire(dir)
 	if err != nil {
@@ -71,6 +76,7 @@ func Run(opts Options) error {
 		return err
 	}
 	defer lock.Close()
+	reporter.Log("single-instance lock acquired")
 
 	log, closeLog, err := newGUILogger(dir)
 	if err != nil {
@@ -89,6 +95,15 @@ func Run(opts Options) error {
 	bind.setSupervisor(sup)
 	app := application.New(application.Options{
 		Name: "Torrent TV",
+		// Wails swallows its own fatal errors in production builds (the
+		// default logger discards everything) and exits the process — a
+		// missing WebView2 runtime or a failed window embed would die
+		// invisibly under windowsgui. Mirror every wails-reported error
+		// into the startup reporter; the dialog fires once per process, so
+		// later benign reports only append a log line. The chromium error
+		// callback exits right after its callback returns, so the
+		// reporter's dialog must complete inside this call.
+		ErrorHandler: reporter.Report,
 		// Dock/taskbar icon for raw runs (make package-darwin stamps the
 		// .app bundle's own icon; this covers `go run ./cmd/server gui`).
 		// Options.Icon — not SetIcon: the framework applies it during
@@ -110,6 +125,7 @@ func Run(opts Options) error {
 			_ = lock.Close()
 		},
 	})
+	reporter.Log("wails app created")
 
 	// The pinned beta installs no application menu: without this, macOS
 	// has no Cmd+Q / app menu Quit at all. The role menu carries the
@@ -161,6 +177,7 @@ func Run(opts Options) error {
 	if len(settings.MissingRequired()) == 0 {
 		_ = sup.Start()
 	}
+	reporter.Log("window and tray created; entering event loop")
 
 	app.Run()
 	return nil

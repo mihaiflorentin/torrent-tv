@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/mihaiflorentin88/torrent-tv/internal/gui"
 	"github.com/mihaiflorentin88/torrent-tv/internal/platform/datadir"
 	"github.com/mihaiflorentin88/torrent-tv/internal/platform/listenaddr"
+	"github.com/mihaiflorentin88/torrent-tv/internal/platform/startupfail"
 )
 
 // settingsPathEnv keeps its historic precedence (spec: Data directory): when
@@ -45,9 +47,9 @@ func runGUI(opts guiOptions) error {
 }
 
 // newRootCommand separates command wiring from effects so tests can inject
-// the GUI and serve runners. The serve runner receives the --update flag:
-// update-and-serve, never check-only.
-func newRootCommand(runGUI func(guiOptions) error, runServe func(string, bool, logger) error) *cobra.Command {
+// the GUI and serve runners, plus the startup-failure reporter. The serve
+// runner receives the --update flag: update-and-serve, never check-only.
+func newRootCommand(runGUI func(guiOptions) error, runServe func(string, bool, logger) error, reportStartupFailure func(error)) *cobra.Command {
 	var dataDir string
 	var minimized bool
 	root := &cobra.Command{
@@ -59,7 +61,14 @@ func newRootCommand(runGUI func(guiOptions) error, runServe func(string, bool, l
 			// gui.ErrNoDisplay's text already points at `serve`, so the
 			// error is returned as-is; cobra adds the usage line listing
 			// the subcommand.
-			return runGUI(opts)
+			err := runGUI(opts)
+			if err != nil && reportStartupFailure != nil {
+				// A windowsgui-subsystem binary has no stderr: the cobra
+				// print in main would land in the void. Report first so the
+				// error reaches gui-startup.log and (on Windows) a dialog.
+				reportStartupFailure(err)
+			}
+			return err
 		},
 	}
 	root.PersistentFlags().StringVar(&dataDir, "data-dir", "", "data directory (default: data/ next to the executable)")
@@ -245,10 +254,18 @@ func openComposition(settingsPath string, log logger) (*composition.App, error) 
 }
 
 func main() {
+	// A panic during startup would otherwise die with invisible stderr
+	// under the windowsgui subsystem; the log and dialog name it.
+	defer func() {
+		if v := recover(); v != nil {
+			startupfail.Default().ReportPanic(v, debug.Stack())
+			os.Exit(2)
+		}
+	}()
 	// Adopt a helper-carried invocation before any command wiring: the
 	// relaunched installation resumes as if started with those arguments.
 	applyRelaunchArgs()
-	root := newRootCommand(runGUI, runServe)
+	root := newRootCommand(runGUI, runServe, startupfail.Default().Report)
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
