@@ -76,7 +76,7 @@ CREATE INDEX IF NOT EXISTS catalog_releases_browse ON catalog_releases(media_kin
 CREATE TABLE IF NOT EXISTS catalog_metadata(
  title_id TEXT PRIMARY KEY,provider TEXT NOT NULL DEFAULT '',provider_id TEXT NOT NULL DEFAULT '',title TEXT NOT NULL DEFAULT '',
  original_title TEXT NOT NULL DEFAULT '',overview TEXT NOT NULL DEFAULT '',poster_path TEXT NOT NULL DEFAULT '',backdrop_path TEXT NOT NULL DEFAULT '',
- language TEXT NOT NULL DEFAULT '',rating REAL NOT NULL DEFAULT 0,rating_votes INTEGER NOT NULL DEFAULT 0,rating_provider TEXT NOT NULL DEFAULT '',
+ language TEXT NOT NULL DEFAULT '',rating REAL NOT NULL DEFAULT 0,rating_votes INTEGER NOT NULL DEFAULT 0,rating_provider TEXT NOT NULL DEFAULT '',year INTEGER NOT NULL DEFAULT 0,
  fetched_at INTEGER NOT NULL DEFAULT 0,expires_at INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS sync_state(name TEXT PRIMARY KEY,last_success INTEGER,item_count INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS downloads(
@@ -200,6 +200,7 @@ func (r *Repository) migrateTrackers(ctx context.Context) error {
 		"ALTER TABLE downloads ADD COLUMN tracker_name TEXT NOT NULL DEFAULT 'FileList'",
 		"ALTER TABLE torrent_manifests ADD COLUMN metainfo BLOB",
 		"ALTER TABLE jobs ADD COLUMN tracker_id TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE catalog_metadata ADD COLUMN year INTEGER NOT NULL DEFAULT 0",
 	} {
 		if err := runAlter(q); err != nil {
 			return err
@@ -620,19 +621,19 @@ func (r *Repository) CatalogFacets(ctx context.Context, eligible []string) (doma
 }
 
 func (r *Repository) SaveCatalogMetadata(ctx context.Context, m domain.CatalogMetadata) error {
-	_, err := r.db.ExecContext(ctx, `INSERT INTO catalog_metadata(title_id,provider,provider_id,title,original_title,overview,poster_path,backdrop_path,language,rating,rating_votes,rating_provider,fetched_at,expires_at,last_error)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(title_id) DO UPDATE SET provider=excluded.provider,provider_id=excluded.provider_id,title=excluded.title,
-original_title=excluded.original_title,overview=excluded.overview,poster_path=excluded.poster_path,backdrop_path=excluded.backdrop_path,language=excluded.language,
+	_, err := r.db.ExecContext(ctx, `INSERT INTO catalog_metadata(title_id,provider,provider_id,title,original_title,overview,poster_path,backdrop_path,language,year,rating,rating_votes,rating_provider,fetched_at,expires_at,last_error)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(title_id) DO UPDATE SET provider=excluded.provider,provider_id=excluded.provider_id,title=excluded.title,
+original_title=excluded.original_title,overview=excluded.overview,poster_path=excluded.poster_path,backdrop_path=excluded.backdrop_path,language=excluded.language,year=excluded.year,
 rating=excluded.rating,rating_votes=excluded.rating_votes,rating_provider=excluded.rating_provider,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at,last_error=excluded.last_error`, m.TitleID, m.Provider, m.ProviderID, m.Title, m.OriginalTitle,
-		m.Overview, m.PosterPath, m.BackdropPath, m.Language, m.Rating, m.RatingVotes, m.RatingProvider, m.FetchedAt.Unix(), m.ExpiresAt.Unix(), m.LastError)
+		m.Overview, m.PosterPath, m.BackdropPath, m.Language, m.Year, m.Rating, m.RatingVotes, m.RatingProvider, m.FetchedAt.Unix(), m.ExpiresAt.Unix(), m.LastError)
 	return err
 }
 
 func (r *Repository) GetCatalogMetadata(ctx context.Context, titleID string) (domain.CatalogMetadata, error) {
 	var m domain.CatalogMetadata
 	var fetched, expires int64
-	err := r.db.QueryRowContext(ctx, `SELECT title_id,provider,provider_id,title,original_title,overview,poster_path,backdrop_path,language,rating,rating_votes,rating_provider,fetched_at,expires_at,last_error FROM catalog_metadata WHERE title_id=?`, titleID).
-		Scan(&m.TitleID, &m.Provider, &m.ProviderID, &m.Title, &m.OriginalTitle, &m.Overview, &m.PosterPath, &m.BackdropPath, &m.Language, &m.Rating, &m.RatingVotes, &m.RatingProvider, &fetched, &expires, &m.LastError)
+	err := r.db.QueryRowContext(ctx, `SELECT title_id,provider,provider_id,title,original_title,overview,poster_path,backdrop_path,language,year,rating,rating_votes,rating_provider,fetched_at,expires_at,last_error FROM catalog_metadata WHERE title_id=?`, titleID).
+		Scan(&m.TitleID, &m.Provider, &m.ProviderID, &m.Title, &m.OriginalTitle, &m.Overview, &m.PosterPath, &m.BackdropPath, &m.Language, &m.Year, &m.Rating, &m.RatingVotes, &m.RatingProvider, &fetched, &expires, &m.LastError)
 	m.FetchedAt, m.ExpiresAt = time.Unix(fetched, 0).UTC(), time.Unix(expires, 0).UTC()
 	return m, err
 }

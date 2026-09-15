@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -261,6 +262,18 @@ func episodeSource(base domain.CatalogSource, file domain.TorrentFile) (domain.C
 	release.SizeBytes = file.SizeBytes
 	parsed := domain.ParseRelease(release)
 	if parsed.EpisodeStart <= 0 {
+		// Anime packs number files absolutely: the pack name carries the
+		// season, the file only the number — "Show S2 - 27 [720p].mkv",
+		// "Show (Season 2) - 27.mkv", "Season 3 (2019) - 01v2.mkv" or a bare
+		// "27 - Episode Title.mkv".
+		if episode := packFileEpisode(file.Path); episode > 0 {
+			parsed.EpisodeStart = episode
+			if parsed.SeasonStart == 0 {
+				parsed.SeasonStart = base.Parsed.SeasonStart
+			}
+		}
+	}
+	if parsed.EpisodeStart <= 0 {
 		return domain.CatalogSource{}, false
 	}
 	for value, target := range map[string]*string{base.Parsed.Resolution: &parsed.Resolution, base.Parsed.Quality: &parsed.Quality, base.Parsed.VideoCodec: &parsed.VideoCodec, base.Parsed.Audio: &parsed.Audio, base.Parsed.HDR: &parsed.HDR} {
@@ -270,4 +283,29 @@ func episodeSource(base domain.CatalogSource, file domain.TorrentFile) (domain.C
 	}
 	index := file.Index
 	return domain.CatalogSource{Release: base.Release, Parsed: parsed, FileIndex: &index, FilePath: file.Path, FileSizeBytes: file.SizeBytes}, true
+}
+
+// packEpisodeRE extracts the absolute episode number from a pack file name
+// that carries no SxxEyy marker. The season-anchored alternative keeps the
+// number after a dash following S2/(Season 2)/Season 2 (2019); the anchored
+// alternative keeps a leading "27 -" number. Resolution strings ("1080p"),
+// years and video sizes never match.
+var packEpisodeRE = regexp.MustCompile(`(?i)(?:S\d{1,2}\s*|\bSeason\s+\d{1,2}(?:\s*\(\d{4}\))?\s*\)?\s*)[-–]\s*(\d{1,3})(?:v\d)?\b|^\s*(\d{1,3})(?:v\d)?\s*[-–]`)
+
+func packFileEpisode(name string) int {
+	m := packEpisodeRE.FindStringSubmatch(name)
+	if m == nil {
+		return 0
+	}
+	for _, group := range m[1:] {
+		if group == "" {
+			continue
+		}
+		value, err := strconv.Atoi(group)
+		if err != nil || value <= 0 {
+			return 0
+		}
+		return value
+	}
+	return 0
 }

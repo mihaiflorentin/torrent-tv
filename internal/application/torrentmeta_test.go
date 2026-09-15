@@ -123,3 +123,43 @@ func TestApplyMetadataFillsMissingYear(t *testing.T) {
 		t.Fatalf("expected release-name year 2009 to survive, got %d", parsed.Year)
 	}
 }
+
+func TestEpisodeSourceParsesAbsolutePackFileNames(t *testing.T) {
+	base := domain.CatalogSource{
+		Release: domain.TorrentRelease{ID: "filelist:9", TrackerID: "filelist", Name: "Shingeki.no.Kyojin.S02.720p.BluRay.AAC2.0.x264-Group"},
+		Parsed:  domain.ParsedRelease{SeasonStart: 2},
+	}
+	cases := []struct {
+		name    string
+		path    string
+		season  int
+		episode int
+	}{
+		{"season marker with dash", "[HorribleSubs] Shingeki no Kyojin S2 - 27 [720p].mkv", 2, 27},
+		{"paren season with dash", "[BlurayDesuYo] Shingeki no Kyojin (Season 2) - 27 (BD 1920x1080 10bit FLAC) [838487A3].mkv", 2, 27},
+		{"season year dash", "[Erai-raws] Shingeki no Kyojin Season 3 (2019) - 01v2 [1080p][Multiple Subtitle].mkv", 3, 1},
+		{"bare absolute number", "27 - I'm Home.mkv", 2, 27},
+		{"standard marker still wins", "[Group] Show S02E05.mkv", 2, 5},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			virtual, ok := episodeSource(base, domain.TorrentFile{Index: 0, Path: c.path, SizeBytes: 10, Playable: true})
+			if !ok {
+				t.Fatalf("%q did not expand into an episode source", c.path)
+			}
+			if virtual.Parsed.SeasonStart != c.season || virtual.Parsed.EpisodeStart != c.episode {
+				t.Fatalf("%q parsed as S%dE%d, want S%dE%d", c.path, virtual.Parsed.SeasonStart, virtual.Parsed.EpisodeStart, c.season, c.episode)
+			}
+		})
+	}
+
+	nonEpisodes := []string{
+		"Great Movie 2019 1080p.mkv",
+		"Sample/sample.avi",
+	}
+	for _, path := range nonEpisodes {
+		if virtual, ok := episodeSource(base, domain.TorrentFile{Index: 0, Path: path, SizeBytes: 10, Playable: true}); ok {
+			t.Fatalf("%q must not expand into an episode source, got S%dE%d", path, virtual.Parsed.SeasonStart, virtual.Parsed.EpisodeStart)
+		}
+	}
+}

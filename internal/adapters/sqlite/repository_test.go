@@ -442,3 +442,29 @@ func TestSaveJobAdoptsRetargetedRowByID(t *testing.T) {
 		t.Fatalf("job_logs history must survive adoption: %#v %v", logs, err)
 	}
 }
+
+func TestCatalogMetadataYearRoundTrip(t *testing.T) {
+	r, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := r.SaveCatalogMetadata(ctx, domain.CatalogMetadata{TitleID: "t1", Provider: "tmdb", Title: "Show", Year: 2013, FetchedAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.GetCatalogMetadata(ctx, "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Year != 2013 {
+		t.Fatalf("metadata year was not persisted: got %d, want 2013", got.Year)
+	}
+	if err := r.SaveCatalogMetadata(ctx, domain.CatalogMetadata{TitleID: "t1", Provider: "tmdb", Title: "Show", Year: 2022, FetchedAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err = r.GetCatalogMetadata(ctx, "t1"); err != nil || got.Year != 2022 {
+		t.Fatalf("metadata year was not updated: got %d, %v", got.Year, err)
+	}
+}
