@@ -22,6 +22,8 @@ func TestParseReleaseFixtures(t *testing.T) {
 		{"Shogun.1x02.Servants.of.Two.Masters.720p.HDTV", "Shogun", MediaSeries, 1, 2, "720p", 0},
 		{"[Shinobi] Naruto Shippuden - Sezonul 01 [480p]", "Naruto Shippuden", MediaSeries, 1, 0, "480p", 0},
 		{"Naruto Shippuden - Season 12 [SD]", "Naruto Shippuden", MediaSeries, 12, 0, "", 0},
+		{"Attack.On.Titan.S01.E04.The.Night.Of.The.Dissolution.Ceremony.2013.1080p.BluRay.x264.D-Z0N3.mkv", "Attack On Titan", MediaSeries, 1, 4, "1080p", 2013},
+		{"Show.S01.Extras.1080p.WEB-DL", "Show", MediaSeries, 1, 0, "1080p", 0},
 	}
 	for _, tt := range tests {
 		p := ParseRelease(TorrentRelease{Name: tt.name})

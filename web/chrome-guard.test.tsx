@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe.each([
-  ['Downloads', <Downloads items={[]} onRefresh={() => { }} onPlay={() => { }} onRemove={async () => { }} onAction={async () => { }} />],
+  ['Downloads', <Downloads items={[]} onRefresh={() => { }} onPlay={() => { }} onRemove={async () => { }} onRemoveFile={async () => { }} onAction={async () => { }} />],
   ['Jobs', <Jobs onError={() => { }} onOpenDetail={() => { }} onCloseDetail={() => { }} />],
   ['Settings', <Settings value={{}} fields={[]} onSaved={() => { }} onError={() => { }} />],
 ])('%s renders no webapp chrome', (_name, ui) => {

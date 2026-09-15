@@ -2247,6 +2247,25 @@ func (s *Service) Manage(ctx context.Context, id, action string, _ bool) error {
 			}
 		}
 		return s.removeTorrent(ctx, d.EngineID)
+	case "remove-file":
+		if d.Leased {
+			return fmt.Errorf("cannot remove a file that is being streamed")
+		}
+		if err := s.repo.DeleteDownload(ctx, d.ID); err != nil {
+			return err
+		}
+		remaining, listErr := s.repo.ListDownloads(ctx)
+		if listErr != nil {
+			return listErr
+		}
+		for _, item := range remaining {
+			if item.EngineID == d.EngineID {
+				return nil
+			}
+		}
+		// A route with zero rows is invisible to retention (retentionSurvey walks
+		// download rows), so the last removal must take the torrent with it.
+		return s.removeTorrent(ctx, d.EngineID)
 	default:
 		return fmt.Errorf("unknown download action")
 	}

@@ -62,7 +62,7 @@ describe('Downloads tracker badges', () => {
    state: 'downloading', progress: 0.5, playbackMode: 'progressive', downloadedBytes: 512,
    speedBytesPerSecond: 0, etaSeconds: 0, peers: 1, seeds: 2, leased: false, streamUrl: '/api/v1/downloads/d1/stream',
   };
-  await mount(<Downloads items={[download]} onRefresh={() => { }} onPlay={() => { }} onRemove={async () => { }} onAction={async () => { }} />);
+  await mount(<Downloads items={[download]} onRefresh={() => { }} onPlay={() => { }} onRemove={async () => { }} onRemoveFile={async () => { }} onAction={async () => { }} />);
   const badge = document.querySelector('.download-list .tracker-badge')!;
   expect(badge.className).toContain('filelist');
   expect(badge.textContent).toBe('FileList');

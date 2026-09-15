@@ -100,6 +100,75 @@ describe('downloads page cards', () => {
  });
 });
 
+describe('downloads page torrent grouping', () => {
+ const packRow = (id: string, fileIndex: number, displayTitle: string) => ({
+  id, releaseId: 'r-pack', engineId: 'native:pack', fileIndex,
+  filePath: `Attack.On.Titan.S01.E${String(fileIndex + 1).padStart(2, '0')}.1080p.BluRay.x264.D-Z0N3.mkv`, displayTitle, mimeType: 'video/x-matroska',
+  sizeBytes: 4000000000 + fileIndex, state: 'seeding', progress: 1, playbackMode: 'local',
+  downloadedBytes: 4000000000 + fileIndex, speedBytesPerSecond: 0, etaSeconds: 0, peers: 0, seeds: 1,
+  leased: false, error: '', streamUrl: `/api/v1/downloads/${id}/stream`,
+ });
+ const mountPack = async (extra: object[] = []) => {
+  vi.spyOn(API.prototype, 'downloads').mockResolvedValue({ items: [packRow('ep1', 0, 'Attack On Titan · S01E01'), packRow('ep2', 1, 'Attack On Titan · S01E02'), ...extra] as never[], nextCursor: null, total: 2 + extra.length });
+  await openDownloads();
+ };
+
+ it('collapses rows of one torrent into a single card with an expandable file list', async () => {
+  await mountPack([qbDownload]);
+  const cards = document.querySelectorAll('.download-list article');
+  expect(cards).toHaveLength(2);
+  expect(document.body.textContent).toContain('2 files');
+  expect(document.body.textContent).not.toContain('Attack On Titan · S01E02');
+  await act(async () => {
+   Array.from(cards[0].querySelectorAll('button')).find(b => b.textContent === 'Show files')!.click();
+  });
+  expect(document.body.textContent).toContain('Attack On Titan · S01E01');
+ });
+
+ it('plays and removes the clicked file row, not the representative', async () => {
+  const playback = vi.spyOn(API.prototype, 'playback').mockResolvedValue({ profileId: 'p', sourceId: 'ep1', releaseId: 'r-pack', fileIndex: 0, filePath: 'x', positionMs: 0, durationMs: 0, watched: false, updatedAt: '' });
+  const call = vi.spyOn(API.prototype, 'call').mockImplementation(async function mockApiCall(this: API, path: string) {
+   if (path === '/state') return { favorites: [], continueWatching: [], recent: [], watched: [] } as never;
+   if (path.endsWith('/remove-file')) return undefined as never;
+   throw new Error('unexpected API call: ' + path);
+  });
+  await mountPack();
+  const card = document.querySelector('.download-list article')!;
+  await act(async () => {
+   Array.from(card.querySelectorAll('button')).find(b => b.textContent === 'Show files')!.click();
+  });
+  const fileRows = card.querySelectorAll('.download-files li');
+  expect(fileRows).toHaveLength(2);
+  await act(async () => {
+   Array.from(fileRows[1].querySelectorAll('button')).find(b => b.textContent === 'Play')!.click();
+  });
+  expect(playback).toHaveBeenCalledWith('ep2');
+  await act(async () => {
+   Array.from(fileRows[1].querySelectorAll('button')).find(b => b.textContent === 'Remove')!.click();
+  });
+  const confirm = document.querySelector('.removal-confirm')!;
+  expect(confirm.textContent).toContain('The episode leaves the download list');
+  await act(async () => {
+   Array.from(confirm.querySelectorAll('button')).find(b => b.textContent === 'Remove episode')!.click();
+  });
+  expect(call).toHaveBeenCalledWith('/downloads/ep2/remove-file', { method: 'POST' });
+ });
+
+ it('keeps the group visible when the search matches a non-first file', async () => {
+  await mountPack([qbDownload]);
+  await act(async () => {
+   const input = document.querySelector<HTMLInputElement>('.download-tools .search input')!;
+   input.value = 'S01E02';
+   input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await settle();
+  const cards = document.querySelectorAll('.download-list article');
+  expect(cards).toHaveLength(1);
+  expect(cards[0].textContent).toContain('Attack On Titan · S01E02');
+  expect(cards[0].textContent).not.toContain('Attack On Titan · S01E01');
+ });
+});
+
 describe('error modal layering', () => {
  it('surfaces errors as a topmost dialog while other modals are open', async () => {
   vi.spyOn(API.prototype, 'call').mockRejectedValue(new Error('the tracker refused this release'));

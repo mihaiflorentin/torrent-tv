@@ -35,6 +35,12 @@ export interface DownloadTransferActionItem { action: DownloadTransferAction; la
 const ACTIVE_TRANSFER_STATES: Record<string, true> = { allocating: true, downloading: true, forceddl: true, forcedmetadl: true, metadl: true, queueddl: true, stalleddl: true };
 const HALTED_TRANSFER_STATES: Record<string, true> = { pauseddl: true, pausedup: true, stoppeddl: true, stoppedup: true };
 export function downloadTransferActions(download: Pick<Download, 'state' | 'error'>): DownloadTransferActionItem[] { const state = (download.state || '').trim().toLowerCase(); if (download.error || state === 'error' || state === 'missingfiles') return [{ action: 'retry', label: 'Retry download', pendingLabel: 'Retrying…' }]; if (HALTED_TRANSFER_STATES[state]) return [{ action: 'resume', label: 'Resume', pendingLabel: 'Resuming…' }]; if (ACTIVE_TRANSFER_STATES[state]) return [{ action: 'pause', label: 'Pause', pendingLabel: 'Pausing…' }]; return [] }
+export interface DownloadGroup { representative: Download; rows: Download[]; totalSizeBytes: number }
+// One card per physical torrent: rows sharing an engineId are the same
+// torrent on the engine, and every server-side action (pause, resume,
+// remove) acts route-wide, so the UI groups them. First-seen order of the
+// (already sorted) input is preserved.
+export function groupDownloadsByTorrent(items: Download[]): DownloadGroup[] { const groups: DownloadGroup[] = []; const byEngine = new Map<string, DownloadGroup>(); for (const item of items) { let group = byEngine.get(item.engineId); if (!group) { group = { representative: item, rows: [], totalSizeBytes: 0 }; byEngine.set(item.engineId, group); groups.push(group) } group.rows.push(item); group.totalSizeBytes += item.sizeBytes } return groups }
 export interface Job { id: string; trackerId?: string; kind: string; state: string; label: string; dedupeKey: string; progress: number; attempt: number; error?: string; retryable: boolean; nextAttemptAt?: string; createdAt: string; updatedAt: string }
 export interface JobLog { id: number; jobId: string; attempt: number; level: string; phase: string; message: string; context?: Record<string, unknown>; createdAt: string }
 export interface SearchResult extends Page<CatalogTitle> { job: Job; trackers: TrackerStatus[] }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { API, type Download, downloadTransferActions, reconcileDownloads } from './index';
+import { API, type Download, downloadTransferActions, groupDownloadsByTorrent, reconcileDownloads } from './index';
 
 const row = (state: string, error?: string): Pick<Download, 'state' | 'error'> => ({ state, error });
 const actions = (state: string, error?: string) => downloadTransferActions(row(state, error)).map(item => item.action);
@@ -121,5 +121,47 @@ describe('Download reconciliation and provenance fingerprinting', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  describe('Download grouping by torrent', () => {
+    const packRow = (id: string, engineId: string, sizeBytes: number): Download => ({
+      id,
+      releaseId: 'rel-pack',
+      trackerId: 'filelist',
+      trackerName: 'FileList',
+      engineId,
+      fileIndex: Number(id.replace(/\D/g, '')) || 0,
+      filePath: `${id}.mkv`,
+      mimeType: 'video/x-matroska',
+      sizeBytes,
+      state: 'seeding',
+      progress: 1,
+      playbackMode: 'local',
+      downloadedBytes: sizeBytes,
+      speedBytesPerSecond: 0,
+      etaSeconds: 0,
+      peers: 0,
+      seeds: 1,
+      leased: false,
+      streamUrl: `/downloads/${id}/stream`,
+    });
+
+    it('collapses rows sharing an engineId into one group led by the first row', () => {
+      const rows = [packRow('ep2', 'qb:hash', 500), packRow('ep1', 'qb:hash', 700), packRow('other', 'qb:hash2', 300)];
+      const groups = groupDownloadsByTorrent(rows);
+      expect(groups).toHaveLength(2);
+      expect(groups[0].representative.id).toBe('ep2');
+      expect(groups[0].rows.map(row => row.id)).toEqual(['ep2', 'ep1']);
+      expect(groups[0].totalSizeBytes).toBe(1200);
+      expect(groups[1].rows.map(row => row.id)).toEqual(['other']);
+      expect(groups[1].totalSizeBytes).toBe(300);
+    });
+
+    it('passes single-row groups through unchanged and keeps input order', () => {
+      const rows = [packRow('a', 'qb:a', 10), packRow('b', 'qb:b', 20), packRow('c', 'qb:c', 30)];
+      const groups = groupDownloadsByTorrent(rows);
+      expect(groups.map(group => group.representative.id)).toEqual(['a', 'b', 'c']);
+      expect(groups.every(group => group.rows.length === 1 && group.rows[0] === group.representative)).toBe(true);
+    });
   });
 });

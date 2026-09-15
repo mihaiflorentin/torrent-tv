@@ -188,9 +188,10 @@ export function useTVNavigation(options: {
       if (!element) return;
       revealElement(element);
       const key = element.dataset.focusKey;
-      if (key) latest.current.onFocusKey?.(key);
+      if (key) { lastFocusKey = key; latest.current.onFocusKey?.(key); }
     };
     let backStarted = 0; let backTimer = 0;
+    let lastFocusKey: string | null = null;
     let editingElement: HTMLInputElement | HTMLTextAreaElement | null = null;
     let finishTime = 0;
     const finishEditing = () => {
@@ -251,7 +252,12 @@ export function useTVNavigation(options: {
       if (action === 'ime-done' || action === 'ime-cancel') return;
       event.preventDefault();
       const elements = visibleFocusables();
-      const current = active instanceof HTMLElement && elements.includes(active) ? active : latest.current.getInitialFocus();
+      // DOM churn (polling re-renders, dialogs) can blur the active element.
+      // Return to where the user was — the last focused key — before falling
+      // back to the screen's initial element, or a D-pad press appears to
+      // teleport to the top of the page.
+      const remembered = lastFocusKey ? elements.find(element => element.dataset.focusKey === lastFocusKey) || null : null;
+      const current = active instanceof HTMLElement && elements.includes(active) ? active : remembered || latest.current.getInitialFocus();
       if (!current) return;
       if (latest.current.onDirection?.(action, current)) return;
       const structured = Boolean(current.dataset.focusRegion && current.dataset.focusRow !== undefined && current.dataset.focusCol !== undefined);

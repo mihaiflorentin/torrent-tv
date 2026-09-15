@@ -154,7 +154,7 @@ type CatalogMetadata struct {
 }
 
 var (
-	episodeRE    = regexp.MustCompile(`(?i)(?:^|[ ._\-])S(\d{1,2})E(\d{1,3})(?:[ ._\-]|$)`)
+	episodeRE    = regexp.MustCompile(`(?i)(?:^|[ ._\-])S(\d{1,2})[ ._\-]?E(\d{1,3})(?:[ ._\-]|$)`)
 	episodeAltRE = regexp.MustCompile(`(?i)(?:^|[ ._\-])(\d{1,2})x(\d{1,3})(?:[ ._\-]|$)`)
 	seasonRE     = regexp.MustCompile(`(?i)(?:^|[ ._\-])S(\d{1,2})(?:\s*[-–]\s*S(\d{1,2}))?(?:[ ._\-]|$)`)
 	seasonWordRE = regexp.MustCompile(`(?i)(?:^|[ ._\-])(?:season|sezonul)\s*(\d{1,2})(?:\s*[-–]\s*(?:season|sezonul)?\s*(\d{1,2}))?(?:[ ._\-\[]|$)`)
