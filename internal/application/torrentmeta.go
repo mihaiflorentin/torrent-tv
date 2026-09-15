@@ -55,6 +55,45 @@ func (s *Service) releaseMetainfo(ctx context.Context, release domain.TorrentRel
 	return data, nil
 }
 
+// warmTorrentManifest caches the metainfo file list for a multi-file
+// release. warmed=false means the tracker could only offer a magnet:
+// resolving it requires an engine metadata exchange (up to 90s each),
+// which the warmup must not pay per release — a downloaded pack
+// expands through the engine file list instead.
+func (s *Service) warmTorrentManifest(ctx context.Context, release domain.TorrentRelease) (bool, error) {
+	if cached, err := s.repo.GetTorrentManifest(ctx, release.ID); err == nil && (len(cached.Files) > 0 || len(cached.Metainfo) > 0) {
+		return true, nil
+	} else if err != nil && err != sql.ErrNoRows {
+		return false, err
+	}
+	tracker, err := s.trackers.RequireEligible(release.TrackerID)
+	if err != nil {
+		return false, err
+	}
+	providerID := release.ProviderID
+	if providerID == "" {
+		providerID = release.ID
+	}
+	acquisition, err := tracker.Acquire(ctx, providerID)
+	if err != nil {
+		return false, err
+	}
+	if acquisition.Magnet != "" {
+		return false, nil
+	}
+	if err := acquisition.Validate(); err != nil {
+		return false, err
+	}
+	manifest, err := parseTorrentManifest(release.ID, acquisition.Metainfo)
+	if err != nil {
+		return false, err
+	}
+	if err := s.repo.SaveTorrentManifest(ctx, manifest); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func parseTorrentManifest(releaseID string, data []byte) (domain.TorrentManifest, error) {
 	if len(data) == 0 || len(data) >= 16<<20 {
 		return domain.TorrentManifest{}, fmt.Errorf("torrent metadata is empty or too large")

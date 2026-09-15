@@ -148,6 +148,7 @@ type CatalogMetadata struct {
 	Rating         float64   `json:"rating,omitempty"`
 	RatingVotes    int       `json:"ratingVotes,omitempty"`
 	RatingProvider string    `json:"ratingProvider,omitempty"`
+	Year           int       `json:"year,omitempty"`
 	FetchedAt      time.Time `json:"fetchedAt"`
 	ExpiresAt      time.Time `json:"expiresAt"`
 	LastError      string    `json:"-"`

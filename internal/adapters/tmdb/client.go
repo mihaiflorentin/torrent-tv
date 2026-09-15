@@ -34,6 +34,7 @@ type findResult struct {
 		BackdropPath  string  `json:"backdrop_path"`
 		VoteAverage   float64 `json:"vote_average"`
 		VoteCount     int     `json:"vote_count"`
+		ReleaseDate   string  `json:"release_date"`
 	} `json:"movie_results"`
 	TVResults []struct {
 		ID           int64   `json:"id"`
@@ -44,6 +45,7 @@ type findResult struct {
 		BackdropPath string  `json:"backdrop_path"`
 		VoteAverage  float64 `json:"vote_average"`
 		VoteCount    int     `json:"vote_count"`
+		FirstAirDate string  `json:"first_air_date"`
 	} `json:"tv_results"`
 	TVEpisodeResults []struct {
 		ID     int64  `json:"id"`
@@ -150,12 +152,23 @@ func selectResult(result findResult, kind domain.MediaKind, language string) dom
 
 func tvMetadata(result findResult, language string) domain.CatalogMetadata {
 	x := result.TVResults[0]
-	return domain.CatalogMetadata{ProviderID: strconv.FormatInt(x.ID, 10), Title: x.Name, OriginalTitle: x.OriginalName, Overview: x.Overview, PosterPath: x.PosterPath, BackdropPath: x.BackdropPath, Language: language, Rating: x.VoteAverage, RatingVotes: x.VoteCount, RatingProvider: "tmdb"}
+	return domain.CatalogMetadata{ProviderID: strconv.FormatInt(x.ID, 10), Title: x.Name, OriginalTitle: x.OriginalName, Overview: x.Overview, PosterPath: x.PosterPath, BackdropPath: x.BackdropPath, Language: language, Rating: x.VoteAverage, RatingVotes: x.VoteCount, RatingProvider: "tmdb", Year: yearFromDate(x.FirstAirDate)}
 }
 
 func movieMetadata(result findResult, language string) domain.CatalogMetadata {
 	x := result.MovieResults[0]
-	return domain.CatalogMetadata{ProviderID: strconv.FormatInt(x.ID, 10), Title: x.Title, OriginalTitle: x.OriginalTitle, Overview: x.Overview, PosterPath: x.PosterPath, BackdropPath: x.BackdropPath, Language: language, Rating: x.VoteAverage, RatingVotes: x.VoteCount, RatingProvider: "tmdb"}
+	return domain.CatalogMetadata{ProviderID: strconv.FormatInt(x.ID, 10), Title: x.Title, OriginalTitle: x.OriginalTitle, Overview: x.Overview, PosterPath: x.PosterPath, BackdropPath: x.BackdropPath, Language: language, Rating: x.VoteAverage, RatingVotes: x.VoteCount, RatingProvider: "tmdb", Year: yearFromDate(x.ReleaseDate)}
+}
+
+func yearFromDate(value string) int {
+	if len(value) < 4 {
+		return 0
+	}
+	year, err := strconv.Atoi(value[:4])
+	if err != nil {
+		return 0
+	}
+	return year
 }
 
 func (c *Client) OpenArtwork(ctx context.Context, path, kind string) (io.ReadCloser, string, error) {

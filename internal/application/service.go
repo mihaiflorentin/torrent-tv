@@ -330,7 +330,7 @@ func (s *Service) ensureMetadata(ctx context.Context, titleIDs []string, force b
 			continue
 		}
 		if !force {
-			if metadata, err := s.repo.GetCatalogMetadata(ctx, id); err == nil && metadata.ExpiresAt.After(time.Now()) && metadata.RatingVotes > 0 {
+			if metadata, err := s.repo.GetCatalogMetadata(ctx, id); err == nil && metadata.ExpiresAt.After(time.Now()) && metadata.RatingVotes > 0 && metadata.Year > 0 {
 				continue
 			}
 		}
@@ -1180,6 +1180,11 @@ func (s *Service) titleRefreshWorker() {
 	}
 }
 
+// manifestWarmupBudget bounds the title-level manifest warmup inside the
+// catalog-title-refresh job: magnet-only releases stay unexpanded rather
+// than stalling the job on per-release engine metadata exchanges.
+const manifestWarmupBudget = 3 * time.Minute
+
 // titleRefreshKeyID extracts the title id from a catalog-title-refresh job or
 // sync key. Title ids are base64url (no colon), so the id follows the last
 // colon: either "catalog-title-refresh:<tid>" or
@@ -1320,26 +1325,6 @@ func (s *Service) runTitleRefresh(request titleRefreshRequest) {
 				return
 			}
 
-			releaseIDs := make([]string, 0, len(stored))
-			for _, release := range stored {
-				releaseIDs = append(releaseIDs, release.ID)
-			}
-			projected, projErr := s.repo.CatalogTitleIDsForReleases(ctx, releaseIDs)
-			if projErr != nil {
-				s.jobLog(childJob, "warn", "torrent-manifest", "Could not resolve projected titles for manifest warmup", map[string]any{"error": projErr.Error()})
-				projected = map[string]string{}
-			}
-			for _, release := range stored {
-				if release.FileCount > 1 && projected[release.ID] == titleRefreshKeyID(refreshKey) {
-					if _, manifestErr := s.torrentManifest(ctx, release); manifestErr != nil {
-						s.jobLog(childJob, "warn", "torrent-manifest", "Could not inspect a multi-file torrent", map[string]any{"releaseId": release.ID, "release": release.Name, "error": manifestErr.Error()})
-						if errors.Is(manifestErr, context.DeadlineExceeded) || errors.Is(manifestErr, context.Canceled) {
-							break
-						}
-					}
-				}
-			}
-
 			childJob.State = "completed"
 			childJob.Progress = 1
 			childJob.UpdatedAt = time.Now().UTC()
@@ -1380,6 +1365,7 @@ func (s *Service) runTitleRefresh(request titleRefreshRequest) {
 		job.ID, job.DedupeKey = fresh.ID, fresh.DedupeKey
 	}
 	appliedTitleID := titleRefreshKeyID(job.DedupeKey)
+	s.warmTitleManifests(job, appliedTitleID)
 	job.UpdatedAt = time.Now().UTC()
 	if len(namedFailures) > 0 && successful == 0 && len(eligible) > 0 {
 		job.State = "failed"
@@ -1406,6 +1392,40 @@ func (s *Service) runTitleRefresh(request titleRefreshRequest) {
 	}
 	s.publish("job.updated", job)
 	s.publish("catalog.updated", map[string]any{"mode": "title", "titleId": appliedTitleID, "items": total, "job": job})
+}
+
+// warmTitleManifests caches metainfo file lists for every multi-file
+// release projected to the title — not just the ones in the current
+// tracker search — so season episode lists expand per file on the next
+// catalog read. Runs inside the catalog-title-refresh job.
+func (s *Service) warmTitleManifests(job domain.Job, titleID string) {
+	ctx, cancel := context.WithTimeout(s.providerContext(), manifestWarmupBudget)
+	defer cancel()
+	sources, err := s.repo.ListCatalogSourcesByTitleIDs(ctx, []string{titleID}, s.eligibleTrackerIDs())
+	if err != nil {
+		return
+	}
+	skipped := 0
+	for _, source := range sources {
+		if source.Release.FileCount <= 1 {
+			continue
+		}
+		if ctx.Err() != nil {
+			s.jobLog(job, "info", "torrent-manifest", "Manifest warmup budget exhausted; remaining releases warm on the next refresh", nil)
+			return
+		}
+		warmed, err := s.warmTorrentManifest(ctx, source.Release)
+		if err != nil {
+			s.jobLog(job, "warn", "torrent-manifest", "Could not inspect a multi-file torrent", map[string]any{"releaseId": source.Release.ID, "release": source.Release.Name, "error": err.Error()})
+			continue
+		}
+		if !warmed {
+			skipped++
+		}
+	}
+	if skipped > 0 {
+		s.jobLog(job, "info", "torrent-manifest", fmt.Sprintf("Skipped %d magnet-only releases; their episodes expand when a pack is downloaded", skipped), nil)
+	}
 }
 
 func (s *Service) TestEngine(ctx context.Context) (string, error) {

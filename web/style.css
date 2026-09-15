@@ -559,7 +559,9 @@ button {
 
 .detail-hero {
  position: relative;
- height: 420px;
+ min-height: 420px;
+ display: flex;
+ align-items: flex-end;
  overflow: hidden;
  border-radius: 18px 18px 0 0
 }
@@ -570,10 +572,16 @@ button {
  background: linear-gradient(90deg, var(--ink), #07101488 60%, transparent), linear-gradient(0deg, var(--ink), transparent 45%)
 }
 
-.detail-hero>section {
+.detail-hero>img {
  position: absolute;
- left: 45px;
- bottom: 45px;
+ inset: 0
+}
+
+.detail-hero>section {
+ position: relative;
+ z-index: 1;
+ margin-left: 45px;
+ padding-bottom: 45px;
  width: min(620px, 60%)
 }
 
@@ -1235,12 +1243,12 @@ progress {
  }
 
  .detail-hero {
-  height: 500px
+  min-height: 500px
  }
 
  .detail-hero>section {
-  left: 20px;
-  bottom: 25px;
+  margin-left: 20px;
+  padding-bottom: 25px;
   width: calc(100% - 40px)
  }
 

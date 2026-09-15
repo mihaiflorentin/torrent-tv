@@ -556,6 +556,9 @@ func applyMetadata(title *domain.CatalogTitle, metadata domain.CatalogMetadata) 
 	}
 	title.OriginalTitle, title.Overview = metadata.OriginalTitle, metadata.Overview
 	title.Rating, title.RatingVotes, title.RatingProvider = metadata.Rating, metadata.RatingVotes, metadata.RatingProvider
+	if title.Year == 0 {
+		title.Year = metadata.Year
+	}
 	if metadata.PosterPath != "" {
 		title.PosterURL = "/api/v1/artwork/" + title.ID + "/poster"
 	}
