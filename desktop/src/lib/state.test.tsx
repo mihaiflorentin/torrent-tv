@@ -39,7 +39,7 @@ const fakeBindings = vi.hoisted(() => ({
   openURL: vi.fn(),
 }));
 
-vi.mock('../bindings/github.com/mihaiflorentin88/torrent-tv/internal/gui/bindings', () => ({
+vi.mock('../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings', () => ({
   AutostartStatus: vi.fn().mockResolvedValue(false),
   DataDirInfo: vi.fn().mockResolvedValue(['', '']),
   DisableAutostart: vi.fn(),

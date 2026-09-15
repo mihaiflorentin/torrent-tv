@@ -4,7 +4,7 @@ A self-hosted Go media server with a built-in torrent engine, a responsive web a
 
 Version **0.6.0** adds the LG webOS TV client: the same shared TV application rebuilt for the webOS Chromium 53 floor and packaged as a Developer Mode IPK; physical-LG verification is tracked in [docs/WEBOS-VERIFICATION.md](docs/WEBOS-VERIFICATION.md). Version **0.3.0** added the built-in torrent engine — no qBittorrent or Docker required — first-run setup prompts, and automatic ffmpeg/ffprobe detection. Progressive HTTP Range playback from an incomplete download is server-verified; physical Samsung AVPlay verification below 100% remains pending.
 
-**[Install](docs/INSTALLATION.md)** — download a binary for Linux, Windows, or macOS from the [releases page](https://github.com/mihaiflorentin88/torrent-tv/releases) and run it. Nothing else is required to start.
+**[Install](docs/INSTALLATION.md)** — download a binary for Linux, Windows, or macOS from the [releases page](https://github.com/mihaiflorentin/torrent-tv/releases) and run it. Nothing else is required to start.
 
 ## Features
 

@@ -16,7 +16,7 @@ The server listens on `8097` (web) and `42069` (torrent peers). Both are configu
 
 ## Download
 
-Prebuilt archives for every supported platform are on the [releases page](https://github.com/mihaiflorentin88/torrent-tv/releases). Names follow one standard — `torrent-tv-<version>-<platform>[-<flavor>].<ext>` — so the filename tells you what a build is and where it runs:
+Prebuilt archives for every supported platform are on the [releases page](https://github.com/mihaiflorentin/torrent-tv/releases). Names follow one standard — `torrent-tv-<version>-<platform>[-<flavor>].<ext>` — so the filename tells you what a build is and where it runs:
 
 - **`app`** — the packaged macOS application (a `.app` bundle inside the zip).
 - **`desktop`** — desktop app + server in one archive (GUI included).
@@ -171,7 +171,7 @@ sudo systemctl restart torrent-tv
 On a new dedicated Linux server, `deploy/bootstrap-server.sh` installs packages, creates service users, verifies and installs the exact Go toolchain, builds the versioned headless server (`-tags headless`, `composition.Version` from `VERSION`), installs it under the service-owned `/var/lib/torrent-tv/bin` directory, and enables the services:
 
 ```bash
-git clone https://github.com/mihaiflorentin88/torrent-tv.git
+git clone https://github.com/mihaiflorentin/torrent-tv.git
 cd torrent-tv
 sudo sh deploy/bootstrap-server.sh --confirm-server-install --download-root=/mnt/sda1/torrent
 ```
@@ -211,7 +211,7 @@ Replace the binary and restart; settings and catalog survive. On a Raspberry Pi,
 
 The project was renamed from `filelist-streaming-service` to **Torrent TV** (`torrent-tv`). Installations of version 0.3.0 or older keep working, but they carry the old names. A one-time move brings them onto the new identity:
 
-1. **Binary and release assets.** New releases ship `torrent-tv-<version>-<platform>[-<flavor>]` archives (a `torrent-tv-<version>-samsung-tizen.wgt` and a `torrent-tv-<version>-android-tv.apk`), so the old self-updater stops finding assets — download the new archive from the [releases page](https://github.com/mihaiflorentin88/torrent-tv/releases) or redeploy with `make deploy-pi` once and upgrade in place afterwards.
+1. **Binary and release assets.** New releases ship `torrent-tv-<version>-<platform>[-<flavor>]` archives (a `torrent-tv-<version>-samsung-tizen.wgt` and a `torrent-tv-<version>-android-tv.apk`), so the old self-updater stops finding assets — download the new archive from the [releases page](https://github.com/mihaiflorentin/torrent-tv/releases) or redeploy with `make deploy-pi` once and upgrade in place afterwards.
 2. **Linux data directory.** The default data location is now `/var/lib/torrent-tv` (was `/var/lib/filelist-streaming-service` or `/var/lib/filelist-streaming`) and XDG installs move from `~/.local/share/filelist-streaming` to `~/.local/share/torrent-tv`. Stop the server, move the directory, and update any `--data-dir` pointer or systemd override.
 3. **systemd service.** The unit is now `torrent-tv.service` running as the `torrent-tv` user (`deploy/systemd/torrent-tv.service`; `make deploy-pi` installs it). Disable and remove the old `filelist-streaming.service` after the new one is up.
 4. **macOS/Windows app data.** The desktop GUI now stores its data under `Application Support/Torrent TV` (macOS) or `%APPDATA%\Torrent TV` (Windows); move the old `FileList Streaming` folder if you want to keep settings and catalog.

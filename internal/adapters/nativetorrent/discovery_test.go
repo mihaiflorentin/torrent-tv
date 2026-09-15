@@ -25,7 +25,7 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	pp "github.com/anacrolix/torrent/peer_protocol"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
 
 // --- controlled DHT node -------------------------------------------------

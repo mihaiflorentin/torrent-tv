@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/application"
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/outbound"
+	"github.com/mihaiflorentin/torrent-tv/internal/application"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/outbound"
 )
 
 type Client struct {

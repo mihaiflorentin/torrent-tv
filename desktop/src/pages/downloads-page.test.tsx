@@ -15,7 +15,7 @@ const fakeApi = vi.hoisted(() => ({
   call: vi.fn(),
 }));
 
-vi.mock('../bindings/github.com/mihaiflorentin88/torrent-tv/internal/gui/bindings', () => ({
+vi.mock('../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings', () => ({
   OpenURL: fakeBindings.openURL,
 }));
 

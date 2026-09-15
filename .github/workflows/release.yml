@@ -244,7 +244,7 @@ jobs:
         run: |
           version="$(tr -d '[:space:]' < VERSION)"
           mkdir -p staging
-          wails3 task windows:build ARCH=${{ matrix.goarch }} OUTPUT="staging/torrent-tv${{ matrix.suffix }}" GO_LDFLAGS="-s -w -X github.com/mihaiflorentin88/torrent-tv/internal/composition.Version=${version}"
+          wails3 task windows:build ARCH=${{ matrix.goarch }} OUTPUT="staging/torrent-tv${{ matrix.suffix }}" GO_LDFLAGS="-s -w -X github.com/mihaiflorentin/torrent-tv/internal/composition.Version=${version}"
       # macOS: verbatim `wails3 task darwin:build` from the Makefile build-all
       # darwin lines; the amd64 slice cross-compiles via CGO_FLAGS
       # (-arch x86_64 -mmacosx-version-min=11.0, build/darwin/Taskfile.yml).
@@ -257,7 +257,7 @@ jobs:
           clang --version | head -1
           version="$(tr -d '[:space:]' < VERSION)"
           mkdir -p staging
-          args=(darwin:build "ARCH=${{ matrix.goarch }}" "OUTPUT=staging/torrent-tv" "GO_LDFLAGS=-s -w -X github.com/mihaiflorentin88/torrent-tv/internal/composition.Version=${version}")
+          args=(darwin:build "ARCH=${{ matrix.goarch }}" "OUTPUT=staging/torrent-tv" "GO_LDFLAGS=-s -w -X github.com/mihaiflorentin/torrent-tv/internal/composition.Version=${version}")
           if [[ -n "${CGO_FLAGS_X}" ]]; then args+=("CGO_FLAGS=${CGO_FLAGS_X}"); fi
           wails3 task "${args[@]}"
       # Linux GUI: verbatim docker invocation from the Makefile build-arm64 /
@@ -287,7 +287,7 @@ jobs:
             -e CGO_ENABLED=1 -e GOOS=linux -e "GOARCH=${{ matrix.goarch }}" -e CC=gcc \
             --entrypoint go "${image}" build \
             -tags production,gtk3 -trimpath -buildvcs=false \
-            -ldflags="-s -w -X github.com/mihaiflorentin88/torrent-tv/internal/composition.Version=${version}" \
+            -ldflags="-s -w -X github.com/mihaiflorentin/torrent-tv/internal/composition.Version=${version}" \
             -o staging/torrent-tv ./cmd/server
       # Pure headless (Makefile build-all last line plus
       # build-arm64-headless / build-amd64-headless): CGO_ENABLED=0 go build,
@@ -306,7 +306,7 @@ jobs:
           mkdir -p staging
           args=(build -trimpath)
           if [[ -n "${GO_TAGS}" ]]; then args+=(-tags "${GO_TAGS}"); fi
-          args+=(-ldflags="-s -w -X github.com/mihaiflorentin88/torrent-tv/internal/composition.Version=${version}")
+          args+=(-ldflags="-s -w -X github.com/mihaiflorentin/torrent-tv/internal/composition.Version=${version}")
           args+=(-o "staging/torrent-tv${{ matrix.suffix }}" ./cmd/server)
           go "${args[@]}"
       - name: Stage release files

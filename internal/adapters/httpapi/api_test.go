@@ -20,12 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/adapters/portalclient"
-	"github.com/mihaiflorentin88/torrent-tv/internal/application"
-	"github.com/mihaiflorentin88/torrent-tv/internal/application/portal"
-	"github.com/mihaiflorentin88/torrent-tv/internal/application/updates"
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/adapters/portalclient"
+	"github.com/mihaiflorentin/torrent-tv/internal/application"
+	"github.com/mihaiflorentin/torrent-tv/internal/application/portal"
+	"github.com/mihaiflorentin/torrent-tv/internal/application/updates"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 func TestBrowserTranscodeRouteIsRegistered(t *testing.T) {
@@ -1229,7 +1229,7 @@ func newUpdatesFixture(t *testing.T, coordinator *scriptedCoordinator) *httptest
 }
 
 func TestUpdateRoutesServeCachedCurrentFreshCheckAndApplyMapping(t *testing.T) {
-	releases := "https://github.com/mihaiflorentin88/torrent-tv/releases"
+	releases := "https://github.com/mihaiflorentin/torrent-tv/releases"
 	coord := &scriptedCoordinator{
 		flushed:     make(chan struct{}),
 		current:     updates.Status{CurrentVersion: "1.2.3", ReleasesURL: releases, SelfUpdate: true},
@@ -1295,7 +1295,7 @@ func TestUpdateRoutesServeCachedCurrentFreshCheckAndApplyMapping(t *testing.T) {
 }
 
 func TestUpdateApplyFlushBarrierSurvivesLostClient(t *testing.T) {
-	releases := "https://github.com/mihaiflorentin88/torrent-tv/releases"
+	releases := "https://github.com/mihaiflorentin/torrent-tv/releases"
 
 	// A connected client: the barrier releases after the response was
 	// written, and the body completes.
@@ -1367,7 +1367,7 @@ func TestSSEEnvelopeCarriesPortalAndUpdateEvents(t *testing.T) {
 	if err := fixture.hub.Refresh(context.Background()); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
-	fixture.service.PublishEvent("updates.status", updates.Status{CurrentVersion: "1.2.3", ReleasesURL: "https://github.com/mihaiflorentin88/torrent-tv/releases"})
+	fixture.service.PublishEvent("updates.status", updates.Status{CurrentVersion: "1.2.3", ReleasesURL: "https://github.com/mihaiflorentin/torrent-tv/releases"})
 
 	res, err := http.Get(fixture.server.URL + "/api/v1/events?after=0")
 	if err != nil {

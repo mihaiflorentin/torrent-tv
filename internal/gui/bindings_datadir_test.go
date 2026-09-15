@@ -10,9 +10,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/autostart"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/datadir"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/autostart"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/datadir"
 )
 
 // relocatableBindings wires a Bindings the way the runner does, but with

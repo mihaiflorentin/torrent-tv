@@ -18,9 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/outbound"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/outbound"
 )
 
 type Service struct {

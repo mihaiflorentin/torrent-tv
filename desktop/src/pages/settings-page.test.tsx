@@ -44,7 +44,7 @@ const enabledSnapshot: PortalState = { accountsEnabled: true, adsEnabled: false,
 const disabledSnapshot: PortalState = { accountsEnabled: false, adsEnabled: false, donor: false, links: [] };
 const updateStatus: UpdateStatus = { currentVersion: '1.2.3', available: true, latest: '1.3.0', releasesUrl: 'https://example.invalid/releases', selfUpdate: true, applying: false };
 
-vi.mock('../bindings/github.com/mihaiflorentin88/torrent-tv/internal/gui/bindings', () => ({
+vi.mock('../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings', () => ({
   LoadSettings: fakeBindings.loadSettings,
   MissingRequired: fakeBindings.missingRequired,
   RestartServer: fakeBindings.restartServer,

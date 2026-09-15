@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
 
 type Tracker interface {

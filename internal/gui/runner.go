@@ -14,12 +14,12 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/composition"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/datadir"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/listenaddr"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/singleinstance"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/startupfail"
+	"github.com/mihaiflorentin/torrent-tv/internal/composition"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/datadir"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/listenaddr"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/singleinstance"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/startupfail"
 )
 
 // Run assembles and runs the Wails desktop app: data-dir resolution,

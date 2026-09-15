@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/adapters/sqlite"
-	"github.com/mihaiflorentin88/torrent-tv/internal/application"
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/adapters/sqlite"
+	"github.com/mihaiflorentin/torrent-tv/internal/application"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 // The starvation path of ADR-0004 must reach the client as a 409 problem whose

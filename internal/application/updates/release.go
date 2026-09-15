@@ -14,7 +14,7 @@ import (
 // The fixed repository every automatic update resolves against. Release
 // metadata, assets, and checksums are only trusted from these coordinates.
 const (
-	releaseOwner = "mihaiflorentin88"
+	releaseOwner = "mihaiflorentin"
 	releaseRepo  = "torrent-tv"
 	releaseHost  = "github.com"
 

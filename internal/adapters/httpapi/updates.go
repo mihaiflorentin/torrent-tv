@@ -7,7 +7,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/application/updates"
+	"github.com/mihaiflorentin/torrent-tv/internal/application/updates"
 )
 
 // Coordinator is the update surface the HTTP layer consumes: the shared

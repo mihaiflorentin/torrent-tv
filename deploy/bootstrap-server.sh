@@ -85,7 +85,7 @@ else
 	tar -C "$go_root.new" --strip-components=1 -xzf "$tmp_dir/$go_archive"
 	rm -rf -- "$go_root"
 	mv "$go_root.new" "$go_root"
-	GOCACHE="$build_root/go-cache" CGO_ENABLED=0 "$go_root/bin/go" build -trimpath -tags headless -ldflags="-s -w -X github.com/mihaiflorentin88/torrent-tv/internal/composition.Version=${version}" -o "$build_root/torrent-tv" ./cmd/server
+	GOCACHE="$build_root/go-cache" CGO_ENABLED=0 "$go_root/bin/go" build -trimpath -tags headless -ldflags="-s -w -X github.com/mihaiflorentin/torrent-tv/internal/composition.Version=${version}" -o "$build_root/torrent-tv" ./cmd/server
 fi
 
 if ! getent group qbittorrent >/dev/null 2>&1; then run groupadd --system qbittorrent; fi

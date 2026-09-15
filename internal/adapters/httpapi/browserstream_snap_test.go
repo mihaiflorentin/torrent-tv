@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
 
 // snapFixture builds a 12s synthetic MKV with keyframes every 2s and returns

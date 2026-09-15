@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
 
 // apibay serves search rows with string fields (q.php) and detail objects

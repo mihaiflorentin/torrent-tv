@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 // SchemaField describes one editable setting for the settings UI. The JSON

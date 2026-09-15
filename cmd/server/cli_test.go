@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/application/updates"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/application/updates"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 var (
@@ -188,11 +188,11 @@ type stubSource struct{}
 func (stubSource) LatestRelease(context.Context) (updates.Release, error) {
 	tag := "v0.4.0"
 	url := func(name string) string {
-		return "https://github.com/mihaiflorentin88/torrent-tv/releases/download/" + tag + "/" + name
+		return "https://github.com/mihaiflorentin/torrent-tv/releases/download/" + tag + "/" + name
 	}
 	return updates.Release{
 		Tag: tag,
-		URL: "https://github.com/mihaiflorentin88/torrent-tv/releases/tag/" + tag,
+		URL: "https://github.com/mihaiflorentin/torrent-tv/releases/tag/" + tag,
 		Assets: []updates.Asset{
 			{Name: "torrent-tv-0.4.0-macos-arm64-cli.tar.gz", URL: url("torrent-tv-0.4.0-macos-arm64-cli.tar.gz")},
 			{Name: "SHA256SUMS", URL: url("SHA256SUMS")},

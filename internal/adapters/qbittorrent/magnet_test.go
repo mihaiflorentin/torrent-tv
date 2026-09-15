@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
 
 // Fixed bencode fixture: the same info dictionary the existing client tests

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/adapters/sqlite"
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/adapters/sqlite"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 type anchorProbeStub struct {

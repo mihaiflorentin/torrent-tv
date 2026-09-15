@@ -12,7 +12,7 @@ import {
   StartServer,
   StopServer,
   Version,
-} from '../bindings/github.com/mihaiflorentin88/torrent-tv/internal/gui/bindings';
+} from '../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings';
 
 import { applyServerUpdate, checkForServerUpdate, usePortal, useServerState } from '../lib/state';
 

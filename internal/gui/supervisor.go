@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/composition"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/composition"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 // State is the server lifecycle phase the GUI renders in its status

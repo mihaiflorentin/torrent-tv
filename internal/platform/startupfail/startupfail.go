@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/datadir"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/datadir"
 )
 
 // maxLogBytes caps the startup log. Launches append; a file that grew past

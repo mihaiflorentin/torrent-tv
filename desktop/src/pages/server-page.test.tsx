@@ -26,7 +26,7 @@ const fakeBindings = vi.hoisted(() => ({
 
 // The generated bindings module exports one function per Go method; the
 // factory maps them onto the same camelCase fakes the assertions use.
-vi.mock('../bindings/github.com/mihaiflorentin88/torrent-tv/internal/gui/bindings', () => ({
+vi.mock('../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings', () => ({
   AutostartStatus: fakeBindings.autostartStatus,
   DataDirInfo: fakeBindings.dataDirInfo,
   DisableAutostart: fakeBindings.disableAutostart,

@@ -31,7 +31,7 @@ This file records constraints and invariants that must survive context resets an
 
 ## Release and repository rules
 
-- The repository is `mihaiflorentin88/torrent-tv` (renamed from `filelist-streaming-service`). Release assets follow `torrent-tv-<version>-<platform>[-<flavor>].<ext>` (desktop / headless / cli / app flavors; `torrent-tv-<version>-samsung-tizen.wgt`, `torrent-tv-<version>-android-tv.apk`); the update-feed service validates that exact payload set.
+- The repository is `mihaiflorentin/torrent-tv` (renamed from `filelist-streaming-service`, later moved from the `mihaiflorentin88` account — GitHub redirects the old coordinates). Release assets follow `torrent-tv-<version>-<platform>[-<flavor>].<ext>` (desktop / headless / cli / app flavors; `torrent-tv-<version>-samsung-tizen.wgt`, `torrent-tv-<version>-android-tv.apk`); the update-feed service validates that exact payload set.
 - Renamed-repo transition: releases tagged before the rename ship `filelist-streaming-…` assets and are therefore ineligible to the update-feed service — its reconciliation skips them and keeps the previously published notice, so the first post-rename tag is the first one the feed can publish.
 - `VERSION` is the release source of truth. It must equal the Tizen package and manifest versions; release tags use `v<VERSION>`. The Android release artifact is named from it (`torrent-tv-<VERSION>-android-tv.apk`), while the app's own `versionName`/`versionCode` live in `clients/android-tv/app/build.gradle.kts` (application id `com.torrenttv.app` is unchanged).
 - Generated web bundles, WGTs, binaries, SBOMs, certificates, runtime data, logs, editor state, and local design scratch files stay ignored.

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
 
 // Starvation path of ADR-0004: a new download must fit the Allocation. The

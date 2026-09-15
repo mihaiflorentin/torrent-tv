@@ -16,12 +16,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/application/updates"
-	"github.com/mihaiflorentin88/torrent-tv/internal/composition"
-	"github.com/mihaiflorentin88/torrent-tv/internal/gui"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/datadir"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/listenaddr"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/startupfail"
+	"github.com/mihaiflorentin/torrent-tv/internal/application/updates"
+	"github.com/mihaiflorentin/torrent-tv/internal/composition"
+	"github.com/mihaiflorentin/torrent-tv/internal/gui"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/datadir"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/listenaddr"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/startupfail"
 )
 
 // settingsPathEnv keeps its historic precedence (spec: Data directory): when

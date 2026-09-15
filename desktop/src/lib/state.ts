@@ -11,7 +11,7 @@ import {
   loadPortalSession,
   type PortalSessionStorage,
 } from '@torrent-tv/shared';
-import { OpenURL } from '../bindings/github.com/mihaiflorentin88/torrent-tv/internal/gui/bindings';
+import { OpenURL } from '../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings';
 
 export type ServerState = 'stopped' | 'starting' | 'running' | 'stopping' | 'failed';
 

@@ -322,7 +322,7 @@ func TestReleaseResolutionRejectsWrongRepository(t *testing.T) {
 			func(r *Release) {
 				for i, asset := range r.Assets {
 					if asset.Name == "SHA256SUMS" {
-						r.Assets[i].URL = "http://github.com/mihaiflorentin88/torrent-tv/releases/download/v" + testVersion + "/SHA256SUMS"
+						r.Assets[i].URL = "http://github.com/mihaiflorentin/torrent-tv/releases/download/v" + testVersion + "/SHA256SUMS"
 					}
 				}
 			},
@@ -332,7 +332,7 @@ func TestReleaseResolutionRejectsWrongRepository(t *testing.T) {
 			func(r *Release) {
 				for i, asset := range r.Assets {
 					if asset.Name == "SHA256SUMS" {
-						r.Assets[i].URL = "https://user:secret@github.com/mihaiflorentin88/torrent-tv/releases/download/v" + testVersion + "/SHA256SUMS"
+						r.Assets[i].URL = "https://user:secret@github.com/mihaiflorentin/torrent-tv/releases/download/v" + testVersion + "/SHA256SUMS"
 					}
 				}
 			},
@@ -485,7 +485,7 @@ func TestReleaseResolutionDevIdentityIsManualOnly(t *testing.T) {
 }
 
 func TestReleasePageConstantMatchesRepository(t *testing.T) {
-	if want := "https://github.com/mihaiflorentin88/torrent-tv/releases"; ReleasesURL != want {
+	if want := "https://github.com/mihaiflorentin/torrent-tv/releases"; ReleasesURL != want {
 		t.Fatalf("ReleasesURL = %q, want %q", ReleasesURL, want)
 	}
 }

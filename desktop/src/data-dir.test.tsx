@@ -19,7 +19,7 @@ const fakeBindings = vi.hoisted(() => ({
   changeDataDir: vi.fn(),
 }));
 
-vi.mock('./bindings/github.com/mihaiflorentin88/torrent-tv/internal/gui/bindings', () => ({
+vi.mock('./bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings', () => ({
   AutostartStatus: fakeBindings.autostartStatus,
   ChangeDataDir: fakeBindings.changeDataDir,
   DataDirInfo: fakeBindings.dataDirInfo,

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 // retentionKind is the persisted Job kind for storage enforcement. The

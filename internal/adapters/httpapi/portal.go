@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/application/portal"
+	"github.com/mihaiflorentin/torrent-tv/internal/application/portal"
 )
 
 // maxPromotionsCount bounds the count query value a client may request.

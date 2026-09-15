@@ -49,7 +49,7 @@ const (
 
 	// compositionPath is the package carrying the linker-injected version in
 	// release builds (-X .../internal/composition.Version=<version>).
-	compositionPath = "github.com/mihaiflorentin88/torrent-tv/internal/composition"
+	compositionPath = "github.com/mihaiflorentin/torrent-tv/internal/composition"
 )
 
 // Staging and verification failure classes. Callers classify with errors.Is.

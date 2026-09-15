@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/domain"
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
 
 type stubEngine struct {

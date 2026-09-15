@@ -1,4 +1,4 @@
-module github.com/mihaiflorentin88/torrent-tv
+module github.com/mihaiflorentin/torrent-tv
 
 go 1.26.0
 

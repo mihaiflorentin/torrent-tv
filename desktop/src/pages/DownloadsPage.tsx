@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { Download, DownloadTransferAction } from '@torrent-tv/shared';
 import { Downloads, captureDownloadAnchor, reconcileDownloads, restoreDownloadAnchor } from '@torrent-tv/web/downloads';
 import { sharedApi } from '@torrent-tv/web/shared-api';
-import { OpenURL } from '../bindings/github.com/mihaiflorentin88/torrent-tv/internal/gui/bindings';
+import { OpenURL } from '../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings';
 import { useServerState } from '../lib/state';
 
 // watchURL builds the web player's deep link for a download: Play in the

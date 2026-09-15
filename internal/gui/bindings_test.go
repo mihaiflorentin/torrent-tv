@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/adapters/httpapi"
-	"github.com/mihaiflorentin88/torrent-tv/internal/application"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/autostart"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/adapters/httpapi"
+	"github.com/mihaiflorentin/torrent-tv/internal/application"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/autostart"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 // dynamicCanStart mirrors the runner's CanStart: required settings missing is

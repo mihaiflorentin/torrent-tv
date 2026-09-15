@@ -8,7 +8,7 @@ TIZEN_WGT := clients/tizen/.build/artifacts/torrent-tv-$(TIZEN_VERSION)-samsung-
 WEBOS_VERSION ?= $(VERSION)
 WEBOS_IPK := clients/webos/.build/artifacts/torrent-tv-$(WEBOS_VERSION)-webos.ipk
 GO_CACHE ?= /tmp/torrent-tv-go-cache
-GO_LDFLAGS := -s -w -X github.com/mihaiflorentin88/torrent-tv/internal/composition.Version=$(VERSION)
+GO_LDFLAGS := -s -w -X github.com/mihaiflorentin/torrent-tv/internal/composition.Version=$(VERSION)
 
 # Desktop GUI tooling. wails3 (v3.0.0-beta.16) drives the darwin builds and
 # packaging plus icon/syso generation (Taskfiles: Taskfile.yml, build/).

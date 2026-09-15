@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mihaiflorentin88/torrent-tv/internal/composition"
-	"github.com/mihaiflorentin88/torrent-tv/internal/platform/config"
+	"github.com/mihaiflorentin/torrent-tv/internal/composition"
+	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
 // fakeApp is a controllable stand-in for composition.App. A nil serve
