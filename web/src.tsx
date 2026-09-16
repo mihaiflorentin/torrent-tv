@@ -66,9 +66,7 @@ const navGroups: { label?: string; items: NavItem[] }[] = [
 
 
 function Sidebar({ view, onView, dock }: { view: View; onView: (view: View) => void; dock?: ComponentChild }) {
-  return <aside class="sidebar"><div class="brand"><span class="brand-mark">TT</span><strong>Torrent <span>TV</span></strong></div><nav aria-label="Main navigation">{navGroups.map((group, index) => <div class="nav-group" key={index}>{group.label && <p>{group.label}</p>}{group.items.map(item => item.href
-    ? <a href={item.href} target="_blank" rel="noreferrer"><Icon name={item.icon} /><span>{item.label}</span></a>
-    : <button class={view === item.id ? 'selected' : ''} onClick={() => { if (item.id) onView(item.id) }} aria-current={view === item.id ? 'page' : undefined}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>)}</nav>{dock}</aside>;
+  return <aside class="sidebar"><div class="brand"><span class="brand-mark">TT</span><strong>Torrent <span>TV</span></strong></div><nav aria-label="Main navigation">{navGroups.map((group, index) => <div class="nav-group" key={index}>{group.label && <p>{group.label}</p>}{group.items.map(item => <button type="button" class={view === item.id ? 'selected' : ''} onClick={() => { if (item.href) { window.open(item.href, '_blank', 'noopener,noreferrer') } else if (item.id) { onView(item.id) } }} aria-current={view === item.id ? 'page' : undefined}><Icon name={item.icon} /><span>{item.label}</span></button>)}</div>)}</nav>{dock}</aside>;
 }
 
 function Artwork({ title, kind = 'poster' }: { title: CatalogTitle; kind?: 'poster' | 'backdrop' }) {

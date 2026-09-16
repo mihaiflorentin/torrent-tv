@@ -117,29 +117,22 @@ select:focus-visible {
  letter-spacing: .08em
 }
 
-.nav-group button,
-.nav-group a {
+.nav-group button {
  display: flex;
  align-items: center;
  width: 246px;
  height: 48px;
  gap: 18px;
+ padding: 10px 14px;
  border: 0;
  border-radius: 12px;
  background: transparent;
  text-align: left;
  cursor: pointer;
- color: #c7d3d8;
- text-decoration: none
+ color: #c7d3d8
 }
 
-.nav-group a:focus-visible {
- outline: 3px solid var(--teal);
- outline-offset: -3px
-}
-
-.nav-group button:hover,
-.nav-group a:hover {
+.nav-group button:hover {
  background: #ffffff0b
 }
 

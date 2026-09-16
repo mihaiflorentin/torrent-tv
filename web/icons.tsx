@@ -1,3 +1,9 @@
+// Per-icon transforms: glyphs drawn on a smaller footprint than the 24x24
+// box scale up about their center so stroke weight reads like the rest.
+const transforms: Record<string, string | undefined> = {
+  bug: 'translate(12 12) scale(1.3) translate(-12 -12)',
+};
+
 export function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     home: 'M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z',
@@ -18,5 +24,5 @@ export function Icon({ name }: { name: string }) {
     activity: 'M3 12h4l2-6 4 12 2-6h6',
     settings: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4',
   };
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={paths[name] || paths.grid} /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={paths[name] || paths.grid} transform={transforms[name]} /></svg>;
 }
