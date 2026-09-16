@@ -61,7 +61,7 @@ const navGroups: { label?: string; items: NavItem[] }[] = [
   { items: [{ id: 'home', label: 'Home', icon: 'home' }, { id: 'search', label: 'Search', icon: 'search' }] },
   { label: 'My Library', items: [{ id: 'library', label: 'Dashboard', icon: 'library' }, { id: 'continue', label: 'Continue watching', icon: 'play' }, { id: 'favorites', label: 'Favorites', icon: 'heart' }, { id: 'watched', label: 'Watched', icon: 'check' }, { id: 'downloads', label: 'Downloads', icon: 'download' }, { id: 'library-categories', label: 'Categories', icon: 'folder' }] },
   { label: 'Tracker', items: [{ id: 'tracker', label: 'Dashboard', icon: 'tracker' }, { id: 'browse', label: 'Browse', icon: 'grid' }, { id: 'categories', label: 'Categories', icon: 'folder' }] },
-  { items: [{ id: 'jobs', label: 'Jobs', icon: 'activity' }, { id: 'events', label: 'Events', icon: 'tracker' }, { id: 'projects', label: 'Projects', icon: 'link' }, { label: 'Bug Report', icon: 'link', href: 'https://github.com/mihaiflorentin/torrent-tv/issues' }, { id: 'settings', label: 'Settings', icon: 'settings' }] },
+  { items: [{ id: 'jobs', label: 'Jobs', icon: 'activity' }, { id: 'events', label: 'Events', icon: 'tracker' }, { id: 'projects', label: 'Projects', icon: 'link' }, { label: 'Bug Report', icon: 'bug', href: 'https://github.com/mihaiflorentin/torrent-tv/issues' }, { id: 'settings', label: 'Settings', icon: 'settings' }] },
 ];
 
 
