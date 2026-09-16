@@ -1,8 +1,8 @@
 // The Jobs view: persistent job history with search and state filters,
 // scroll-loaded pages, retry, a detail overlay with log-level filtering
-// and older-log paging, and live job.log streaming. Extracted verbatim from
-// src.tsx; API calls and the event stream follow the shared API origin so
-// the desktop GUI points them at its loopback server.
+// and older-log paging, and live job.log streaming. API calls and the
+// event stream follow the shared API origin so the desktop GUI points
+// them at its loopback server.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Job, JobLog } from '@torrent-tv/shared';
 import { Icon } from './icons';
