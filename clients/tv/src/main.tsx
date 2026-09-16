@@ -1,4 +1,4 @@
-import { Fragment, render } from 'preact';
+import { Fragment, render, type JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { API, canonicalHouseholdItems, canonicalLanguage, ControlsVisibility, subtitleRank, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, resumeSummary, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
 import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation } from './navigation';
@@ -973,11 +973,14 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
     const groupKey = `unknown-${selected.number}`;
     const groupOpen = expanded === groupKey;
     const groupRow = episodeRowBase + selected.episodes.length * 20;
-    const children = selected.unknown.flatMap((episode, episodeIndex) => {
+    // Built with forEach+push: flatMap/flat are absent from the Tizen 5.0
+    // engine floor and the pack validator rejects them.
+    const children: JSX.Element[] = [];
+    selected.unknown.forEach((episode, episodeIndex) => {
      const key = `unknown-episode-${episode.season}:${episode.number}`;
-     return episode.sources.map((source, sourceIndex) => (
-      <SourceButton key={`${key}-${sourceIndex}`} source={source} row={groupRow + 1 + episodeIndex * 2 + sourceIndex} focusKey={`${key}-${sourceIndex}`} onPlay={onPlay} />
-     ));
+     episode.sources.forEach((source, sourceIndex) => {
+      children.push(<SourceButton key={`${key}-${sourceIndex}`} source={source} row={groupRow + 1 + episodeIndex * 2 + sourceIndex} focusKey={`${key}-${sourceIndex}`} onPlay={onPlay} />);
+     });
     });
     return <article key={groupKey} class="episode-row unknown-group">
      <button class="episode-tile" aria-expanded={groupOpen} data-focus-region="content" data-focus-row={groupRow} data-focus-col="0" data-focus-key={groupKey} onClick={() => setExpanded(current => current === groupKey ? '' : groupKey)}>

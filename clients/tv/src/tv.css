@@ -1223,8 +1223,12 @@ button.primary {
 .tv-download-file {
  display: flex;
  align-items: center;
- gap: 14px;
  padding: 10px 14px
+}
+
+/* ADR-0006: flex gap is Chromium 84+; sibling margins stand in for it. */
+.tv-download-file>*+* {
+ margin-left: 14px
 }
 
 .tv-download-file+.tv-download-file {
@@ -1245,8 +1249,11 @@ button.primary {
 }
 
 .tv-download-file span {
- display: flex;
- gap: 10px
+ display: flex
+}
+
+.tv-download-file span>*+* {
+ margin-left: 10px
 }
 
 .tv-download-file button {
