@@ -873,12 +873,12 @@ function sourceActionLabel(source: CatalogSource) { return source.libraryState?.
 function SourceButton({ source, row, onPlay, focusKey }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void; focusKey?: string }) { return <button class="source-button" data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={focusKey || `source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}><span class="source-copy"><strong>{source.parsed.resolution || 'Source'}{source.parsed.hdr ? ` · ${source.parsed.hdr}` : ''}</strong><small class="source-filename">{source.filePath || source.release.name}</small><small>{source.parsed.quality || source.release.category} · {source.parsed.videoCodec || 'codec unknown'}</small><small>Tracker: {source.release.trackerName}</small></span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b><small>{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</small></span></button> }
 
 type SeasonPackAction = 'download' | 'pause' | 'resume' | 'retry' | 'delete';
-function TVSeasonPackCard({ source, season, index, open, onToggle, onAction, onDelete }: { source: CatalogSource; season: number; index: number; open: boolean; onToggle: () => void; onAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onDelete: () => void }) {
+function TVSeasonPackCard({ source, season, index, baseRow, open, onToggle, onAction, onDelete }: { source: CatalogSource; season: number; index: number; baseRow: number; open: boolean; onToggle: () => void; onAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onDelete: () => void }) {
  const state = source.libraryState; const [busy, setBusy] = useState(''); const managed = Boolean(state?.downloadId); const paused = state?.transferState === 'paused'; const complete = state?.downloadState === 'downloaded'; const error = state?.downloadState === 'error';
  const run = async (action: SeasonPackAction) => { if (busy) return; setBusy(action); try { await onAction(source, season, action) } finally { setBusy('') } };
  // Unique structured row band per pack card: shared rows collided across
  // cards, so D-pad movement crossed into sibling headers and controls.
- const row = 3 + index * 4;
+ const row = baseRow + index * 4;
  return <article class={`season-pack-card ${open ? 'expanded' : ''}`}>
   <button class="season-pack-button" data-focus-region="content" data-focus-row={row} data-focus-col={index} data-focus-key={`season-pack-${source.release.id}`} aria-expanded={open} aria-controls={`tv-pack-${source.release.id}`} onClick={onToggle} aria-label={`${source.parsed.resolution || 'Season pack'} · ${seasonPackActionLabel(state)} · ${open ? 'hide' : 'show'} controls`}>
    <span class="season-pack-copy"><strong>{source.parsed.resolution || 'Season pack'}{source.parsed.hdr ? ` · ${source.parsed.hdr}` : ''}</strong><small class="source-filename">{source.release.name}</small><small>{[source.parsed.quality, source.parsed.videoCodec, source.parsed.audio].filter(Boolean).join(' · ') || 'Source details unavailable'}</small><small>Tracker: {source.release.trackerName}</small></span>
@@ -895,11 +895,14 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
  const [deleting, setDeleting] = useState(false);
  const [refreshing, setRefreshing] = useState(false);
  const [refreshNote, setRefreshNote] = useState('');
+ const [packsOpen, setPacksOpen] = useState(false);
  const selected = detail.seasons.find(item => item.number === season);
- // Season pack cards occupy row bands 3, 7, 11, ... (4 rows each); episode
- // rows start after the last band so the bands stay disjoint for any count.
+ // The packs toggle owns row 3. Expanded pack cards occupy 4-row bands
+ // from row 4 (4 + index * 4); collapsed packs render no cards at all, so
+ // episode rows start right after the toggle and the bands stay disjoint
+ // for any pack count.
  const packCount = selected?.packSources?.length || 0;
- const episodeRowBase = 4 + packCount * 4;
+ const episodeRowBase = packsOpen && packCount > 0 ? 5 + packCount * 4 : 4;
  const firstSource = detail.sources[0] || selected?.episodes[0]?.sources[0];
  useEffect(() => { const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(timer); }, []);
  useEffect(() => { if (!pendingPack) return; const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(timer) }, [pendingPack]);
@@ -934,9 +937,11 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
    <h2>Seasons</h2>
    <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { setSeason(item.number); setExpanded(''); setExpandedPack('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
    {selected?.packSources && selected.packSources.length > 0 && <div class="season-pack-downloads">
-    <h3>Complete season versions</h3>
-    <p>Select a version to review it. Downloads start only from the button inside the expanded version.</p>
-    <div class="season-pack-grid">{selected.packSources.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected.number} index={index} open={expandedPack === source.release.id} onToggle={() => setExpandedPack(current => current === source.release.id ? '' : source.release.id)} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>
+    <button class="episode-tile packs-toggle" aria-expanded={packsOpen} data-focus-region="content" data-focus-row="3" data-focus-col="0" data-focus-key={`packs-toggle-${selected.number}`} onClick={() => setPacksOpen(current => !current)}>
+     <span><b>Complete season versions ({selected.packSources.length})</b><small>{packsOpen ? 'Select a version to review it. Downloads start only from the button inside the expanded version.' : 'Show the complete season downloads.'}</small></span>
+     <b>{packsOpen ? 'Hide' : 'Show'}</b>
+    </button>
+    {packsOpen && <div class="season-pack-grid">{selected.packSources.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected.number} index={index} baseRow={4} open={expandedPack === source.release.id} onToggle={() => setExpandedPack(current => current === source.release.id ? '' : source.release.id)} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>}
    </div>}
    {selected && selected.episodes.length === 0 ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates automatically when it is ready.</p> : selected?.episodes.map((episode, index) => {
     const key = `${episode.season}:${episode.number}`;

@@ -117,7 +117,8 @@ select:focus-visible {
  letter-spacing: .08em
 }
 
-.nav-group button {
+.nav-group button,
+.nav-group a {
  display: flex;
  align-items: center;
  width: 246px;
@@ -128,10 +129,17 @@ select:focus-visible {
  background: transparent;
  text-align: left;
  cursor: pointer;
- color: #c7d3d8
+ color: #c7d3d8;
+ text-decoration: none
 }
 
-.nav-group button:hover {
+.nav-group a:focus-visible {
+ outline: 3px solid var(--teal);
+ outline-offset: -3px
+}
+
+.nav-group button:hover,
+.nav-group a:hover {
  background: #ffffff0b
 }
 
@@ -148,6 +156,39 @@ select:focus-visible {
  height: 24px;
  border-radius: 3px;
  background: var(--teal)
+}
+
+.packs-toggle {
+ display: grid;
+ width: 100%;
+ grid-template-columns: minmax(0, 1fr) auto;
+ align-items: center;
+ gap: 12px;
+ padding: 12px 16px;
+ border: 0;
+ border-radius: 0;
+ background: transparent;
+ text-align: left;
+ cursor: pointer
+}
+
+.packs-toggle:hover {
+ background: #17262b
+}
+
+.packs-toggle:focus-visible {
+ outline: 3px solid var(--teal);
+ outline-offset: -3px
+}
+
+.packs-toggle-copy {
+ display: grid;
+ gap: 3px
+}
+
+.packs-toggle-copy small {
+ color: var(--muted);
+ font-size: .92em
 }
 
 svg {
