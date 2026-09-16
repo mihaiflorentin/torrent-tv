@@ -468,3 +468,90 @@ func TestCatalogMetadataYearRoundTrip(t *testing.T) {
 		t.Fatalf("metadata year was not updated: got %d, %v", got.Year, err)
 	}
 }
+
+func TestCatalogMetadataGenresRoundTrip(t *testing.T) {
+	r, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := r.SaveCatalogMetadata(ctx, domain.CatalogMetadata{TitleID: "t1", Provider: "tmdb", Title: "Show", Genres: []string{"Animation", "Action"}, FetchedAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.GetCatalogMetadata(ctx, "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Genres) != 2 || got.Genres[0] != "Animation" || got.Genres[1] != "Action" {
+		t.Fatalf("metadata genres were not persisted: %v", got.Genres)
+	}
+	if err := r.SaveCatalogMetadata(ctx, domain.CatalogMetadata{TitleID: "t1", Provider: "tmdb", Title: "Show", Genres: []string{"Drama"}, FetchedAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err = r.GetCatalogMetadata(ctx, "t1"); err != nil || len(got.Genres) != 1 || got.Genres[0] != "Drama" {
+		t.Fatalf("metadata genres were not updated: got %v, %v", got.Genres, err)
+	}
+}
+
+func TestSeriesSeasonsRoundTripAndDelete(t *testing.T) {
+	r, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	seasons := domain.SeriesSeasons{
+		Provider:   "tmdb",
+		ProviderID: "51445",
+		Language:   "ro-RO",
+		Genres:     []string{"Animation"},
+		Seasons: []domain.SeriesSeason{{
+			Number:       2,
+			Name:         "Season 2",
+			EpisodeCount: 12,
+			Episodes:     []domain.SeriesEpisode{{Number: 1, Name: "Smoke", AirDate: "2017-04-01"}},
+		}},
+		FetchedAt: now,
+		ExpiresAt: now.Add(30 * 24 * time.Hour),
+	}
+	if err := r.SaveSeriesSeasons(ctx, seasons); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.GetSeriesSeasons(ctx, "tmdb", "51445", "ro-RO")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Provider != "tmdb" || got.ProviderID != "51445" || got.Language != "ro-RO" {
+		t.Fatalf("seasons identity not durable: %+v", got)
+	}
+	if len(got.Genres) != 1 || got.Genres[0] != "Animation" {
+		t.Fatalf("seasons genres not durable: %v", got.Genres)
+	}
+	if len(got.Seasons) != 1 || got.Seasons[0].Number != 2 || got.Seasons[0].EpisodeCount != 12 || len(got.Seasons[0].Episodes) != 1 {
+		t.Fatalf("season structure not durable: %+v", got.Seasons)
+	}
+	if got.Seasons[0].Episodes[0].Name != "Smoke" || got.Seasons[0].Episodes[0].AirDate != "2017-04-01" {
+		t.Fatalf("episode detail not durable: %+v", got.Seasons[0].Episodes[0])
+	}
+	if !got.ExpiresAt.After(now) {
+		t.Fatalf("expiry not durable: %+v", got)
+	}
+	if err := r.SaveSeriesSeasons(ctx, domain.SeriesSeasons{Provider: "tmdb", ProviderID: "51445", Language: "ro-RO", Seasons: []domain.SeriesSeason{}, FetchedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err = r.GetSeriesSeasons(ctx, "tmdb", "51445", "ro-RO"); err != nil || len(got.Seasons) != 0 {
+		t.Fatalf("seasons were not replaced: got %d seasons, %v", len(got.Seasons), err)
+	}
+	if err := r.DeleteSeriesSeasons(ctx, "tmdb", "51445", "ro-RO"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.GetSeriesSeasons(ctx, "tmdb", "51445", "ro-RO"); err == nil {
+		t.Fatal("deleted seasons must read back as no rows")
+	}
+	if err := r.DeleteSeriesSeasons(ctx, "tmdb", "missing", "ro-RO"); err != nil {
+		t.Fatalf("deleting an absent row must be a no-op, got %v", err)
+	}
+}

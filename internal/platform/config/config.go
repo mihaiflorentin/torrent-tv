@@ -57,6 +57,7 @@ type Settings struct {
 	FallbackSubtitleLanguage   string   `json:"fallbackSubtitleLanguage"`
 	PreferredAudioLanguage     string   `json:"preferredAudioLanguage"`
 	TMDBAPIKey                 string   `json:"tmdbApiKey,omitempty"`
+	MetadataProviders          []string `json:"metadataProviders"`
 	MetadataLanguage           string   `json:"metadataLanguage"`
 	MetadataFallbackLanguage   string   `json:"metadataFallbackLanguage"`
 	ArtworkCachePath           string   `json:"artworkCachePath"`
@@ -83,7 +84,8 @@ func Defaults() Settings {
 		InitialBufferBytes: 128 << 20, ReadAheadBytes: 256 << 20, PieceWaitTimeoutSeconds: 600, StreamStartBytes: 2 << 20, CatalogMaxAgeHours: 24,
 		AllocationGB: 15, ReserveGB: 8, EvictionRules: []string{"oldest-completed"}, ProtectIncomplete: true, ProtectLeased: true, PreferredSubtitleLanguage: "ro", FallbackSubtitleLanguage: "en", PreferredAudioLanguage: "en",
 		MetadataLanguage: "ro-RO", MetadataFallbackLanguage: "en-US", ArtworkCachePath: "data/artwork", ArtworkCacheMaxBytes: 512 << 20,
-		SubDLURL: "https://api.subdl.com", MaxConcurrentJobs: 10, TitleRefreshTimeoutMinutes: 30,
+		MetadataProviders: []string{"tmdb", "tvmaze", "jikan"},
+		SubDLURL:          "https://api.subdl.com", MaxConcurrentJobs: 10, TitleRefreshTimeoutMinutes: 30,
 		SubtitleCachePath: "data/subtitles", SubtitleCacheMaxBytes: 256 << 20,
 		FFprobePath: "/usr/bin/ffprobe", FFmpegPath: "/usr/bin/ffmpeg",
 		WatchedThresholdPercent: 90,
@@ -141,6 +143,9 @@ func LoadAt(path string) (*Store, error) {
 		}
 		if _, ok := present["evictionRules"]; !ok {
 			base.EvictionRules = []string{"oldest-completed"}
+		}
+		if _, ok := present["metadataProviders"]; !ok {
+			base.MetadataProviders = []string{"tmdb", "tvmaze", "jikan"}
 		}
 		if _, ok := present["protectIncomplete"]; !ok {
 			base.ProtectIncomplete = true
@@ -266,6 +271,7 @@ func (s *Store) Save(next Settings) error {
 	defer s.mu.Unlock()
 	mergeSecrets(&next, s.value)
 	persisted := next
+	persisted.MetadataProviders = NormalizeMetadataProviders(persisted.MetadataProviders)
 	restoreManagedFields(&persisted, s.base, s.envManaged)
 	effective := persisted
 	managed, err := applyEnvironment(&effective)
@@ -410,6 +416,13 @@ func (s *Store) validate(v Settings) error {
 			return fmt.Errorf("evictionRules contains unknown rule %q; valid rules are %s", strings.TrimSpace(rule), strings.Join(EvictionRuleAtoms, ", "))
 		}
 	}
+	normalized := NormalizeMetadataProviders(v.MetadataProviders)
+	allowed := map[string]bool{"tmdb": true, "tvmaze": true, "jikan": true}
+	for _, provider := range normalized {
+		if !allowed[provider] {
+			return fmt.Errorf("metadataProviders contains unknown provider %q; valid providers are tmdb, tvmaze, jikan", provider)
+		}
+	}
 	return nil
 }
 
@@ -443,6 +456,22 @@ func NormalizeEvictionRules(rules []string) []string {
 	}
 	if len(out) == 0 {
 		return []string{EvictionRuleAtoms[0]}
+	}
+	return out
+}
+
+// NormalizeMetadataProviders trims and lowercases the configured provider
+// list, drops blanks, and dedupes preserving order; an empty list is honored
+// and means no metadata provider is used. Unknown ids pass through:
+// validation rejects them at every boundary that can persist settings.
+func NormalizeMetadataProviders(providers []string) []string {
+	out := make([]string, 0, len(providers))
+	seen := make(map[string]bool, len(providers))
+	for _, provider := range providers {
+		if id := strings.ToLower(strings.TrimSpace(provider)); id != "" && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
 	}
 	return out
 }

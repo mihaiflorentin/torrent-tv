@@ -70,8 +70,9 @@ type SubtitleProvider interface {
 	Download(context.Context, string) (SubtitleDownload, error)
 }
 type MetadataProvider interface {
-	Lookup(context.Context, string, domain.MediaKind, string, string) (domain.CatalogMetadata, error)
-	OpenArtwork(context.Context, string, string) (io.ReadCloser, string, error)
+	Lookup(ctx context.Context, imdbID, title string, kind domain.MediaKind, language, fallback string) (domain.CatalogMetadata, error)
+	SeriesSeasons(ctx context.Context, provider, providerID, language string) (domain.SeriesSeasons, error)
+	OpenArtwork(ctx context.Context, path, kind string) (io.ReadCloser, string, error)
 }
 type MediaProbe interface {
 	ProbeMedia(context.Context, string) (domain.MediaInfo, error)
@@ -89,6 +90,9 @@ type Repository interface {
 	CatalogFacets(context.Context, []string) (domain.CatalogFacets, error)
 	SaveCatalogMetadata(context.Context, domain.CatalogMetadata) error
 	GetCatalogMetadata(context.Context, string) (domain.CatalogMetadata, error)
+	SaveSeriesSeasons(context.Context, domain.SeriesSeasons) error
+	GetSeriesSeasons(context.Context, string, string, string) (domain.SeriesSeasons, error)
+	DeleteSeriesSeasons(context.Context, string, string, string) error
 	GetRelease(context.Context, string) (domain.TorrentRelease, error)
 	SyncAge(context.Context, string) (int64, error)
 	RecordSync(context.Context, string, int, error) error

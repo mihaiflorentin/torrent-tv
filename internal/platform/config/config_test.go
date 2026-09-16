@@ -525,3 +525,96 @@ func TestTrackerDefaultsAndURLValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestMetadataProvidersDefaultAndMigration(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	t.Setenv(EnvironmentPrefix+"SETTINGS_PATH", settingsPath)
+	t.Setenv(EnvironmentPrefix+"DATABASE_PATH", filepath.Join(dir, "providers.db"))
+	file := Defaults()
+	b, err := json.Marshal(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var legacy map[string]any
+	if err := json.Unmarshal(b, &legacy); err != nil {
+		t.Fatal(err)
+	}
+	delete(legacy, "metadataProviders")
+	encoded, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settingsPath, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := store.Get().MetadataProviders
+	want := []string{"tmdb", "tvmaze", "jikan"}
+	if len(got) != len(want) {
+		t.Fatalf("legacy settings file did not receive the provider default: %v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("provider default = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestNormalizeMetadataProviders(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{"nil stays empty", nil, []string{}},
+		{"empty stays empty", []string{}, []string{}},
+		{"blanks dropped", []string{"  ", ""}, []string{}},
+		{"trims and lowercases", []string{" TVMaze ", "Jikan"}, []string{"tvmaze", "jikan"}},
+		{"dedupes preserving order", []string{"jikan", "tmdb", "JIKAN"}, []string{"jikan", "tmdb"}},
+	} {
+		got := NormalizeMetadataProviders(tt.input)
+		if len(got) != len(tt.want) {
+			t.Errorf("%s: NormalizeMetadataProviders = %v, want %v", tt.name, got, tt.want)
+			continue
+		}
+		for i := range tt.want {
+			if got[i] != tt.want[i] {
+				t.Errorf("%s: NormalizeMetadataProviders = %v, want %v", tt.name, got, tt.want)
+				break
+			}
+		}
+	}
+}
+
+func TestMetadataProvidersValidation(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	t.Setenv(EnvironmentPrefix+"SETTINGS_PATH", settingsPath)
+	t.Setenv(EnvironmentPrefix+"DATABASE_PATH", filepath.Join(dir, "providers.db"))
+	store, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := store.Get()
+	next.MetadataProviders = []string{"tmdb", "shinycatalog"}
+	if err := store.Save(next); err == nil {
+		t.Fatal("an unknown provider id was accepted")
+	} else if !strings.Contains(err.Error(), "metadataProviders") || !strings.Contains(err.Error(), "shinycatalog") {
+		t.Fatalf("rejection does not name the setting and the unknown id: %v", err)
+	}
+	next.MetadataProviders = []string{" TVMaze ", "tmdb", "tvmaze"}
+	if err := store.Save(next); err != nil {
+		t.Fatalf("sloppy provider casing was rejected: %v", err)
+	}
+	if got := store.Get().MetadataProviders; len(got) != 2 || got[0] != "tvmaze" || got[1] != "tmdb" {
+		t.Fatalf("saved providers were not normalized and deduped: %v", got)
+	}
+	next.MetadataProviders = []string{}
+	if err := store.Save(next); err != nil {
+		t.Fatalf("an empty provider list must stay saveable: %v", err)
+	}
+}

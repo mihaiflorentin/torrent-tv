@@ -17,6 +17,12 @@ import (
 	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
 
+// seasonEpisodeKey pairs the parsed season and episode numbers that group detail
+// sources before provider alignment.
+type seasonEpisodeKey struct {
+	season, episode int
+}
+
 func (s *Service) CatalogTitles(ctx context.Context, q domain.CatalogQuery) (domain.Page[domain.CatalogTitle], error) {
 	if len(q.TrackerIDs) == 0 {
 		q.TrackerIDs = s.eligibleTrackerIDs()
@@ -98,13 +104,12 @@ func (s *Service) CatalogDetail(ctx context.Context, id string) (domain.CatalogD
 		s.applyCatalogState(ctx, &detail)
 		return detail, nil
 	}
-	type episodeKey struct{ season, episode int }
-	episodes := map[episodeKey][]domain.CatalogSource{}
+	episodes := map[seasonEpisodeKey][]domain.CatalogSource{}
 	seasonPacks := map[int][]domain.CatalogSource{}
 	for _, source := range allSources {
 		p := source.Parsed
 		if p.EpisodeStart > 0 {
-			key := episodeKey{p.SeasonStart, p.EpisodeStart}
+			key := seasonEpisodeKey{p.SeasonStart, p.EpisodeStart}
 			episodes[key] = append(episodes[key], source)
 			continue
 		}
@@ -115,7 +120,7 @@ func (s *Service) CatalogDetail(ctx context.Context, id string) (domain.CatalogD
 						continue
 					}
 					if virtual, ok := episodeSource(source, file); ok {
-						key := episodeKey{virtual.Parsed.SeasonStart, virtual.Parsed.EpisodeStart}
+						key := seasonEpisodeKey{virtual.Parsed.SeasonStart, virtual.Parsed.EpisodeStart}
 						episodes[key] = append(episodes[key], virtual)
 					}
 				}
@@ -129,6 +134,173 @@ func (s *Service) CatalogDetail(ctx context.Context, id string) (domain.CatalogD
 			seasonPacks[season] = append(seasonPacks[season], source)
 		}
 	}
+	var providerSeasons *domain.SeriesSeasons
+	if title.Kind == domain.MediaSeries && s.metadata != nil {
+		if metadata, err := s.repo.GetCatalogMetadata(ctx, title.ID); err == nil && metadata.Provider != "" && metadata.ProviderID != "" {
+			if seasons, err := s.seriesSeasons(ctx, metadata.Provider, metadata.ProviderID); err == nil {
+				providerSeasons = &seasons
+			}
+		}
+	}
+	detail.Seasons = buildSeasons(episodes, seasonPacks, providerSeasons)
+	s.applyCatalogState(ctx, &detail)
+	return detail, nil
+}
+
+// seriesSeasons returns the provider canonical structure for a title's
+// matched provider id: served from the persisted cache while fresh, otherwise
+// fetched and cached; provider failures are negatively cached for ten
+// minutes so catalog reads do not hammer a struggling provider.
+func (s *Service) seriesSeasons(ctx context.Context, provider, providerID string) (domain.SeriesSeasons, error) {
+	language := s.settings.Get().MetadataLanguage
+	if cached, err := s.repo.GetSeriesSeasons(ctx, provider, providerID, language); err == nil && cached.ExpiresAt.After(time.Now()) && len(cached.Seasons) > 0 {
+		return cached, nil
+	}
+	seasons, err := s.metadata.SeriesSeasons(ctx, provider, providerID, language)
+	if err != nil {
+		now := time.Now().UTC()
+		_ = s.repo.SaveSeriesSeasons(ctx, domain.SeriesSeasons{Provider: provider, ProviderID: providerID, Language: language, FetchedAt: now, ExpiresAt: now.Add(10 * time.Minute)})
+		return domain.SeriesSeasons{}, err
+	}
+	now := time.Now().UTC()
+	if seasons.FetchedAt.IsZero() {
+		seasons.FetchedAt = now
+	}
+	if !seasons.ExpiresAt.After(seasons.FetchedAt) {
+		seasons.ExpiresAt = seasons.FetchedAt.Add(30 * 24 * time.Hour)
+	}
+	if seasons.Provider == "" {
+		seasons.Provider = provider
+	}
+	if seasons.ProviderID == "" {
+		seasons.ProviderID = providerID
+	}
+	seasons.Language = language
+	_ = s.repo.SaveSeriesSeasons(ctx, seasons)
+	return seasons, nil
+}
+
+// buildSeasons projects parsed sources onto the provider canonical structure
+// when one exists: files align to provider-relative numbers and names, and
+// files fitting no provider episode land in a per-season unknown group.
+// Without provider data the torrent-only rendering is kept verbatim.
+func buildSeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPacks map[int][]domain.CatalogSource, providerSeasons *domain.SeriesSeasons) []domain.CatalogSeason {
+	if providerSeasons == nil {
+		return buildTorrentOnlySeasons(episodes, seasonPacks)
+	}
+	seasonByNumber := make(map[int]domain.SeriesSeason, len(providerSeasons.Seasons))
+	offsets := make(map[int]int, len(providerSeasons.Seasons))
+	total := 0
+	for _, season := range providerSeasons.Seasons {
+		if season.Number >= 1 {
+			offsets[season.Number] = total
+			total += season.EpisodeCount
+		}
+		seasonByNumber[season.Number] = season
+	}
+	// align resolves the provider season and provider-relative episode for a
+	// parsed (season, number) pair: first the claimed season's own window,
+	// then the absolute numbering window across ordered seasons.
+	align := func(seasonNumber, n int) (int, int, bool) {
+		if entry, known := seasonByNumber[seasonNumber]; known && n >= 1 && n <= entry.EpisodeCount {
+			return seasonNumber, n, true
+		}
+		for _, season := range providerSeasons.Seasons {
+			if season.Number >= 1 && n > offsets[season.Number] && n <= offsets[season.Number]+season.EpisodeCount {
+				return season.Number, n - offsets[season.Number], true
+			}
+		}
+		return 0, 0, false
+	}
+
+	aligned := map[int]map[int][]domain.CatalogSource{}
+	unknown := map[int][]domain.CatalogEpisode{}
+	seasonNumbers := map[int]bool{}
+	for key, sources := range episodes {
+		claimed := key.season
+		seasonNumbers[claimed] = true
+		if seasonNumber, episodeNumber, ok := align(claimed, key.episode); ok {
+			if aligned[seasonNumber] == nil {
+				aligned[seasonNumber] = map[int][]domain.CatalogSource{}
+			}
+			aligned[seasonNumber][episodeNumber] = append(aligned[seasonNumber][episodeNumber], sources...)
+			seasonNumbers[seasonNumber] = true
+			continue
+		}
+		name := sources[0].Parsed.EpisodeTitle
+		if name == "" {
+			name = fmt.Sprintf("Episode %d", key.episode)
+		}
+		unknown[claimed] = append(unknown[claimed], domain.CatalogEpisode{Number: key.episode, Season: claimed, Title: name, SourceCount: len(sources), Sources: sources})
+	}
+	for number := range seasonPacks {
+		seasonNumbers[number] = true
+	}
+
+	numbers := make([]int, 0, len(seasonNumbers))
+	for number := range seasonNumbers {
+		numbers = append(numbers, number)
+	}
+	sort.Ints(numbers)
+	seasons := make([]domain.CatalogSeason, 0, len(numbers))
+	for _, number := range numbers {
+		season := domain.CatalogSeason{Number: number, Episodes: []domain.CatalogEpisode{}, PackSources: seasonPacks[number]}
+		if entry, known := seasonByNumber[number]; known && entry.Name != "" {
+			season.Title = entry.Name
+		} else if number == 0 {
+			season.Title = "Specials"
+		} else {
+			season.Title = fmt.Sprintf("Season %d", number)
+		}
+		names := map[int]string{}
+		if entry, known := seasonByNumber[number]; known {
+			for _, episode := range entry.Episodes {
+				if episode.Name != "" {
+					names[episode.Number] = episode.Name
+				}
+			}
+		}
+		relative := make([]int, 0, len(aligned[number]))
+		for episodeNumber := range aligned[number] {
+			relative = append(relative, episodeNumber)
+		}
+		sort.Ints(relative)
+		for _, episodeNumber := range relative {
+			items := aligned[number][episodeNumber]
+			title := names[episodeNumber]
+			if title == "" {
+				title = fmt.Sprintf("Episode %d", episodeNumber)
+			}
+			season.Episodes = append(season.Episodes, domain.CatalogEpisode{Number: episodeNumber, Season: number, Title: title, SourceCount: len(items), Sources: items})
+		}
+		season.EpisodeCount = len(season.Episodes)
+		for _, episode := range unknown[number] {
+			season.Unknown = append(season.Unknown, episode)
+		}
+		sort.Slice(season.Unknown, func(i, j int) bool {
+			if season.Unknown[i].Number != season.Unknown[j].Number {
+				return season.Unknown[i].Number < season.Unknown[j].Number
+			}
+			return firstSourcePath(season.Unknown[i]) < firstSourcePath(season.Unknown[j])
+		})
+		seasons = append(seasons, season)
+	}
+	return seasons
+}
+
+// firstSourcePath gives the unknown-group sort a deterministic tiebreak for
+// files whose parsed episode number is identical (for example "99" and
+// "99v2").
+func firstSourcePath(episode domain.CatalogEpisode) string {
+	if len(episode.Sources) == 0 {
+		return ""
+	}
+	return episode.Sources[0].FilePath
+}
+
+// buildTorrentOnlySeasons renders seasons from parsed torrent structure
+// alone, exactly as CatalogDetail did before provider alignment existed.
+func buildTorrentOnlySeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPacks map[int][]domain.CatalogSource) []domain.CatalogSeason {
 	seasonNumbers := map[int]bool{}
 	for key := range episodes {
 		seasonNumbers[key.season] = true
@@ -141,9 +313,10 @@ func (s *Service) CatalogDetail(ctx context.Context, id string) (domain.CatalogD
 		numbers = append(numbers, number)
 	}
 	sort.Ints(numbers)
+	seasons := make([]domain.CatalogSeason, 0, len(numbers))
 	for _, number := range numbers {
 		season := domain.CatalogSeason{Number: number, Title: fmt.Sprintf("Season %d", number), Episodes: []domain.CatalogEpisode{}, PackSources: seasonPacks[number]}
-		keys := []episodeKey{}
+		keys := []seasonEpisodeKey{}
 		for key := range episodes {
 			if key.season == number {
 				keys = append(keys, key)
@@ -159,10 +332,9 @@ func (s *Service) CatalogDetail(ctx context.Context, id string) (domain.CatalogD
 			season.Episodes = append(season.Episodes, domain.CatalogEpisode{Number: key.episode, Season: number, Title: name, SourceCount: len(items), Sources: items})
 		}
 		season.EpisodeCount = len(season.Episodes)
-		detail.Seasons = append(detail.Seasons, season)
+		seasons = append(seasons, season)
 	}
-	s.applyCatalogState(ctx, &detail)
-	return detail, nil
+	return seasons
 }
 
 type catalogStateIndex struct {
@@ -220,7 +392,15 @@ func (s *Service) applyCatalogState(ctx context.Context, detail *domain.CatalogD
 				episode.Sources[sourceIndex].LibraryState = emptyMediaState()
 			}
 		}
+		for episodeIndex := range season.Unknown {
+			episode := &season.Unknown[episodeIndex]
+			episode.LibraryState = emptyMediaState()
+			for sourceIndex := range episode.Sources {
+				episode.Sources[sourceIndex].LibraryState = emptyMediaState()
+			}
+		}
 	}
+
 	state, err := s.catalogState(ctx)
 	if err != nil {
 		return
@@ -240,10 +420,18 @@ func (s *Service) applyCatalogState(ctx context.Context, detail *domain.CatalogD
 			}
 			episode.LibraryState = aggregateSourceState(episode.Sources)
 		}
-		for i := range season.PackSources {
-			season.PackSources[i].LibraryState = packSourceState(season.PackSources[i].Release.ID, season.Episodes)
+		for episodeIndex := range season.Unknown {
+			episode := &season.Unknown[episodeIndex]
+			for sourceIndex := range episode.Sources {
+				episode.Sources[sourceIndex].LibraryState = state.sourceState(episode.Sources[sourceIndex])
+			}
+			episode.LibraryState = aggregateSourceState(episode.Sources)
 		}
-		season.LibraryState = aggregateEpisodeState(season.Episodes)
+		all := append(append([]domain.CatalogEpisode{}, season.Episodes...), season.Unknown...)
+		for i := range season.PackSources {
+			season.PackSources[i].LibraryState = packSourceState(season.PackSources[i].Release.ID, all)
+		}
+		season.LibraryState = aggregateEpisodeState(all)
 	}
 	if detail.Title.Kind == domain.MediaMovie {
 		detail.Title.LibraryState = aggregateSourceState(detail.Sources)
@@ -555,6 +743,7 @@ func applyMetadata(title *domain.CatalogTitle, metadata domain.CatalogMetadata) 
 		title.Title = metadata.Title
 	}
 	title.OriginalTitle, title.Overview = metadata.OriginalTitle, metadata.Overview
+	title.Genres = metadata.Genres
 	title.Rating, title.RatingVotes, title.RatingProvider = metadata.Rating, metadata.RatingVotes, metadata.RatingProvider
 	if title.Year == 0 {
 		title.Year = metadata.Year

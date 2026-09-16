@@ -20,6 +20,7 @@ import (
 
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/filelist"
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/httpapi"
+	"github.com/mihaiflorentin/torrent-tv/internal/adapters/jikan"
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/mediaprobe"
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/nativetorrent"
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/piratebay"
@@ -28,6 +29,7 @@ import (
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/sqlite"
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/subtitles"
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/tmdb"
+	"github.com/mihaiflorentin/torrent-tv/internal/adapters/tvmaze"
 	"github.com/mihaiflorentin/torrent-tv/internal/application"
 	"github.com/mihaiflorentin/torrent-tv/internal/application/portal"
 	"github.com/mihaiflorentin/torrent-tv/internal/application/updates"
@@ -218,7 +220,14 @@ func assemble(settings *config.Store, log *slog.Logger) (*App, error) {
 			"error", legacyNativeErr)
 	}
 	service := application.NewService(registry, engineSet, repo, settings, subtitles.NewSubDL(settings))
-	service.SetMetadataProvider(tmdb.New(func() string { return settings.Get().TMDBAPIKey }))
+	// Priority-ordered metadata chain; the order rides the metadataProviders
+	// setting and is re-read on every lookup so edits apply without a restart.
+	providerEntries := []application.ProviderEntry{
+		{ID: "tmdb", Provider: tmdb.New(func() string { return settings.Get().TMDBAPIKey })},
+		{ID: "tvmaze", Provider: tvmaze.New()},
+		{ID: "jikan", Provider: jikan.New()},
+	}
+	service.SetMetadataProvider(application.NewMetadataChain(providerEntries, func() []string { return settings.Get().MetadataProviders }))
 	service.SetMediaProbe(mediaprobe.New(settings))
 	service.SetLogger(log)
 	service.StartScheduler()

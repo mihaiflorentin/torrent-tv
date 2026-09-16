@@ -16,12 +16,14 @@ import (
 )
 
 type Client struct {
-	apiKey func() string
-	http   *http.Client
+	apiKey    func() string
+	http      *http.Client
+	base      string
+	onRequest func(*http.Request)
 }
 
 func New(apiKey func() string) *Client {
-	return &Client{apiKey: apiKey, http: &http.Client{Timeout: 20 * time.Second}}
+	return &Client{apiKey: apiKey, http: &http.Client{Timeout: 20 * time.Second}, base: "https://api.themoviedb.org"}
 }
 
 type findResult struct {
@@ -54,7 +56,7 @@ type findResult struct {
 	} `json:"tv_episode_results"`
 }
 
-func (c *Client) Lookup(ctx context.Context, imdbID string, kind domain.MediaKind, language, fallback string) (domain.CatalogMetadata, error) {
+func (c *Client) Lookup(ctx context.Context, imdbID, title string, kind domain.MediaKind, language, fallback string) (domain.CatalogMetadata, error) {
 	if c.apiKey() == "" {
 		return domain.CatalogMetadata{}, fmt.Errorf("TMDB API key is not configured")
 	}
@@ -65,13 +67,13 @@ func (c *Client) Lookup(ctx context.Context, imdbID string, kind domain.MediaKin
 	if err != nil {
 		return domain.CatalogMetadata{}, err
 	}
-	m := selectResult(primary, kind, language)
+	m, matchedKind := selectResult(primary, kind, language)
 	if (m.Title == "" || m.Overview == "") && fallback != "" && fallback != language {
 		secondary, fallbackErr := c.find(ctx, imdbID, fallback)
 		if fallbackErr == nil {
-			other := selectResult(secondary, kind, fallback)
+			other, otherKind := selectResult(secondary, kind, fallback)
 			if m.ProviderID == "" {
-				m = other
+				m, matchedKind = other, otherKind
 			} else {
 				if m.Title == "" {
 					m.Title = other.Title
@@ -94,16 +96,35 @@ func (c *Client) Lookup(ctx context.Context, imdbID string, kind domain.MediaKin
 	if m.ProviderID == "" {
 		return domain.CatalogMetadata{}, fmt.Errorf("TMDB did not match %s (requested kind %s; movie results %d, TV results %d, episode results %d)", imdbID, kind, len(primary.MovieResults), len(primary.TVResults), len(primary.TVEpisodeResults))
 	}
+	// Genres ride a second details fetch; a failure there must not undo an
+	// otherwise valid match.
+	m.Genres = c.detailsGenres(ctx, matchedKind, m.ProviderID, language)
 	now := time.Now().UTC()
 	m.Provider, m.FetchedAt, m.ExpiresAt = "tmdb", now, now.Add(30*24*time.Hour)
 	return m, nil
 }
 
 func (c *Client) find(ctx context.Context, imdbID, language string) (findResult, error) {
+	var result findResult
+	path := "/3/find/" + url.PathEscape(imdbID) + "?external_source=imdb_id&language=" + url.QueryEscape(language)
+	if err := c.getJSON(ctx, path, &result); err != nil {
+		return findResult{}, err
+	}
+	return result, nil
+}
+
+// getJSON fetches one TMDB API path, attaching the credential the way the
+// key shape demands: v4 read-access tokens (eyJ...) ride the Authorization
+// header, legacy v3 keys ride the api_key query parameter.
+func (c *Client) getJSON(ctx context.Context, pathAndQuery string, out any) error {
 	key := c.apiKey()
-	endpoint := "https://api.themoviedb.org/3/find/" + url.PathEscape(imdbID) + "?external_source=imdb_id&language=" + url.QueryEscape(language)
+	endpoint := c.base + pathAndQuery
 	if !strings.HasPrefix(key, "eyJ") {
-		endpoint += "&api_key=" + url.QueryEscape(key)
+		separator := "?"
+		if strings.Contains(pathAndQuery, "?") {
+			separator = "&"
+		}
+		endpoint += separator + "api_key=" + url.QueryEscape(key)
 	}
 	resp, err := outbound.Do(ctx, c.http, func() (*http.Request, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -114,40 +135,60 @@ func (c *Client) find(ctx context.Context, imdbID, language string) (findResult,
 			req.Header.Set("Authorization", "Bearer "+key)
 		}
 		req.Header.Set("Accept", "application/json")
+		if c.onRequest != nil {
+			c.onRequest(req)
+		}
 		return req, nil
 	}, outbound.Policy{Provider: "TMDB", Attempts: 3, MaxInlineDelay: 15 * time.Second})
 	if err != nil {
-		return findResult{}, err
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
-		return findResult{}, fmt.Errorf("TMDB returned HTTP %d", resp.StatusCode)
+		return fmt.Errorf("TMDB returned HTTP %d", resp.StatusCode)
 	}
-	var result findResult
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&result); err != nil {
-		return findResult{}, fmt.Errorf("decode TMDB response: %w", err)
-	}
-	return result, nil
+	return json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(out)
 }
 
-func selectResult(result findResult, kind domain.MediaKind, language string) domain.CatalogMetadata {
+func (c *Client) detailsGenres(ctx context.Context, kind domain.MediaKind, providerID, language string) []string {
+	kindPath := "movie"
+	if kind == domain.MediaSeries {
+		kindPath = "tv"
+	}
+	var details struct {
+		Genres []struct {
+			Name string `json:"name"`
+		} `json:"genres"`
+	}
+	path := "/3/" + kindPath + "/" + url.PathEscape(providerID) + "?language=" + url.QueryEscape(language)
+	if err := c.getJSON(ctx, path, &details); err != nil {
+		return nil
+	}
+	genres := make([]string, 0, len(details.Genres))
+	for _, genre := range details.Genres {
+		genres = append(genres, genre.Name)
+	}
+	return genres
+}
+
+func selectResult(result findResult, kind domain.MediaKind, language string) (domain.CatalogMetadata, domain.MediaKind) {
 	if kind == domain.MediaSeries && len(result.TVResults) > 0 {
-		return tvMetadata(result, language)
+		return tvMetadata(result, language), domain.MediaSeries
 	}
 	if kind == domain.MediaMovie && len(result.MovieResults) > 0 {
-		return movieMetadata(result, language)
+		return movieMetadata(result, language), domain.MediaMovie
 	}
 	// FileList names are parsed before metadata exists, so the inferred media
 	// kind is a useful preference rather than an authority. TMDB's Find API can
 	// validly return a TV record for a release parsed as a movie (and vice
 	// versa); retaining that result is more accurate than reporting no match.
 	if len(result.TVResults) > 0 {
-		return tvMetadata(result, language)
+		return tvMetadata(result, language), domain.MediaSeries
 	}
 	if len(result.MovieResults) > 0 {
-		return movieMetadata(result, language)
+		return movieMetadata(result, language), domain.MediaMovie
 	}
-	return domain.CatalogMetadata{}
+	return domain.CatalogMetadata{}, kind
 }
 
 func tvMetadata(result findResult, language string) domain.CatalogMetadata {

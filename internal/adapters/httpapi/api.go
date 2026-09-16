@@ -371,6 +371,7 @@ func (a *API) searchTitles(w http.ResponseWriter, r *http.Request) {
 func (a *API) refreshCatalogTitle(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Query string `json:"query"`
+		Force bool   `json:"force"`
 	}
 	if r.ContentLength != 0 {
 		if err := decode(r, &input); err != nil {
@@ -386,7 +387,7 @@ func (a *API) refreshCatalogTitle(w http.ResponseWriter, r *http.Request) {
 		}
 		input.Query = detail.Title.Title
 	}
-	job, err := a.service.QueueTitleRefresh(r.Context(), r.PathValue("id"), input.Query, false)
+	job, err := a.service.QueueTitleRefresh(r.Context(), r.PathValue("id"), input.Query, input.Force)
 	if err != nil {
 		problem(w, 409, err)
 		return

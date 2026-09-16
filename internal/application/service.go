@@ -66,11 +66,15 @@ type cachedMediaInfo struct {
 type metadataRequest struct {
 	TitleID string
 	IMDbID  string
+	Title   string
 	Kind    domain.MediaKind
 }
 
 type (
-	titleRefreshRequest  struct{ TitleID, Query string }
+	titleRefreshRequest struct {
+		TitleID, Query string
+		Force          bool
+	}
 	trackerSearchRequest struct{ Query string }
 )
 
@@ -197,7 +201,7 @@ func (s *Service) runMetadataRequest(request metadataRequest) {
 	s.jobLog(job, "info", "metadata", "Metadata lookup started", map[string]any{"provider": "tmdb", "imdbId": request.IMDbID, "requestedKind": request.Kind})
 	ctx, cancel := context.WithTimeout(s.baseCtx, 30*time.Second)
 	settings := s.settings.Get()
-	metadata, err := s.metadata.Lookup(ctx, request.IMDbID, request.Kind, settings.MetadataLanguage, settings.MetadataFallbackLanguage)
+	metadata, err := s.metadata.Lookup(ctx, request.IMDbID, request.Title, request.Kind, settings.MetadataLanguage, settings.MetadataFallbackLanguage)
 	// Re-resolve before applying results: a concurrent reconciliation can
 	// merge this title mid-lookup and retarget (or coalesce away) the
 	// queued/running job's row while preserving the historical id. The
@@ -330,7 +334,10 @@ func (s *Service) ensureMetadata(ctx context.Context, titleIDs []string, force b
 			continue
 		}
 		if !force {
-			if metadata, err := s.repo.GetCatalogMetadata(ctx, id); err == nil && metadata.ExpiresAt.After(time.Now()) && metadata.RatingVotes > 0 && metadata.Year > 0 {
+			// A row is complete when its provider identity, title, and year
+			// survived the lookup; rating votes are TMDB-specific and must
+			// not force keyless providers to be re-fetched forever.
+			if metadata, err := s.repo.GetCatalogMetadata(ctx, id); err == nil && metadata.ExpiresAt.After(time.Now()) && metadata.ProviderID != "" && metadata.Title != "" && metadata.Year > 0 {
 				continue
 			}
 		}
@@ -358,7 +365,7 @@ func (s *Service) ensureMetadata(ctx context.Context, titleIDs []string, force b
 		}
 		s.jobLog(job, "info", "queue", "Metadata job queued", map[string]any{"forced": force})
 		select {
-		case s.metaQueue <- metadataRequest{TitleID: id, IMDbID: title.IMDbID, Kind: title.Kind}:
+		case s.metaQueue <- metadataRequest{TitleID: id, IMDbID: title.IMDbID, Title: title.Title, Kind: title.Kind}:
 			queued++
 		default:
 			s.pendingMu.Lock()
@@ -1152,7 +1159,7 @@ func (s *Service) QueueTitleRefresh(ctx context.Context, titleID, query string, 
 		return domain.Job{}, err
 	}
 	select {
-	case s.refreshQueue <- titleRefreshRequest{TitleID: titleID, Query: query}:
+	case s.refreshQueue <- titleRefreshRequest{TitleID: titleID, Query: query, Force: force}:
 		s.jobLog(job, "info", "queue", "Title refresh queued", map[string]any{"forced": force})
 		s.publish("job.updated", job)
 		return job, nil
@@ -1366,6 +1373,9 @@ func (s *Service) runTitleRefresh(request titleRefreshRequest) {
 	}
 	appliedTitleID := titleRefreshKeyID(job.DedupeKey)
 	s.warmTitleManifests(job, appliedTitleID)
+	if request.Force {
+		s.expireTitleSeasons(job, appliedTitleID)
+	}
 	job.UpdatedAt = time.Now().UTC()
 	if len(namedFailures) > 0 && successful == 0 && len(eligible) > 0 {
 		job.State = "failed"
@@ -1382,7 +1392,7 @@ func (s *Service) runTitleRefresh(request titleRefreshRequest) {
 			job.Error = ""
 		}
 		job.Label = fmt.Sprintf("Refreshed %s · %d releases", request.Query, total)
-		_ = s.EnsureMetadata(context.Background(), []string{appliedTitleID})
+		_ = s.ensureMetadata(context.Background(), []string{appliedTitleID}, request.Force)
 	}
 	_ = s.repo.SaveJob(context.Background(), job)
 	if job.State == "completed" {
@@ -1392,6 +1402,19 @@ func (s *Service) runTitleRefresh(request titleRefreshRequest) {
 	}
 	s.publish("job.updated", job)
 	s.publish("catalog.updated", map[string]any{"mode": "title", "titleId": appliedTitleID, "items": total, "job": job})
+}
+
+// expireTitleSeasons drops the cached provider seasons for a title so the
+// next catalog read re-fetches them from the provider chain. Runs inside a
+// forced catalog-title-refresh job.
+func (s *Service) expireTitleSeasons(job domain.Job, titleID string) {
+	metadata, err := s.repo.GetCatalogMetadata(context.Background(), titleID)
+	if err != nil || metadata.Provider == "" || metadata.ProviderID == "" {
+		return
+	}
+	if err := s.repo.DeleteSeriesSeasons(context.Background(), metadata.Provider, metadata.ProviderID, s.settings.Get().MetadataLanguage); err != nil {
+		s.jobLog(job, "warn", "metadata-seasons", "Could not expire cached provider seasons", map[string]any{"error": err.Error()})
+	}
 }
 
 // warmTitleManifests caches metainfo file lists for every multi-file
@@ -1757,13 +1780,12 @@ func (s *Service) NextEpisode(ctx context.Context, sourceID string) (*domain.Dow
 	if err != nil {
 		return nil, err
 	}
-	type episodeKey struct{ season, episode int }
-	currentKey := episodeKey{parsed.SeasonStart, parsed.EpisodeStart}
+	currentKey := seasonEpisodeKey{parsed.SeasonStart, parsed.EpisodeStart}
 	for _, season := range detail.Seasons {
 		for _, episode := range season.Episodes {
 			for _, source := range episode.Sources {
 				if source.Release.ID == current.ReleaseID && ((source.FileIndex != nil && *source.FileIndex == current.FileIndex) || (source.FileIndex == nil && release.FileCount <= 1)) {
-					currentKey = episodeKey{season.Number, episode.Number}
+					currentKey = seasonEpisodeKey{season.Number, episode.Number}
 				}
 			}
 		}
@@ -1772,10 +1794,10 @@ func (s *Service) NextEpisode(ctx context.Context, sourceID string) (*domain.Dow
 		return nil, nil
 	}
 	var candidates []domain.CatalogSource
-	nextKey := episodeKey{}
+	nextKey := seasonEpisodeKey{}
 	for _, season := range detail.Seasons {
 		for _, episode := range season.Episodes {
-			key := episodeKey{season.Number, episode.Number}
+			key := seasonEpisodeKey{season.Number, episode.Number}
 			if key.season < currentKey.season || (key.season == currentKey.season && key.episode <= currentKey.episode) {
 				continue
 			}

@@ -82,7 +82,7 @@ const TAB_GROUPS: Record<string, Array<{ title: string; note?: string; fields: S
     { title: 'Enabled trackers', note: 'Disabling a tracker hides its discovery. Existing downloads remain listed and playable.', fields: [['FileList enabled', 'fileListEnabled', 'checkbox'], ['The Pirate Bay enabled', 'pirateBayEnabled', 'checkbox']] },
     { title: 'FileList account', fields: [['FileList URL', 'fileListUrl'], ['FileList username', 'fileListUsername'], ['FileList passkey', 'fileListPasskey', 'password']] },
     { title: 'The Pirate Bay', fields: [['The Pirate Bay website URL', 'pirateBayWebsiteUrl'], ['The Pirate Bay API URL (advanced)', 'pirateBayApiUrl']] },
-    { title: 'Metadata', fields: [['TMDB API key or token', 'tmdbApiKey', 'password'], ['Metadata language', 'metadataLanguage', 'language', 'tmdb'], ['Metadata fallback language', 'metadataFallbackLanguage', 'language', 'tmdb']] },
+    { title: 'Metadata', fields: [['TMDB API key or token', 'tmdbApiKey', 'password'], ['Metadata language', 'metadataLanguage', 'language', 'tmdb'], ['Metadata fallback language', 'metadataFallbackLanguage', 'language', 'tmdb'], ['Metadata providers (priority order)', 'metadataProviders']] },
   ],
   storage: [
     { title: 'Download engine', note: 'Selection controls new acquisitions. Existing downloads keep the engine that owns them.', fields: [['Download engine', 'downloadEngine', 'engine-toggle']] },
@@ -113,7 +113,7 @@ const isConfigTab = (id: string) => Boolean(TAB_GROUPS[id]);
 // The server stores list-shaped fields as arrays; the form edits them as
 // canonical comma strings, so every dirty check and draft revert compares
 // against this form shape.
-const formValue = (key: string, value: unknown) => (key === 'trustedCidrs' || key === 'evictionRules') && Array.isArray(value) ? (value as string[]).join(', ') : value;
+const formValue = (key: string, value: unknown) => (key === 'trustedCidrs' || key === 'evictionRules' || key === 'metadataProviders') && Array.isArray(value) ? (value as string[]).join(', ') : value;
 // Display label for engine values ('native' | 'qbittorrent') in saved-vs-running feedback.
 const engineName = (v: unknown) => (v === 'native' ? 'Native' : 'qBittorrent');
 
@@ -216,6 +216,7 @@ export function Settings({ value, fields, onSaved, onError, onDirtyChange, accou
     tabFieldKeys(activeTab).forEach(key => { merged[key] = current[key] });
     if (typeof merged.trustedCidrs === 'string') merged.trustedCidrs = (merged.trustedCidrs as string).split(',').map((x: string) => x.trim()).filter(Boolean);
     if (typeof merged.evictionRules === 'string') merged.evictionRules = (merged.evictionRules as string).split(',').map((x: string) => x.trim().toLowerCase()).filter(Boolean);
+    if (typeof merged.metadataProviders === 'string') merged.metadataProviders = (merged.metadataProviders as string).split(',').map((x: string) => x.trim().toLowerCase()).filter(Boolean);
     const out = { ...merged };
     Object.keys(out).filter(k => k.endsWith('Configured') || k === 'settingsPath' || k === 'engineRunning').forEach(k => delete out[k]);
     try {

@@ -80,6 +80,7 @@ type CatalogTitle struct {
 	Rating           float64         `json:"rating,omitempty"`
 	RatingVotes      int             `json:"ratingVotes,omitempty"`
 	RatingProvider   string          `json:"ratingProvider,omitempty"`
+	Genres           []string        `json:"genres,omitempty"`
 	Sources          []CatalogSource `json:"sources,omitempty"`
 	LibraryState     MediaState      `json:"libraryState"`
 }
@@ -107,6 +108,9 @@ type CatalogSeason struct {
 	Title        string           `json:"title"`
 	EpisodeCount int              `json:"episodeCount"`
 	Episodes     []CatalogEpisode `json:"episodes"`
+	// Unknown holds playable files that fit no provider episode; nil when
+	// no provider structure is in play.
+	Unknown      []CatalogEpisode `json:"unknown,omitempty"`
 	PackSources  []CatalogSource  `json:"packSources,omitempty"`
 	LibraryState MediaState       `json:"libraryState"`
 }
@@ -149,9 +153,37 @@ type CatalogMetadata struct {
 	RatingVotes    int       `json:"ratingVotes,omitempty"`
 	RatingProvider string    `json:"ratingProvider,omitempty"`
 	Year           int       `json:"year,omitempty"`
+	Genres         []string  `json:"genres,omitempty"`
 	FetchedAt      time.Time `json:"fetchedAt"`
 	ExpiresAt      time.Time `json:"expiresAt"`
 	LastError      string    `json:"-"`
+}
+
+// SeriesSeasons is the provider canonical season/episode structure for a
+// series, cached per (provider, providerId, language).
+type SeriesSeasons struct {
+	Provider   string         `json:"provider"`
+	ProviderID string         `json:"providerId"`
+	Language   string         `json:"language"`
+	Genres     []string       `json:"genres,omitempty"`
+	Seasons    []SeriesSeason `json:"seasons"`
+	FetchedAt  time.Time      `json:"fetchedAt"`
+	ExpiresAt  time.Time      `json:"expiresAt"`
+}
+
+// SeriesSeason is one provider season with its episode list.
+type SeriesSeason struct {
+	Number       int             `json:"number"`
+	Name         string          `json:"name"`
+	EpisodeCount int             `json:"episodeCount"`
+	Episodes     []SeriesEpisode `json:"episodes"`
+}
+
+// SeriesEpisode is one provider episode entry.
+type SeriesEpisode struct {
+	Number  int    `json:"number"`
+	Name    string `json:"name"`
+	AirDate string `json:"airDate,omitempty"`
 }
 
 var (

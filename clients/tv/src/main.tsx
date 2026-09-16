@@ -870,7 +870,7 @@ function TitleCard({ api, title, row, col, focusRef, onOpen }: { api: API; title
 }
 
 function sourceActionLabel(source: CatalogSource) { return source.libraryState?.downloadState && source.libraryState.downloadState !== 'none' ? 'Play' : 'Play and download' }
-function SourceButton({ source, row, onPlay }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void }) { return <button class="source-button" data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={`source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}><span class="source-copy"><strong>{source.parsed.resolution || 'Source'}{source.parsed.hdr ? ` · ${source.parsed.hdr}` : ''}</strong><small class="source-filename">{source.filePath || source.release.name}</small><small>{source.parsed.quality || source.release.category} · {source.parsed.videoCodec || 'codec unknown'}</small><small>Tracker: {source.release.trackerName}</small></span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b><small>{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</small></span></button> }
+function SourceButton({ source, row, onPlay, focusKey }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void; focusKey?: string }) { return <button class="source-button" data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={focusKey || `source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}><span class="source-copy"><strong>{source.parsed.resolution || 'Source'}{source.parsed.hdr ? ` · ${source.parsed.hdr}` : ''}</strong><small class="source-filename">{source.filePath || source.release.name}</small><small>{source.parsed.quality || source.release.category} · {source.parsed.videoCodec || 'codec unknown'}</small><small>Tracker: {source.release.trackerName}</small></span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b><small>{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</small></span></button> }
 
 type SeasonPackAction = 'download' | 'pause' | 'resume' | 'retry' | 'delete';
 function TVSeasonPackCard({ source, season, index, open, onToggle, onAction, onDelete }: { source: CatalogSource; season: number; index: number; open: boolean; onToggle: () => void; onAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onDelete: () => void }) {
@@ -893,27 +893,43 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
  const [expandedPack, setExpandedPack] = useState('');
  const [pendingPack, setPendingPack] = useState<CatalogSource | null>(null);
  const [deleting, setDeleting] = useState(false);
+ const [refreshing, setRefreshing] = useState(false);
+ const [refreshNote, setRefreshNote] = useState('');
  const selected = detail.seasons.find(item => item.number === season);
+ // Season pack cards occupy row bands 3, 7, 11, ... (4 rows each); episode
+ // rows start after the last band so the bands stay disjoint for any count.
+ const packCount = selected?.packSources?.length || 0;
+ const episodeRowBase = 4 + packCount * 4;
  const firstSource = detail.sources[0] || selected?.episodes[0]?.sources[0];
  useEffect(() => { const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(timer); }, []);
  useEffect(() => { if (!pendingPack) return; const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(timer) }, [pendingPack]);
  useEffect(() => { if (!expanded && !expandedPack && !pendingPack) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (pendingPack && !deleting) setPendingPack(null); else if (expandedPack) setExpandedPack(''); else setExpanded('') }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [expanded, expandedPack, pendingPack, deleting]);
  const confirmDelete = async () => { if (!pendingPack || !selected || deleting) return; setDeleting(true); try { await onPackAction(pendingPack, selected.number, 'delete'); setPendingPack(null) } finally { setDeleting(false) } };
+ const refresh = async () => {
+  if (refreshing) return;
+  setRefreshing(true);
+  setRefreshNote('');
+  try { await api.refreshTitle(detail.title.id, detail.title.title, true) } catch (e) { setRefreshNote((e as Error).message) } finally { setRefreshing(false) }
+ };
  return <main class="detail-screen" style={detail.title.backdropUrl ? { backgroundImage: `linear-gradient(90deg,#090d10 5%,rgba(9,13,16,.9) 55%,rgba(9,13,16,.4)),url(${api.streamURL(detail.title.backdropUrl)})` } : undefined}>
   <button data-detail-initial data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}>Back</button>
   <div class="detail-copy">
    <h1>{detail.title.title}</h1>
    <p class="detail-meta">{detail.title.kind} · {detail.title.year || 'Year unknown'}</p>
    {detail.title.trackers && detail.title.trackers.length > 0 && <p class="detail-meta tracker-names">{detail.title.trackers.map(t => t.name).join(' · ')}</p>}
+   {detail.title.genres && detail.title.genres.length > 0 && <p class="detail-meta">{detail.title.genres.join(' · ')}</p>}
    <TVStateBadges state={detail.title.libraryState} />
    <p>{detail.title.overview || 'Choose the version that best matches your display and connection.'}</p>
    <div class="detail-actions">
     {resume ? <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onResume(resume)} aria-label={`${resumeActionLabel(resume, detail.title.kind)} at saved position`}>{resumeActionLabel(resume, detail.title.kind)}</button> : firstSource && <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onPlay(firstSource.release, firstSource.fileIndex)}>{sourceActionLabel(firstSource)}</button>}
     <button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="detail-favorite" onClick={() => onFavorite(detail.title, !favorite)}>{favorite ? 'In favorites' : 'Add to favorites'}</button>
+    <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="detail-refresh" disabled={refreshing} aria-label="Refresh data: fetches fresh series information from the metadata providers and searches all trackers again, then rebuilds the episode list." onClick={() => void refresh()}>{refreshing ? 'Refreshing…' : 'Refresh data'}</button>
    </div>
+   <p class="supporting">Refresh fetches fresh data from the metadata providers and all trackers, then rebuilds the episode list.</p>
    {resume && <small class="resume-file">{resumeSummary(resume, detail.title.kind)}</small>}
   </div>
   {message && <p class="detail-message" aria-live="polite">{message}</p>}
+  {refreshNote && <p class="detail-message" role="alert">{refreshNote}</p>}
   {detail.seasons.length > 0 && <section class="season-browser">
    <h2>Seasons</h2>
    <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { setSeason(item.number); setExpanded(''); setExpandedPack('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
@@ -925,7 +941,7 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
    {selected && selected.episodes.length === 0 ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates automatically when it is ready.</p> : selected?.episodes.map((episode, index) => {
     const key = `${episode.season}:${episode.number}`;
     const open = expanded === key;
-    const row = 10 + index * 20;
+    const row = episodeRowBase + index * 20;
     return <article key={key} class={`episode-row ${open ? 'expanded' : ''}`}>
      <button class="episode-tile" aria-expanded={open} data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={`episode-${key}`} onClick={() => setExpanded(current => current === key ? '' : key)}>
       <span><b>{episode.number ? `${episode.number}. ` : ''}{episode.title}</b><small>{episode.sourceCount} version{episode.sourceCount === 1 ? '' : 's'} · {open ? 'Hide versions' : 'Show versions'}</small></span>
@@ -934,6 +950,23 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
      {open && episode.sources.map((source, sourceIndex) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={row + 1 + sourceIndex} onPlay={onPlay} />)}
     </article>;
    })}
+   {selected && selected.unknown && selected.unknown.length > 0 && (() => {
+    const groupKey = `unknown-${selected.number}`;
+    const groupOpen = expanded === groupKey;
+    const groupRow = episodeRowBase + selected.episodes.length * 20;
+    const children = selected.unknown.flatMap((episode, episodeIndex) => {
+     const key = `unknown-episode-${episode.season}:${episode.number}`;
+     return episode.sources.map((source, sourceIndex) => (
+      <SourceButton key={`${key}-${sourceIndex}`} source={source} row={groupRow + 1 + episodeIndex * 2 + sourceIndex} focusKey={`${key}-${sourceIndex}`} onPlay={onPlay} />
+     ));
+    });
+    return <article key={groupKey} class="episode-row unknown-group">
+     <button class="episode-tile" aria-expanded={groupOpen} data-focus-region="content" data-focus-row={groupRow} data-focus-col="0" data-focus-key={groupKey} onClick={() => setExpanded(current => current === groupKey ? '' : groupKey)}>
+      <span><b>Unknown episodes ({selected.unknown.length})</b><small>Files that did not match the metadata provider · {groupOpen ? 'Hide' : 'Show'}</small></span>
+     </button>
+     {groupOpen && children}
+    </article>;
+   })()}
   </section>}
   {detail.seasons.length === 0 && <section class="source-list"><h2>Available versions</h2>{detail.sources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={2 + index} onPlay={onPlay} />)}</section>}
   {pendingPack && <section role="dialog" aria-modal="true" aria-labelledby="tv-season-pack-delete-heading" class="tv-settings tv-removal-confirm tv-season-pack-confirm"><h2 id="tv-season-pack-delete-heading">Delete season download?</h2><strong>{pendingPack.release.name}</strong><p>Tracker: {pendingPack.release.trackerName}</p><p>This removes the shared season torrent from qBittorrent and permanently deletes every episode file in it.</p><button disabled={deleting} data-focus-region="season-pack-dialog" data-focus-row="0" data-focus-col="0" data-focus-key="season-pack-delete-cancel" onClick={() => setPendingPack(null)}>Cancel</button><button disabled={deleting} class="danger-button" data-focus-region="season-pack-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="season-pack-delete-confirm" onClick={() => void confirmDelete()}>{deleting ? 'Deleting…' : 'Delete download'}</button></section>}
