@@ -343,7 +343,52 @@ button {
  gap: 14px;
  overflow-x: auto;
  padding: 5px 5px 14px;
- scrollbar-width: thin
+ scrollbar-width: none
+}
+
+.rail::-webkit-scrollbar {
+ display: none
+}
+
+.rail-wrap {
+ position: relative
+}
+
+.rail-arrow {
+ position: absolute;
+ top: 50%;
+ z-index: 2;
+ width: 34px;
+ height: 34px;
+ padding: 0;
+ border: 1px solid var(--line);
+ border-radius: 50%;
+ background: #101c24d9;
+ color: var(--text);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ cursor: pointer;
+ transform: translateY(-50%);
+ box-shadow: 0 6px 18px #0007
+}
+
+.rail-arrow:hover {
+ background: var(--panel-2);
+ border-color: var(--teal)
+}
+
+.rail-arrow.left {
+ left: 8px
+}
+
+.rail-arrow.right {
+ right: 8px
+}
+
+.rail-arrow svg {
+ width: 16px;
+ height: 16px
 }
 
 .media-card {

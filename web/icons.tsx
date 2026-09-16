@@ -23,6 +23,8 @@ export function Icon({ name }: { name: string }) {
     link: 'M3.9 7.8a5.1 5.1 0 0 1 7.2 0l2.5 2.5-1.8 1.8-2.5-2.5a2.6 2.6 0 0 0-3.6 3.6l2.5 2.5-1.8 1.8-2.5-2.5a5.1 5.1 0 0 1 0-7.2zm16.2 8.4a5.1 5.1 0 0 1-7.2 0l-2.5-2.5 1.8-1.8 2.5 2.5a2.6 2.6 0 0 0 3.6-3.6l-2.5-2.5 1.8-1.8 2.5 2.5a5.1 5.1 0 0 1 0 7.2z',
     activity: 'M3 12h4l2-6 4 12 2-6h6',
     settings: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4',
+    'chevron-left': 'm14 6-6 6 6 6',
+    'chevron-right': 'm10 6 6 6-6 6',
   };
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={paths[name] || paths.grid} transform={transforms[name]} /></svg>;
 }

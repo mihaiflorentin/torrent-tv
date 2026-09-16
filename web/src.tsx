@@ -92,13 +92,19 @@ export function Rail({ title, children, empty, landscape = false }: { title: str
   // and the render identical to the array case.
   const list = (Array.isArray(children) ? children : [children]).filter(Boolean);
   const hasRail = list.length > 0;
+  const [arrows, setArrows] = useState({ left: false, right: false });
   // A vertical wheel over an overflowing rail scrolls the rail: the dominant
   // gesture for row scrolling, which the browser otherwise spends on the page.
   // Horizontal deltas keep native behavior; a rail at either edge declines the
-  // event so the page keeps scrolling (no scroll trap).
+  // event so the page keeps scrolling (no scroll trap). The < > arrows page by
+  // a full rail width; each direction renders only while it can still move.
   useEffect(() => {
     const el = railRef.current;
     if (!el) return;
+    const sync = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setArrows({ left: el.scrollLeft > 1, right: el.scrollLeft < max - 1 });
+    };
     const onWheel = (event: WheelEvent) => {
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       const max = el.scrollWidth - el.clientWidth;
@@ -109,9 +115,23 @@ export function Rail({ title, children, empty, landscape = false }: { title: str
       event.preventDefault();
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    el.addEventListener('scroll', sync, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync);
+    observer?.observe(el);
+    sync();
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('scroll', sync);
+      observer?.disconnect();
+    };
   }, [hasRail]);
-  return <section class="rail-section"><div class="section-heading"><h2>{title}</h2></div>{!hasRail ? <p class="empty">{empty || 'Nothing here yet.'}</p> : <div ref={railRef} class={`rail ${landscape ? 'landscape' : ''}`}>{list}</div>}</section>;
+  // Paginator step: one full rail width so consecutive pages tile the list
+  // without skipped cards.
+  const page = (direction: -1 | 1) => {
+    const el = railRef.current;
+    if (el) el.scrollBy({ left: direction * el.clientWidth, behavior: 'smooth' });
+  };
+  return <section class="rail-section"><div class="section-heading"><h2>{title}</h2></div>{!hasRail ? <p class="empty">{empty || 'Nothing here yet.'}</p> : <div class="rail-wrap"><div ref={railRef} class={`rail ${landscape ? 'landscape' : ''}`}>{list}</div>{arrows.left && <button type="button" class="rail-arrow left" aria-label={`Scroll ${title} back`} onClick={() => page(-1)}><Icon name="chevron-left" /></button>}{arrows.right && <button type="button" class="rail-arrow right" aria-label={`Scroll ${title} forward`} onClick={() => page(1)}><Icon name="chevron-right" /></button>}</div>}</section>;
 }
 
 // Shared modal focus machinery: inert the page background, move focus into
