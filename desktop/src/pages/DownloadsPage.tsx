@@ -44,6 +44,7 @@ export function DownloadsPage() {
     onRefresh={() => { }}
     onPlay={d => { void OpenURL(watchURL(server.address, d.id)).catch(() => { }) }}
     onRemove={async download => { await sharedApi().deleteDownload(download.id) }}
+    onRemoveFile={async download => { await sharedApi().call(`/downloads/${encodeURIComponent(download.id)}/remove-file`, { method: 'POST' }) }}
     onAction={async (download, action: DownloadTransferAction) => { await sharedApi().call(`/downloads/${encodeURIComponent(download.id)}/${action}`, { method: 'POST' }) }}
   />;
 }

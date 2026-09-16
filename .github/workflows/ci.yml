@@ -64,6 +64,10 @@ jobs:
       # Desktop GUI suite (vitest, @torrent-tv/desktop workspace).
       - name: Desktop unit tests
         run: npm run test -w @torrent-tv/desktop
+      # vitest does not typecheck; the desktop page wiring (shared component
+      # props) broke once undetected, so gate the whole workspace here.
+      - name: Desktop typecheck
+        run: npx tsc --noEmit -p desktop
       - name: Test and build browser and TV clients
         run: npm run build
       - name: Package and validate unsigned Apps2Samsung WGT
