@@ -1,7 +1,7 @@
 // Per-icon transforms: glyphs drawn on a smaller footprint than the 24x24
 // box scale up about their center so stroke weight reads like the rest.
 const transforms: Record<string, string | undefined> = {
-  bug: 'translate(12 12) scale(1.3) translate(-12 -12)',
+  bug: 'translate(12 12) scale(1.15) translate(-12 -12)',
 };
 
 export function Icon({ name }: { name: string }) {
