@@ -1,4 +1,4 @@
-import { render, type ComponentChild } from 'preact';
+import { render, type ComponentChild, type ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { audioPlaybackRoute, buildPath, canonicalHouseholdItems, CatalogDetail, CatalogEpisode, CatalogSource, CatalogTitle, clampVolume, ControlsVisibility, clearPortalSession, Download, DownloadTransferAction, eventPayload, formatBytes, HouseholdItem, HouseholdState, languageDisplayName, LibraryCategory, loadPlayerSettings, loadPortalSession, logicalPlaybackPosition, MediaAudioTrack, MediaInfo, MediaState, canonicalLanguage, PortalSessionStorage, PortalState, PortalSync, PortalUser, subtitleRank, parsePath, PlaybackPreferences, preferredAudioTrack, reconcileDownloads, Route, resumeActionLabel, resumeForTitle, resumeSummary, savePlayerSettings, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, SubtitleWarning, TrackerStatus, UpdateStatus, View } from '@torrent-tv/shared';
 import { applyVolumeStep, fractionTarget, resolveEscape, resolveShortcut, ScrubCoalescer, seekTarget, type PlayerCommand } from './shortcuts';
@@ -86,7 +86,33 @@ function LegacyCard({ item, onOpen }: { item: HouseholdItem; onOpen: (item: Hous
 function MediaBadges({ state }: { state?: MediaState }) { if (!state?.downloadState || !state.watchState) return null; const download = state.downloadState; const watch = state.watchState; return <span class="media-badges">{download !== 'none' && <span class={`media-badge download ${download}`} title={download === 'downloaded' ? 'Downloaded' : download === 'partial' ? 'Some episodes downloaded' : download === 'error' ? 'Download needs attention' : `Downloading ${Math.round((state.progress || 0) * 100)}%`}><Icon name={download === 'downloaded' ? 'check' : 'download'} /><span>{download === 'downloaded' ? 'Downloaded' : download === 'partial' ? 'Partial' : download === 'error' ? 'Error' : `${Math.round((state.progress || 0) * 100)}%`}</span></span>}{watch !== 'unwatched' && <span class={`media-badge watch ${watch}`} title={watch === 'watched' ? 'Watched' : watch === 'partial' ? 'Some episodes watched' : 'In progress'}><Icon name="check" /><span>{watch === 'watched' ? 'Watched' : watch === 'partial' ? 'Part watched' : 'In progress'}</span></span>}</span> }
 
 
-function Rail({ title, children, empty, landscape = false }: { title: string; children: any; empty?: string; landscape?: boolean }) { const list = Array.isArray(children) ? children.filter(Boolean) : children; return <section class="rail-section"><div class="section-heading"><h2>{title}</h2></div>{(!list || list.length === 0) ? <p class="empty">{empty || 'Nothing here yet.'}</p> : <div class={`rail ${landscape ? 'landscape' : ''}`}>{list}</div>}</section> }
+export function Rail({ title, children, empty, landscape = false }: { title: string; children: ComponentChildren; empty?: string; landscape?: boolean }) {
+  const railRef = useRef<HTMLDivElement>(null);
+  // A single child arrives unwrapped; normalizing here keeps the empty check
+  // and the render identical to the array case.
+  const list = (Array.isArray(children) ? children : [children]).filter(Boolean);
+  const hasRail = list.length > 0;
+  // A vertical wheel over an overflowing rail scrolls the rail: the dominant
+  // gesture for row scrolling, which the browser otherwise spends on the page.
+  // Horizontal deltas keep native behavior; a rail at either edge declines the
+  // event so the page keeps scrolling (no scroll trap).
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 0) return;
+      const next = Math.max(0, Math.min(max, el.scrollLeft + event.deltaY));
+      if (next === el.scrollLeft) return;
+      el.scrollLeft = next;
+      event.preventDefault();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [hasRail]);
+  return <section class="rail-section"><div class="section-heading"><h2>{title}</h2></div>{!hasRail ? <p class="empty">{empty || 'Nothing here yet.'}</p> : <div ref={railRef} class={`rail ${landscape ? 'landscape' : ''}`}>{list}</div>}</section>;
+}
 
 // Shared modal focus machinery: inert the page background, move focus into
 // the surface, Tab-cycle inside it, and restore focus on teardown. Escape is
