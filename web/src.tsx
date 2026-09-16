@@ -86,13 +86,16 @@ function LegacyCard({ item, onOpen }: { item: HouseholdItem; onOpen: (item: Hous
 function MediaBadges({ state }: { state?: MediaState }) { if (!state?.downloadState || !state.watchState) return null; const download = state.downloadState; const watch = state.watchState; return <span class="media-badges">{download !== 'none' && <span class={`media-badge download ${download}`} title={download === 'downloaded' ? 'Downloaded' : download === 'partial' ? 'Some episodes downloaded' : download === 'error' ? 'Download needs attention' : `Downloading ${Math.round((state.progress || 0) * 100)}%`}><Icon name={download === 'downloaded' ? 'check' : 'download'} /><span>{download === 'downloaded' ? 'Downloaded' : download === 'partial' ? 'Partial' : download === 'error' ? 'Error' : `${Math.round((state.progress || 0) * 100)}%`}</span></span>}{watch !== 'unwatched' && <span class={`media-badge watch ${watch}`} title={watch === 'watched' ? 'Watched' : watch === 'partial' ? 'Some episodes watched' : 'In progress'}><Icon name="check" /><span>{watch === 'watched' ? 'Watched' : watch === 'partial' ? 'Part watched' : 'In progress'}</span></span>}</span> }
 
 
-export function Rail({ title, children, empty, landscape = false }: { title: string; children: ComponentChildren; empty?: string; landscape?: boolean }) {
+export function Rail({ title, children, empty, landscape = false, onNearEnd }: { title: string; children: ComponentChildren; empty?: string; landscape?: boolean; onNearEnd?: () => void }) {
   const railRef = useRef<HTMLDivElement>(null);
   // A single child arrives unwrapped; normalizing here keeps the empty check
   // and the render identical to the array case.
   const list = (Array.isArray(children) ? children : [children]).filter(Boolean);
   const hasRail = list.length > 0;
   const [arrows, setArrows] = useState({ left: false, right: false });
+  // Latest callback without re-wiring the listeners below on every render.
+  const nearEnd = useRef(onNearEnd);
+  nearEnd.current = onNearEnd;
   // A vertical wheel over an overflowing rail scrolls the rail: the dominant
   // gesture for row scrolling, which the browser otherwise spends on the page.
   // Horizontal deltas keep native behavior; a rail at either edge declines the
@@ -114,14 +117,23 @@ export function Rail({ title, children, empty, landscape = false }: { title: str
       el.scrollLeft = next;
       event.preventDefault();
     };
+    const onScroll = () => {
+      sync();
+      const load = nearEnd.current;
+      if (!load) return;
+      const max = el.scrollWidth - el.clientWidth;
+      // Within a page width of the end, ask for more content so the rail
+      // keeps paging instead of running out.
+      if (max > 0 && el.scrollLeft >= max - el.clientWidth) load();
+    };
     el.addEventListener('wheel', onWheel, { passive: false });
-    el.addEventListener('scroll', sync, { passive: true });
+    el.addEventListener('scroll', onScroll, { passive: true });
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync);
     observer?.observe(el);
     sync();
     return () => {
       el.removeEventListener('wheel', onWheel);
-      el.removeEventListener('scroll', sync);
+      el.removeEventListener('scroll', onScroll);
       observer?.disconnect();
     };
   }, [hasRail]);
@@ -763,12 +775,13 @@ export function App() {
   const pageTitle = navGroups.flatMap(g => g.items).find(i => i.id === view)?.label || 'Home';
   const continueWatching = canonicalHouseholdItems(household.continueWatching); const favorites = canonicalHouseholdItems(household.favorites); const recent = canonicalHouseholdItems(household.recent); const watched = canonicalHouseholdItems(household.watched);
   const libraryItems = view === 'continue' ? continueWatching : view === 'favorites' ? favorites : view === 'watched' ? watched : [];
+  const loadMoreTitles = () => { if (nextCursor && !loading) void loadTitles(true, nextCursor) };
   const showCatalog = ['tracker', 'browse', 'categories', 'search'].includes(view);
   return <div class="app-shell"><Sidebar view={view} onView={guardedNavigate} dock={<PortalSidebarDock snapshot={portal} client={api} identity={identity} onOpenAccount={() => setAccountOpen(true)} openExternal={openExternal} />} /><main class="content" id="content"><header class="topbar"><div><h1>{pageTitle}</h1><p>{view === 'home' ? 'Your private screening archive' : view === 'browse' ? 'Every title, grouped and ready to compare' : ''}</p></div><button class="avatar" aria-label="Household profile">H</button></header>{error && <div class="error" role="alert"><strong>Something needs attention</strong><span>{error}</span><button onClick={() => setError('')}>Dismiss</button></div>}{updateStatus?.available && <UpdateNotice status={updateStatus} controller={updates} openExternal={openExternal} />}
-    {view === 'home' && <><Hero title={hero} onOpen={openTitle} /><Rail title="Continue watching" empty="Start a movie or episode and it will appear here." landscape>{continueWatching.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail><Rail title="Recently added">{titles.slice(0, 12).map(t => <MediaCard title={t} onOpen={openTitle} />)}</Rail><Rail title="Favorites" empty="Favorite a title to keep it close." landscape>{favorites.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail></>}
+    {view === 'home' && <><Hero title={hero} onOpen={openTitle} /><Rail title="Continue watching" empty="Start a movie or episode and it will appear here." landscape>{continueWatching.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail><Rail title="Recently added" onNearEnd={loadMoreTitles}>{titles.map(t => <MediaCard title={t} onOpen={openTitle} />)}</Rail><Rail title="Favorites" empty="Favorite a title to keep it close." landscape>{favorites.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail></>}
     {view === 'library' && <><Rail title="Continue watching" landscape>{continueWatching.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail><Rail title="Recently viewed" landscape>{recent.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail><Rail title="Watched" landscape>{watched.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail></>}
     {['continue', 'favorites', 'watched'].includes(view) && <Rail title={pageTitle} empty={`No ${pageTitle.toLowerCase()} yet.`} landscape>{libraryItems.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail>}
-    {showCatalog && <><CatalogTools draftQuery={draftQuery} setDraftQuery={setDraftQuery} query={query} searching={searching} onSubmit={submitSearch} category={category} setCategory={setCategory} kind={kind} setKind={setKind} resolution={resolution} setResolution={setResolution} sort={sort} setSort={setSort} facets={facets} trackers={searchTrackers} />{updatesAvailable && <button class="catalog-update" onClick={() => void applyUpdates()}>Catalog updates available · Refresh</button>}{view === 'categories' ? <CategoryGrid categories={facets.categories} onSelect={c => { setCategory(c); navigate('browse') }} /> : view === 'tracker' ? <><Rail title="Recently added">{titles.slice(0, 12).map(t => <MediaCard title={t} onOpen={openTitle} />)}</Rail><Rail title="Strong swarms">{[...titles].sort((a, b) => b.bestSeeders - a.bestSeeders).slice(0, 12).map(t => <MediaCard title={t} onOpen={openTitle} />)}</Rail></> : <><section class="poster-grid" aria-busy={loading}>{titles.map(t => <MediaCard title={t} onOpen={openTitle} />)}</section>{loading && <section class="poster-grid">{Array.from({ length: 12 }, (_, i) => <div class="skeleton" key={i} />)}</section>}<div ref={loadMore} class="load-more" aria-hidden="true" /></>}</>}
+    {showCatalog && <><CatalogTools draftQuery={draftQuery} setDraftQuery={setDraftQuery} query={query} searching={searching} onSubmit={submitSearch} category={category} setCategory={setCategory} kind={kind} setKind={setKind} resolution={resolution} setResolution={setResolution} sort={sort} setSort={setSort} facets={facets} trackers={searchTrackers} />{updatesAvailable && <button class="catalog-update" onClick={() => void applyUpdates()}>Catalog updates available · Refresh</button>}{view === 'categories' ? <CategoryGrid categories={facets.categories} onSelect={c => { setCategory(c); navigate('browse') }} /> : view === 'tracker' ? <><Rail title="Recently added" onNearEnd={loadMoreTitles}>{titles.map(t => <MediaCard title={t} onOpen={openTitle} />)}</Rail><Rail title="Strong swarms">{[...titles].sort((a, b) => b.bestSeeders - a.bestSeeders).slice(0, 12).map(t => <MediaCard title={t} onOpen={openTitle} />)}</Rail></> : <><section class="poster-grid" aria-busy={loading}>{titles.map(t => <MediaCard title={t} onOpen={openTitle} />)}</section>{loading && <section class="poster-grid">{Array.from({ length: 12 }, (_, i) => <div class="skeleton" key={i} />)}</section>}<div ref={loadMore} class="load-more" aria-hidden="true" /></>}</>}
     {view === 'downloads' &&
       <Downloads items={downloads} onRefresh={loadDownloads} onPlay={d => void playDownload(d)} onRemove={remove} onRemoveFile={removeDownloadFile} onAction={manageDownload} />
     }

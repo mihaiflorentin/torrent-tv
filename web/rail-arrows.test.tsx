@@ -65,3 +65,26 @@ describe('Rail paginator arrows', () => {
     expect(host.querySelector('.rail-arrow')).toBeFalsy();
   });
 });
+
+describe('Rail near-end loading', () => {
+  it('requests more content once paged within a page width of the end', () => {
+    let calls = 0;
+    const host = document.createElement('div');
+    document.body.append(host);
+    act(() => { render(<Rail title="Recently added" onNearEnd={() => { calls++ }}>{[<div key="a">card</div>]}</Rail>, host) });
+    const rail = host.querySelector<HTMLElement>('.rail')!;
+    fit(rail, 4000, 1000, 500);
+    expect(calls).toBe(0);
+    fit(rail, 4000, 1000, 2400);
+    expect(calls).toBe(1);
+  });
+
+  it('does not request more content when the rail fits without overflow', () => {
+    let calls = 0;
+    const host = document.createElement('div');
+    document.body.append(host);
+    act(() => { render(<Rail title="Recently added" onNearEnd={() => { calls++ }}>{[<div key="a">card</div>]}</Rail>, host) });
+    fit(host.querySelector<HTMLElement>('.rail')!, 1000, 1000);
+    expect(calls).toBe(0);
+  });
+});
