@@ -78,7 +78,6 @@ func newRootCommand(runGUI func(guiOptions) error, runServe func(string, bool, l
 		Use:   "serve",
 		Short: "run the headless streaming server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			attachParentConsole()
 			dir, err := resolveDataDir(dataDir)
 			if err != nil {
 				return err
@@ -265,6 +264,11 @@ func main() {
 	// Adopt a helper-carried invocation before any command wiring: the
 	// relaunched installation resumes as if started with those arguments.
 	applyRelaunchArgs()
+	// Attach the parent console before any command runs — not just serve —
+	// so --help, --version, and root startup errors stream too. Launched by
+	// double-click there is no parent console: attach fails and this is a
+	// no-op.
+	attachParentConsole()
 	root := newRootCommand(runGUI, runServe, startupfail.Default().Report)
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
