@@ -17,6 +17,20 @@ WAILS3 ?= wails3
 # docker-mounts); keeps the cross builds off the network for vendored modules.
 WAILS_DOCKER_MOUNTS := $(shell $(WAILS3) tool docker-mounts)
 
+# Host CPU arch drives the linux GUI container choice (build-all,
+# build-arm64): each arch builds its own GUI natively in the host-arch
+# wails-cross image and emulates the other — amd64 hosts run the
+# arm64-variant image (wails-cross:arm64, built by the wails-cross target)
+# under qemu binfmt, the mirror of the amd64 GUI's --platform linux/amd64.
+HOST_ARCH := $(shell uname -m)
+ifeq ($(HOST_ARCH),x86_64)
+WAILS_CROSS_ARM64_PLATFORM := --platform linux/arm64
+WAILS_CROSS_ARM64_IMAGE := wails-cross:arm64
+else
+WAILS_CROSS_ARM64_PLATFORM :=
+WAILS_CROSS_ARM64_IMAGE := wails-cross
+endif
+
 ## check: run Go tests, Python tools tests, go vet, and whitespace checks
 check:
 	GOCACHE="$(GO_CACHE)" go test ./...
@@ -66,6 +80,11 @@ package-darwin: web desktop-assets
 wails-cross:
 	$(WAILS3) task setup:docker
 	docker build --platform linux/amd64 -t wails-cross:amd64 -f build/docker/Dockerfile.cross build/docker/
+ifeq ($(HOST_ARCH),x86_64)
+	# The arm64 GUI builds run this image emulated on amd64 hosts; build it
+	# up front so a missing qemu/binfmt fails here, not mid-compile.
+	docker build --platform linux/arm64 -t wails-cross:arm64 -f build/docker/Dockerfile.cross build/docker/
+endif
 
 # Linux/arm64 GUI binary via the wails Docker cross toolchain. This is the
 # exact invocation Task 15's pi-deploy depends on — do not paraphrase it.
@@ -76,10 +95,10 @@ wails-cross:
 # what Raspberry Pi OS ships); production drops the wails dev tools.
 ## build-arm64: linux/arm64 GUI binary -> bin/torrent-tv-linux-arm64 (Docker wails-cross)
 build-arm64: web desktop-assets | wails-cross
-	docker run --rm -v "$(CURDIR):/app" -w /app $(WAILS_DOCKER_MOUNTS) \
+	docker run --rm $(WAILS_CROSS_ARM64_PLATFORM) -v "$(CURDIR):/app" -w /app $(WAILS_DOCKER_MOUNTS) \
 		-v torrent-tv-go-build-linux-arm64:/root/.cache/go-build \
 		-e CGO_ENABLED=1 -e GOOS=linux -e GOARCH=arm64 -e CC=gcc \
-		--entrypoint go wails-cross build \
+		--entrypoint go $(WAILS_CROSS_ARM64_IMAGE) build \
 		-tags production,gtk3 -trimpath -buildvcs=false \
 		-ldflags="$(GO_LDFLAGS)" \
 		-o bin/torrent-tv-linux-arm64 ./cmd/server
@@ -105,30 +124,39 @@ build-amd64-headless: web
 		-ldflags="$(GO_LDFLAGS)" \
 		-o bin/torrent-tv-linux-amd64-headless ./cmd/server
 
-# Seven release binaries, then the universal macOS .app (this file's own
-# host flow: on a macOS host the recipe ends by packaging
-# bin/"Torrent TV.app" from the two darwin slices via lipo).
+# Release binaries, then the universal macOS .app (this file's own host flow:
+# on a macOS host the recipe ends by packaging bin/"Torrent TV.app" from the
+# two darwin slices via lipo).
 #   - all: web + desktop-assets once (embedded UIs), wails3 on PATH.
 #   - windows amd64/arm64: cgo-free; icon/version resources via
 #     cmd/server/wails_windows_<arch>.syso (wails3 generate syso, generated
 #     and removed per build, git-ignored), GUI subsystem via -H windowsgui.
 #   - darwin arm64: native on a macOS host (wails3 task darwin:build).
-#     darwin amd64: native cross via clang -arch x86_64.
+#     darwin amd64: native cross via clang -arch x86_64. Both are skipped on
+#     non-macOS hosts: macOS clang/codesign cannot run there, and CI builds
+#     them on the macOS runner.
 #   - linux amd64/arm64 GUI: docker wails-cross containers (same invocation
-#     shape as build-arm64); amd64 needs --platform linux/amd64 (emulated on
-#     arm64 hosts — expect a long build).
+#     shape as build-arm64); each emulates the other arch via --platform on
+#     the wrong host (amd64 GUI emulated on arm64 hosts; arm64 GUI runs the
+#     arm64-variant image under qemu binfmt on amd64 hosts — expect a long
+#     emulated build).
 #   - linux armv7: pure headless (CGO_ENABLED=0; internal/gui compiles to
 #     the ErrNoDisplay fallback via build tags, no webkit2gtk needed).
-## build-all: seven release binaries + universal macOS .app -> bin/ (Docker + wails3; macOS host for the .app)
+## build-all: the five non-darwin release binaries everywhere, + darwin slices and the universal .app on a macOS host -> bin/ (Docker + wails3)
 build-all: web desktop-assets | wails-cross
 	GOCACHE="$(GO_CACHE)" $(WAILS3) task windows:build ARCH=amd64 OUTPUT=bin/torrent-tv-windows-amd64.exe GO_LDFLAGS="$(GO_LDFLAGS)"
 	GOCACHE="$(GO_CACHE)" $(WAILS3) task windows:build ARCH=arm64 OUTPUT=bin/torrent-tv-windows-arm64.exe GO_LDFLAGS="$(GO_LDFLAGS)"
+# The darwin slices need macOS clang (-arch/-mmacosx-version-min) and codesign;
+# on any other host they are a guaranteed toolchain failure, so skip them — CI
+# builds them on the macOS runner (release.yml), as package-darwin below.
+ifeq ($(shell uname -s),Darwin)
 	GOCACHE="$(GO_CACHE)" $(WAILS3) task darwin:build ARCH=arm64 OUTPUT=bin/torrent-tv-darwin-arm64 GO_LDFLAGS="$(GO_LDFLAGS)"
 	GOCACHE="$(GO_CACHE)" $(WAILS3) task darwin:build ARCH=amd64 CGO_FLAGS="-arch x86_64 -mmacosx-version-min=11.0" OUTPUT=bin/torrent-tv-darwin-amd64 GO_LDFLAGS="$(GO_LDFLAGS)"
-	docker run --rm -v "$(CURDIR):/app" -w /app $(WAILS_DOCKER_MOUNTS) \
+endif
+	docker run --rm $(WAILS_CROSS_ARM64_PLATFORM) -v "$(CURDIR):/app" -w /app $(WAILS_DOCKER_MOUNTS) \
 		-v torrent-tv-go-build-linux-arm64:/root/.cache/go-build \
 		-e CGO_ENABLED=1 -e GOOS=linux -e GOARCH=arm64 -e CC=gcc \
-		--entrypoint go wails-cross build \
+		--entrypoint go $(WAILS_CROSS_ARM64_IMAGE) build \
 		-tags production,gtk3 -trimpath -buildvcs=false \
 		-ldflags="$(GO_LDFLAGS)" \
 		-o bin/torrent-tv-linux-arm64 ./cmd/server
