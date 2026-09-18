@@ -42,6 +42,7 @@ const fakeBindings = vi.hoisted(() => ({
 vi.mock('../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings', () => ({
   AutostartStatus: vi.fn().mockResolvedValue(false),
   DataDirInfo: vi.fn().mockResolvedValue(['', '']),
+  DefaultsInUse: vi.fn().mockResolvedValue([]),
   DisableAutostart: vi.fn(),
   EnableAutostart: vi.fn(),
   LoadSettings: vi.fn().mockResolvedValue({ settingsPath: '' }),
@@ -50,7 +51,7 @@ vi.mock('../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings'
   OpenURL: fakeBindings.openURL,
   OpenWebUI: vi.fn(),
   ReadLogs: vi.fn().mockResolvedValue({ lines: [], nextOffset: 0, size: 0 }),
-  SaveSettings: vi.fn().mockResolvedValue({ saved: true, restartRequired: false, autoStarted: false }),
+  SaveSettings: vi.fn().mockResolvedValue({ saved: true, restartRequired: false }),
   ServerState: vi.fn().mockRejectedValue(new Error('offline')),
   SettingsSchema: vi.fn().mockResolvedValue([]),
   StartServer: vi.fn(),

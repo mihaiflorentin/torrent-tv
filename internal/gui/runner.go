@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -29,12 +28,12 @@ import (
 // framework migration touches one boundary (spec: Risks).
 
 // minimizedHides reports whether a launch starts the window hidden:
-// --minimized hides it, but only with complete configuration — with
-// required settings missing the setup window shows regardless, so
-// autostart's pinned --minimized can never strand a wiped config as a
-// silent tray-only app (spec: CLI).
-func minimizedHides(minimized bool, missingRequired []string) bool {
-	return minimized && len(missingRequired) == 0
+// --minimized alone decides it. Credentials are advisory (MissingRequired),
+// so autostart's pinned --minimized can no longer strand an unconfigured
+// install — the server starts regardless and the Settings page banners the
+// blanks.
+func minimizedHides(minimized bool) bool {
+	return minimized
 }
 
 func Run(opts Options) error {
@@ -149,7 +148,7 @@ func Run(opts Options) error {
 		MinWidth:  960,
 		MinHeight: 600,
 		URL:       "/",
-		Hidden:    minimizedHides(opts.Minimized, settings.MissingRequired()),
+		Hidden:    minimizedHides(opts.Minimized),
 	})
 	// Close-to-tray: the pinned beta registers its own WindowClosing
 	// listener in NewWindow that unconditionally destroys the window, and
@@ -171,12 +170,11 @@ func Run(opts Options) error {
 	// Boot emit: arrives before the webview loads, so the frontend also
 	// seeds from the ServerState binding at startup (desktop/src/main.tsx).
 	app.Event.Emit("server:state", newStateEvent(sup.State(), sup.Error(), listenaddr.DisplayAddress(sup.Address())))
-	// Configured launches auto-start the embedded server exactly once
-	// through the supervisor's own Start path; incomplete settings stay in
-	// the setup flow (the completing-save auto-start handles those).
-	if len(settings.MissingRequired()) == 0 {
-		_ = sup.Start()
-	}
+	// The server starts unconditionally: FileList credentials are advisory
+	// (MissingRequired feeds the Settings banner, never a gate), so a
+	// switched-on-but-unconfigured tracker surfaces as UI state, not a
+	// withheld start.
+	_ = sup.Start()
 	reporter.Log("window and tray created; entering event loop")
 
 	app.Run()
@@ -193,15 +191,20 @@ func wireSupervisor(bind *Bindings, log *slog.Logger) *Supervisor {
 	sup := NewSupervisor(SupervisorDeps{
 		Log: log,
 		CanStart: func() error {
-			// The relocation guard keeps any Start — including the
-			// SaveSettings completing-save auto-start — out of the
-			// move window between Stop and the holder swap.
+			// The relocation guard keeps any Start — including the boot
+			// auto-start — out of the move window between Stop and the
+			// holder swap.
 			if bind.relocatingServer() {
 				return errors.New("data directory change in progress; try again when it finishes")
 			}
+			// Credentials are advisory: only the native paths gate a start
+			// here. Create and write-probe the engine's directories so an
+			// unwritable path surfaces as a labeled start error instead of
+			// a crash inside the engine.
 			store, _, _ := bind.snapshot()
-			if missing := store.MissingRequired(); len(missing) > 0 {
-				return fmt.Errorf("required settings missing: %s", strings.Join(missing, ", "))
+			cfg := store.Get()
+			if err := config.EnsureNativePathsWritable(cfg.DownloadEngine, cfg.DownloadRoot, cfg.TorrentSessionDir); err != nil {
+				return err
 			}
 			return nil
 		},

@@ -15,7 +15,7 @@ import {
 } from '../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings';
 
 import { applyServerUpdate, checkForServerUpdate, usePortal, useServerState } from '../lib/state';
-
+import { openSettingsTab } from '../lib/settings-links';
 // renderLogLine formats one JSONL log record as "time LEVEL message" —
 // the server's slog JSON handler keys — with HTTP access records rendered
 // pretty as "time LEVEL GET /api/v1/jobs 200 12ms" from their attributes.
@@ -44,7 +44,7 @@ function renderLogLine(line: string): string {
 // Start/Stop + Open web UI), the Start-at-login card (toggle reflects the OS
 // read-back, never memory), and the details row (version, settings file,
 // data folder with reveal buttons).
-export function ServerPage() {
+export function ServerPage({ onOpenSettings }: { onOpenSettings?: () => void } = {}) {
   const server = useServerState();
   const portal = usePortal();
   const [version, setVersion] = useState('');
@@ -226,7 +226,15 @@ export function ServerPage() {
             : <button class="primary" type="button" disabled={transitioning} onClick={() => void run(StartServer)}>Start server</button>}
           <button type="button" disabled={server.state !== 'running'} onClick={() => void run(OpenWebUI)}>Open web UI</button>
         </div>
-        {error && <p class="settings-status" role="alert">{error}</p>}
+        {error && (
+          <div class="status-card status-card--danger" role="alert">
+            <p class="status-eyebrow">Start failed</p>
+            <p class="status-title">{error}</p>
+            <div class="status-actions">
+              <button type="button" class="status-link" aria-label="Open settings" onClick={() => openSettingsTab(onOpenSettings)}>Open settings</button>
+            </div>
+          </div>
+        )}
       </fieldset>
       <fieldset>
         <legend>Start at login</legend>

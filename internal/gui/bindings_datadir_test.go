@@ -409,8 +409,8 @@ func TestChangeDataDirPostMoveFailureLeavesStopped(t *testing.T) {
 
 // TestChangeDataDirGuardBlocksConcurrentAutoStart pins the move-window
 // guard: while a relocation sits between Stop and its swap, a concurrent
-// completing-save must NOT fire the auto-start (previously it could Start
-// the old store mid-move); after the change finishes, its own restart runs.
+// save must NOT fire a Start mid-move; after the change finishes, its own
+// restart runs.
 func TestChangeDataDirGuardBlocksConcurrentAutoStart(t *testing.T) {
 	oldDir := t.TempDir()
 	newDir := t.TempDir()
@@ -445,18 +445,14 @@ func TestChangeDataDirGuardBlocksConcurrentAutoStart(t *testing.T) {
 		t.Fatalf("server must be stopped inside the move window, got %s", sup.State())
 	}
 
-	// The completing save: required keys filled while the relocation holds
-	// the guard. The auto-start edge must defer.
+	// A save during relocation: saves succeed without error and never
+	// trigger a Start mid-move.
 	next := store.Get()
 	next.DownloadRoot = filepath.Join(oldDir, "downloads")
 	next.FileListUsername = "user"
 	next.FileListPasskey = "pass"
-	result, err := b.SaveSettings(next)
-	if err != nil {
+	if _, err := b.SaveSettings(next); err != nil {
 		t.Fatalf("save during relocation: %v", err)
-	}
-	if result.AutoStarted {
-		t.Fatal("auto-start must defer while a relocation is in flight")
 	}
 	if probe.count() != 1 {
 		t.Fatalf("no Start may race the move (initial start only), got %d factory calls", probe.count())

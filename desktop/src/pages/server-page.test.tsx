@@ -19,6 +19,7 @@ const fakeBindings = vi.hoisted(() => ({
   enableAutostart: vi.fn(),
   disableAutostart: vi.fn(),
   dataDirInfo: vi.fn(),
+  defaultsInUse: vi.fn(),
   openPath: vi.fn(),
   openWebUI: vi.fn(),
   readLogs: vi.fn(),
@@ -29,6 +30,7 @@ const fakeBindings = vi.hoisted(() => ({
 vi.mock('../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings', () => ({
   AutostartStatus: fakeBindings.autostartStatus,
   DataDirInfo: fakeBindings.dataDirInfo,
+  DefaultsInUse: fakeBindings.defaultsInUse,
   DisableAutostart: fakeBindings.disableAutostart,
   EnableAutostart: fakeBindings.enableAutostart,
   LoadSettings: fakeBindings.loadSettings,
@@ -66,11 +68,11 @@ class FakeEventSource {
 
 const mountedHosts: HTMLElement[] = [];
 
-async function mount(): Promise<HTMLElement> {
+async function mount(onOpenSettings?: () => void): Promise<HTMLElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   mountedHosts.push(host);
-  await act(async () => { render(<ServerPage />, host) });
+  await act(async () => { render(<ServerPage onOpenSettings={onOpenSettings} />, host) });
   // The portal engine's recovery refetch resolves a few microtasks deep;
   // drain several rounds so every settled render lands before assertions.
   // Plain microtask rounds only — the log-viewer tests run fake timers.
@@ -88,8 +90,8 @@ beforeEach(() => {
   seedServerState({ state: 'stopped' });
   fakeBindings.version.mockResolvedValue('v0.1.2');
   fakeBindings.dataDirInfo.mockResolvedValue(['/opt/fs/data', 'pointer']);
+  fakeBindings.defaultsInUse.mockResolvedValue([]);
   fakeBindings.loadSettings.mockResolvedValue({ settingsPath: '/opt/fs/data/settings.json' });
-  fakeBindings.autostartStatus.mockResolvedValue(false);
   fakeApi.call.mockReset();
   fakeApi.portalState.mockReset();
   fakeApi.portalState.mockRejectedValue(new Error('portal routes absent'));
@@ -152,12 +154,58 @@ describe('ServerPage status card', () => {
     expect(fakeBindings.openWebUI).toHaveBeenCalled();
   });
 
-  it('surfaces binding errors inline', async () => {
-    fakeBindings.startServer.mockRejectedValue(new Error('required settings missing: fileListPasskey'));
+  it('surfaces start errors in a danger card with the error text', async () => {
+    fakeBindings.startServer.mockRejectedValue(new Error('cannot create download root Z:\\data: access denied'));
     const host = await mount();
     await act(async () => { button('Start server').click() });
     await act(async () => { });
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('required settings missing');
+    const card = host.querySelector('.status-card--danger')!;
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('Start failed');
+    expect(card.textContent).toContain('cannot create download root Z:\\data: access denied');
+  });
+
+  it('offers Open settings from a start error and hands over the active tab hash', async () => {
+    fakeBindings.startServer.mockRejectedValue(new Error('cannot create download root Z:\\data: access denied'));
+    let hashSeenByCallback: string | null = null;
+    const onOpenSettings = vi.fn(() => {
+      hashSeenByCallback = location.hash;
+    });
+    const host = await mount(onOpenSettings);
+    await act(async () => { button('Start server').click() });
+    await act(async () => { });
+
+    const alert = host.querySelector('[role="alert"]')!;
+    expect(alert).not.toBeNull();
+    expect(alert.textContent).toContain('cannot create download root');
+
+    const openSettingsBtn = Array.from(alert.querySelectorAll<HTMLButtonElement>('button')).find(
+      b => b.textContent === 'Open settings',
+    );
+    expect(openSettingsBtn).toBeDefined();
+
+    await act(async () => { openSettingsBtn!.click() });
+    expect(location.hash).toBe('');
+    expect(hashSeenByCallback).toBe('');
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Open settings button for other start errors', async () => {
+    fakeBindings.startServer.mockRejectedValue(new Error('cannot bind port: address in use'));
+    const onOpenSettings = vi.fn();
+    const host = await mount(onOpenSettings);
+    await act(async () => { button('Start server').click() });
+    await act(async () => { });
+
+    const alert = host.querySelector('[role="alert"]')!;
+    expect(alert.textContent).toContain('cannot bind port: address in use');
+    const openSettingsBtn = Array.from(alert.querySelectorAll<HTMLButtonElement>('button')).find(
+      b => b.textContent === 'Open settings',
+    );
+    expect(openSettingsBtn).toBeDefined();
+
+    await act(async () => { openSettingsBtn!.click() });
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 });
 

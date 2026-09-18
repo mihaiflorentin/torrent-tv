@@ -35,7 +35,6 @@ import (
 	"github.com/mihaiflorentin/torrent-tv/internal/application/updates"
 	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
-	"golang.org/x/term"
 )
 
 // closeTimeout bounds App.Close's joins when the caller passes no
@@ -87,29 +86,8 @@ func NewAt(settingsPath string, log *slog.Logger) (*App, error) {
 }
 
 // assemble builds the application around an already-loaded settings store:
-// onboarding, media-tool discovery, and every adapter wiring step.
+// media-tool discovery and every adapter wiring step.
 func assemble(settings *config.Store, log *slog.Logger) (*App, error) {
-	// First-run onboarding: when a required setting is neither in the
-	// settings file nor the environment, ask for it before the engine is
-	// built, so an unwritable default download root becomes a question
-	// instead of a crash loop. Headless runs cannot answer and fall back
-	// to the defaults with a warning.
-	if missing := settings.MissingRequired(); len(missing) > 0 {
-		if term.IsTerminal(int(os.Stdin.Fd())) {
-			console := config.Console{
-				In:  os.Stdin,
-				Out: os.Stdout,
-				Secret: func() ([]byte, error) {
-					return term.ReadPassword(int(os.Stdin.Fd()))
-				},
-			}
-			if err := config.PromptRequired(settings, console, true); err != nil {
-				return nil, err
-			}
-		} else {
-			log.Warn("required settings missing; continuing with defaults", "settings", strings.Join(missing, ", "))
-		}
-	}
 	// Media tools: discover ffprobe/ffmpeg on PATH when the configured
 	// paths do not exist, persisting what is found. A missing tool only
 	// degrades subtitle probing and audio fallback at runtime, so warn

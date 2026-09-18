@@ -3,7 +3,6 @@ package gui
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -19,14 +18,12 @@ import (
 	"github.com/mihaiflorentin/torrent-tv/internal/platform/config"
 )
 
-// dynamicCanStart mirrors the runner's CanStart: required settings missing is
-// a refusal (setup), not a failure.
+// dynamicCanStart mirrors the runner's CanStart: only the native-path probe
+// gates a start; credentials are advisory and never refuse.
 func dynamicCanStart(store *config.Store) func() error {
 	return func() error {
-		if missing := store.MissingRequired(); len(missing) > 0 {
-			return fmt.Errorf("required settings missing: %s", strings.Join(missing, ", "))
-		}
-		return nil
+		cfg := store.Get()
+		return config.EnsureNativePathsWritable(cfg.DownloadEngine, cfg.DownloadRoot, cfg.TorrentSessionDir)
 	}
 }
 
@@ -41,7 +38,7 @@ func newBindingsFixture(t *testing.T, app appLike, store *config.Store, canStart
 }
 
 // completeStore loads a store whose settings file already provides every
-// required key, so saves never trip the completing-setup auto-start edge.
+// setting.
 func completeStore(t *testing.T, dir string) *config.Store {
 	t.Helper()
 	path := filepath.Join(dir, "settings.json")
@@ -65,17 +62,15 @@ func completeStore(t *testing.T, dir string) *config.Store {
 	return store
 }
 
-func TestSaveSettingsCompletingRequiredAutoStarts(t *testing.T) {
+func TestSaveSettingsCompletingRequiredNeverAutoStarts(t *testing.T) {
 	dir := t.TempDir()
 	store, err := config.LoadAt(filepath.Join(dir, "settings.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if missing := store.MissingRequired(); len(missing) != 3 {
-		t.Fatalf("fresh store missing = %v, want all three required keys", missing)
+	if missing := store.MissingRequired(); len(missing) != 2 {
+		t.Fatalf("fresh store missing = %v, want both required FileList credential keys", missing)
 	}
-	// A serve channel keeps the fake app blocked in ListenAndServe, so the
-	// auto-started server settles in running and stays there.
 	app := &fakeApp{addr: "127.0.0.1:8097", serve: make(chan error), closed: make(chan struct{})}
 	b, sup := newBindingsFixture(t, app, store, dynamicCanStart(store))
 
@@ -88,24 +83,28 @@ func TestSaveSettingsCompletingRequiredAutoStarts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !res.Saved || !res.AutoStarted {
-		t.Fatalf("completing save = %+v, want saved+autoStarted", res)
+	if !res.Saved {
+		t.Fatalf("completing save = %+v, want saved", res)
 	}
-	waitForState(t, sup, StateRunning)
-	if ev := b.ServerState(); ev.State != StateRunning || ev.Address != app.addr {
-		t.Fatalf("ServerState after auto-start = %+v", ev)
+	if sup.State() != StateStopped {
+		t.Fatalf("save must not auto-start the server, state = %s", sup.State())
+	}
+	if missing := store.MissingRequired(); len(missing) != 0 {
+		t.Fatalf("advisory report after completing save = %v, want none", missing)
 	}
 
-	// A follow-up ordinary save on a complete, running server must not
-	// re-trigger the auto-start edge.
+	// A follow-up ordinary save on a complete server also does not start it.
 	ordinary := store.Get()
 	ordinary.InstanceName = "Renamed"
 	res2, err := b.SaveSettings(ordinary)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !res2.Saved || res2.AutoStarted || res2.RestartRequired {
-		t.Fatalf("ordinary save = %+v, want saved without auto-start or restart", res2)
+	if !res2.Saved || res2.RestartRequired {
+		t.Fatalf("ordinary save = %+v, want saved without restart", res2)
+	}
+	if sup.State() != StateStopped {
+		t.Fatalf("ordinary save must not start the server, state = %s", sup.State())
 	}
 }
 
@@ -136,7 +135,7 @@ func TestSaveSettingsMirrorsHTTPContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !res.Saved || !res.RestartRequired || res.AutoStarted {
+	if !res.Saved || !res.RestartRequired {
 		t.Fatalf("listener save = %+v, want saved+restartRequired", res)
 	}
 	plain := store.Get()

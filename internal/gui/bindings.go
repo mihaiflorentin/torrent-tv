@@ -32,13 +32,11 @@ type StateEvent struct {
 	Address string `json:"address,omitempty"`
 }
 
-// SaveResult is the SaveSettings response: whether the settings persisted,
-// whether any restart-required field changed, and whether the save completed
-// setup and auto-started the server.
+// SaveResult is the SaveSettings response: whether the settings persisted and
+// whether any restart-required field changed.
 type SaveResult struct {
 	Saved           bool `json:"saved"`
 	RestartRequired bool `json:"restartRequired"`
-	AutoStarted     bool `json:"autoStarted"`
 }
 
 // LogTail is one ReadLogs page: the raw lines read from the GUI session's
@@ -137,16 +135,12 @@ func (b *Bindings) LoadSettings() httpapi.SettingsView {
 }
 
 // SaveSettings mirrors the HTTP PUT /api/v1/settings contract: native-path
-// probe, secrets-preserving save, restart-required diff. A save that
-// completes the required settings while the server is stopped auto-starts
-// it (the GUI form of "starts automatically once configuration is set") —
-// unless a data-dir relocation is in flight, whose guard keeps the
-// auto-start from racing the move; the restarted change performs its own
-// Start against the holder's (new) location.
+// probe, secrets-preserving save, restart-required diff. A save never starts
+// the server: credentials are advisory, and the runner's unconditional boot
+// auto-start owns every start.
 func (b *Bindings) SaveSettings(next config.Settings) (SaveResult, error) {
 	store, _, _ := b.snapshot()
 	old := store.Get()
-	wasIncomplete := len(store.MissingRequired()) > 0
 	if err := config.EnsureNativePathsWritable(next.DownloadEngine, next.DownloadRoot, next.TorrentSessionDir); err != nil {
 		return SaveResult{}, err
 	}
@@ -155,12 +149,7 @@ func (b *Bindings) SaveSettings(next config.Settings) (SaveResult, error) {
 	}
 	current := store.Get()
 	result := SaveResult{Saved: true, RestartRequired: config.RestartRequired(old, current)}
-	sup := b.supervisor()
-	sup.RefreshTrackers()
-	if wasIncomplete && len(store.MissingRequired()) == 0 && sup.State() == StateStopped && !b.relocatingServer() {
-		go func() { _ = sup.Start() }()
-		result.AutoStarted = true
-	}
+	b.supervisor().RefreshTrackers()
 	return result, nil
 }
 
@@ -171,11 +160,21 @@ func (b *Bindings) SettingsSchema() []httpapi.SchemaField {
 	return httpapi.SettingsSchema(store)
 }
 
-// MissingRequired lists the required settings still absent; the Settings
-// page banners it and deep-links the Tracker tab.
+// MissingRequired lists the FileList credentials still blank while the
+// tracker is enabled; the Settings page banners it and deep-links the
+// Tracker tab. Advisory only: it never blocks a start — the server starts
+// regardless and the blanks surface as UI state.
 func (b *Bindings) MissingRequired() []string {
 	store, _, _ := b.snapshot()
 	return store.MissingRequired()
+}
+
+// DefaultsInUse lists the settings still at their built-in defaults
+// (downloadRoot, listenAddress); the Settings page nudges the operator to
+// customize them without treating a default as an error.
+func (b *Bindings) DefaultsInUse() []string {
+	store, _, _ := b.snapshot()
+	return store.DefaultsInUse()
 }
 
 // Version reports the server version (composition.Version, ldflags-injected

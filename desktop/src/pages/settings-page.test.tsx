@@ -14,6 +14,7 @@ const fakeBindings = vi.hoisted(() => ({
   loadSettings: vi.fn(),
   settingsSchema: vi.fn(),
   missingRequired: vi.fn(),
+  defaultsInUse: vi.fn(),
   saveSettings: vi.fn(),
   restartServer: vi.fn(),
 }));
@@ -45,6 +46,7 @@ const disabledSnapshot: PortalState = { accountsEnabled: false, adsEnabled: fals
 const updateStatus: UpdateStatus = { currentVersion: '1.2.3', available: true, latest: '1.3.0', releasesUrl: 'https://example.invalid/releases', selfUpdate: true, applying: false };
 
 vi.mock('../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings', () => ({
+  DefaultsInUse: fakeBindings.defaultsInUse,
   LoadSettings: fakeBindings.loadSettings,
   MissingRequired: fakeBindings.missingRequired,
   RestartServer: fakeBindings.restartServer,
@@ -122,7 +124,8 @@ beforeEach(() => {
   fakeBindings.loadSettings.mockResolvedValue(settingsValue);
   fakeBindings.settingsSchema.mockResolvedValue(schemaFields);
   fakeBindings.missingRequired.mockResolvedValue([]);
-  fakeBindings.saveSettings.mockResolvedValue({ saved: true, restartRequired: false, autoStarted: false });
+  fakeBindings.defaultsInUse.mockResolvedValue([]);
+  fakeBindings.saveSettings.mockResolvedValue({ saved: true, restartRequired: false });
   fakeApi.call.mockReset();
   fakeApi.call.mockResolvedValue({});
   fakeApi.portalState.mockReset();
@@ -152,7 +155,8 @@ beforeEach(() => {
   fakeBindings.loadSettings.mockResolvedValue(settingsValue);
   fakeBindings.settingsSchema.mockResolvedValue(schemaFields);
   fakeBindings.missingRequired.mockResolvedValue([]);
-  fakeBindings.saveSettings.mockResolvedValue({ saved: true, restartRequired: false, autoStarted: false });
+  fakeBindings.defaultsInUse.mockResolvedValue([]);
+  fakeBindings.saveSettings.mockResolvedValue({ saved: true, restartRequired: false });
   fakeApi.call.mockReset();
   fakeApi.call.mockResolvedValue({});
 });
@@ -180,7 +184,7 @@ describe('SettingsPage transport', () => {
   });
 
   it('routes the save bar through SaveSettings instead of the HTTP PUT and flags restart-required changes', async () => {
-    fakeBindings.saveSettings.mockResolvedValue({ saved: true, restartRequired: true, autoStarted: false });
+    fakeBindings.saveSettings.mockResolvedValue({ saved: true, restartRequired: true });
     const host = await mount();
     const input = Array.from(host.querySelectorAll<HTMLInputElement>('.settings-panel label')).find(
       item => item.querySelector('span')?.textContent?.startsWith('FileList URL'),
@@ -203,21 +207,20 @@ describe('SettingsPage transport', () => {
     expect(payload.fileListUrl).toBe('https://filelist.example');
     expect(host.textContent).toContain('Restart to apply');
     await act(async () => {
-      Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Restart to apply')!.click();
+      Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Restart the server')!.click();
     });
     expect(fakeBindings.restartServer).toHaveBeenCalled();
   });
 
-  it('saves through bindings while stopped; a completing save clears the banner and the note reacts to the running event', async () => {
+  it('saves through bindings while stopped; the advisory clears once the credentials are mirrored', async () => {
     seedServerState({ state: 'stopped' });
-    fakeBindings.saveSettings.mockResolvedValue({ saved: true, restartRequired: false, autoStarted: true });
+    fakeBindings.saveSettings.mockResolvedValue({ saved: true, restartRequired: false });
     fakeBindings.missingRequired.mockReset();
     fakeBindings.missingRequired
-      .mockResolvedValueOnce(['fileListPasskey', 'downloadRoot']) // mount read
-      .mockResolvedValue([]); // post-save read: setup completed
+      .mockResolvedValueOnce(['fileListPasskey']) // mount read
+      .mockResolvedValue([]); // post-save read: advisory resolved
     const host = await mount();
-    expect(host.querySelector('[role="note"]')?.textContent).toContain('Start the server to run tests');
-    expect(host.textContent).toContain('Required settings missing');
+    expect(host.textContent).toContain('FileList is on, but its credentials are missing.');
     const input = Array.from(host.querySelectorAll<HTMLInputElement>('.settings-panel label')).find(
       item => item.querySelector('span')?.textContent?.startsWith('FileList passkey'),
     )!.querySelector('input')!;
@@ -236,13 +239,8 @@ describe('SettingsPage transport', () => {
     expect(fakeBindings.saveSettings).toHaveBeenCalled();
     expect(fakeApi.call).not.toHaveBeenCalled(); // works with the server stopped
     const result = await fakeBindings.saveSettings.mock.results[0].value;
-    expect(result).toEqual({ saved: true, restartRequired: false, autoStarted: true });
-    expect(host.textContent).not.toContain('Required settings missing');
-    // The Go side auto-started; the emitted state event moves the page out of
-    // the stopped-server note (the shell pill flips the same way).
-    expect(host.querySelector('[role="note"]')).not.toBeNull();
-    await act(async () => { fakeEvents.emit('server:state', { state: 'running', address: '127.0.0.1:8097' }) });
-    expect(host.querySelector('[role="note"]')).toBeNull();
+    expect(result).toEqual({ saved: true, restartRequired: false });
+    expect(host.textContent).not.toContain('FileList is on, but its credentials are missing.');
   });
 
   it('does not flag restart when the save changed nothing restart-required', async () => {
@@ -268,26 +266,78 @@ describe('SettingsPage transport', () => {
   });
 });
 
-describe('SettingsPage banners', () => {
-  it('banners missing required settings and deep-links the Tracker tab', async () => {
+describe('SettingsPage status cards', () => {
+  it('warns when FileList is enabled without credentials and deep-links the exact field', async () => {
     fakeBindings.missingRequired.mockResolvedValue(['fileListPasskey']);
     history.replaceState(null, '', '#storage');
     const host = await mount();
-    const banner = host.querySelector('[role="alert"]');
-    expect(banner?.textContent).toContain('Required settings missing: fileListPasskey');
+    const card = host.querySelector('.status-card--warning');
+    expect(card?.textContent).toContain('FileList is on, but its credentials are missing.');
+    expect(card?.textContent).toContain('The server starts either way.');
     expect(selectedTab()).toBe('Storage');
     await act(async () => {
-      Array.from(host.querySelectorAll('button')).find(button => button.textContent?.includes('Tracker tab'))!.click();
+      Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'FileList passkey')!.click();
     });
     expect(selectedTab()).toBe('Tracker');
   });
 
-  it('clears the missing banner once a completing save is mirrored', async () => {
+  it('renders one action per missing credential plus a one-click Turn off FileList', async () => {
+    fakeBindings.missingRequired.mockResolvedValue(['fileListUsername', 'fileListPasskey']);
+    history.replaceState(null, '', '#server');
+    const host = await mount();
+    const actionButtons = Array.from(host.querySelectorAll<HTMLButtonElement>('.status-card--warning .status-actions button'));
+    expect(actionButtons.map(b => b.textContent)).toEqual([
+      'FileList username',
+      'FileList passkey',
+      'Turn off FileList',
+    ]);
+    await act(async () => {
+      actionButtons.find(b => b.textContent === 'FileList username')!.click();
+    });
+    expect(selectedTab()).toBe('Tracker');
+  });
+
+  it('Turn off FileList persists the toggle and clears the advisory', async () => {
+    fakeBindings.missingRequired.mockReset();
+    fakeBindings.missingRequired
+      .mockResolvedValueOnce(['fileListUsername', 'fileListPasskey']) // mount read
+      .mockResolvedValue([]); // post-toggle read: tracker disabled
+    const host = await mount();
+    await act(async () => {
+      Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Turn off FileList')!.click();
+    });
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        const { promise, resolve } = Promise.withResolvers<void>();
+        setTimeout(resolve, 0);
+        await promise;
+      });
+    }
+    const payload = fakeBindings.saveSettings.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.fileListEnabled).toBe(false);
+    expect(host.querySelector('.status-card--warning')).toBeNull();
+  });
+
+  it('renders the defaults card and deep-links each default to its tab', async () => {
+    fakeBindings.defaultsInUse.mockResolvedValue(['downloadRoot', 'listenAddress']);
+    history.replaceState(null, '', '#tracker');
+    const host = await mount();
+    const card = host.querySelector('.status-card--info');
+    expect(card?.textContent).toContain('Defaults in use');
+    expect(card?.textContent).toContain('Download root and Listen address are still on the built-in default.');
+    expect(selectedTab()).toBe('Tracker');
+    await act(async () => {
+      Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Listen address')!.click();
+    });
+    expect(selectedTab()).toBe('Server');
+  });
+
+  it('clears the warning card once a save resolves the credentials', async () => {
     fakeBindings.missingRequired
       .mockResolvedValueOnce(['fileListPasskey'])
       .mockResolvedValue([]);
     const host = await mount();
-    expect(host.textContent).toContain('Required settings missing');
+    expect(host.querySelector('.status-card--warning')).not.toBeNull();
     await act(async () => {
       host.querySelector('form.settings')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
@@ -298,19 +348,20 @@ describe('SettingsPage banners', () => {
         await promise;
       });
     }
-    expect(host.textContent).not.toContain('Required settings missing');
+    expect(host.querySelector('.status-card--warning')).toBeNull();
   });
 
-  it('explains stopped-server behavior above the form without hiding it', async () => {
+  it('scopes the stopped-server note to the Test tab instead of the page top', async () => {
     seedServerState({ state: 'stopped' });
     const host = await mount();
+    // Tracker (default) shows no note: nothing about that tab needs a live server.
+    expect(host.querySelector('[role="note"]')).toBeNull();
+    await act(async () => {
+      settingsTabs().find(button => button.textContent === 'Test')!.click();
+    });
     const note = host.querySelector('[role="note"]');
-    expect(note?.textContent).toContain('Start the server to run tests');
+    expect(note?.textContent).toContain('Start the server to run these');
     expect(host.querySelector('form.settings')).not.toBeNull();
-    // The note renders above the shared component.
-    const noteIndex = Array.from(host.children).indexOf(note!);
-    const formIndex = Array.from(host.children).findIndex(child => child.querySelector('form.settings'));
-    expect(noteIndex).toBeLessThan(formIndex);
   });
 });
 
@@ -351,6 +402,11 @@ describe('SettingsPage portal gating', () => {
     // Status still recovers from the last session, but the section must not
     // pretend a stopped server can check or apply anything.
     expect(host.querySelector('.update-section')).toBeNull();
-    expect(host.textContent).toContain('The server is stopped');
+    // The live-server dependency is stated where it applies: on the tabs
+    // that talk HTTP (Test, Maintenance), not above every tab.
+    await act(async () => {
+      settingsTabs().find(button => button.textContent === 'Maintenance')!.click();
+    });
+    expect(host.querySelector('[role="note"]')?.textContent).toContain('Start the server to run these');
   });
 });

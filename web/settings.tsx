@@ -144,8 +144,12 @@ function ByteField({ bytes, unit, disabled, onBytes }: { bytes: number; unit: 'M
   return <span class="byte-field"><input type="text" inputMode="decimal" autoComplete="off" spellcheck={false} disabled={disabled} value={text} onInput={event => { const next = event.currentTarget.value; setText(next); const parsed = Number(next); onBytes(next.trim() !== '' && Number.isFinite(parsed) ? Math.round(parsed * factor) : 0) }} /><span class="byte-unit">{unit}</span></span>;
 }
 
-export function Settings({ value, fields, onSaved, onError, onDirtyChange, accountsEnabled, updateSection, save: saveTransport }: {
+export function Settings({ value, fields, onSaved, onError, onDirtyChange, accountsEnabled, updateSection, serverLive, save: saveTransport }: {
   value: Record<string, unknown>; fields: SettingsField[]; onSaved: (v: Record<string, unknown>) => void; onError: (s: string) => void; onDirtyChange?: (dirty: boolean) => void; accountsEnabled?: boolean; updateSection?: ComponentChild;
+  // Whether the server this UI configures is currently running. The Test
+  // and Maintenance tabs talk to the live server, so a not-live host gets
+  // a note inside those tabs — never a paragraph above every tab.
+  serverLive?: boolean;
   // Alternate save transport for embedded hosts (the desktop GUI): the save
   // bar calls it with the submitted body instead of the storage PUT, and a
   // thrown error takes the normal error path. Absent, the webapp behaves
@@ -287,8 +291,9 @@ export function Settings({ value, fields, onSaved, onError, onDirtyChange, accou
   };
   const diagnostics = (connections: typeof CONNECTIONS) => <section class="diagnostics"><h2>Connection checks</h2>{connections.map(connection => <div key={connection.name}><button type="button" onClick={() => void test(connection.name)}>Test {connection.label}</button><span role="status">{tests[connection.name]}</span>{connection.name === 'storage' && storageFolders && <ul class="storage-folders">{storageFolders.map(folder => <li key={folder.path} class={folder.ok ? 'ok' : 'failed'}><span class="folder-name">{folder.label}</span><code>{folder.path}</code><span class="folder-status">{folder.ok ? `writable${folder.freeBytes ? ` · ${formatBytes(folder.freeBytes)} free` : ''}` : folder.detail}</span></li>)}</ul>}</div>)}</section>;
   const panelContent = () => {
-    if (activeTab === 'maintenance') return <><CacheCoverage /><Events onError={onError} confirmRebuild /></>;
-    if (activeTab === 'test') return diagnostics(CONNECTIONS);
+    const liveNote = serverLive === false && <p class="supporting" role="note">Start the server to run these — they talk to the live server.</p>;
+    if (activeTab === 'maintenance') return <>{liveNote}<CacheCoverage /><Events onError={onError} confirmRebuild /></>;
+    if (activeTab === 'test') return <>{liveNote}{diagnostics(CONNECTIONS)}</>;
     const visibleGroups = () => (TAB_GROUPS[activeTab] || []).filter(group => !group.when || group.when(current));
     return <>{activeTab === 'tracker' && <TrackerReadiness tick={readinessTick} />}{visibleGroups().map(renderGroup)}{connectionsFor(activeTab).length > 0 && diagnostics(connectionsFor(activeTab))}</>;
   };
@@ -301,12 +306,12 @@ export function Settings({ value, fields, onSaved, onError, onDirtyChange, accou
   };
   return <>
     <form class="settings" onSubmit={save}>
-      <p class="supporting">Stored securely at {String(value.settingsPath || 'data/settings.json')}. Blank secrets keep their current value. Fields supplied by the process environment are shown read-only.</p>
       <div class="settings-tabs" role="tablist" aria-label="Settings sections">
         {visibleTabs.map(t => <button type="button" role="tab" class={[t.id === 'maintenance' ? 'ops-start' : '', tabEdits(t.id).length > 0 ? 'dirty' : ''].filter(Boolean).join(' ')} aria-selected={activeTab === t.id} onClick={() => requestTab(t.id)}>{connectionsFor(t.id).length > 0 && <span class={`led ${tabLed(t.id)}`} aria-hidden="true" />}{t.label}</button>)}
       </div>
       <div class="settings-panel" role="tabpanel">{panelContent()}</div>
       {isConfigTab(activeTab) && <><div class="settings-actions"><span class="dirty-count" role="status">{tabEdits(activeTab).length > 0 ? `${tabEdits(activeTab).length} unsaved ${tabEdits(activeTab).length === 1 ? 'change' : 'changes'}` : ''}</span><button type="button" disabled={tabEdits(activeTab).length === 0} onClick={discard}>Discard changes</button><button class="primary" type="submit" disabled={tabEdits(activeTab).length === 0}>Save changes</button></div>{message && <p class="settings-status" role="status">{message}</p>}</>}
+      <p class="settings-footer">Stored securely at {String(value.settingsPath || 'data/settings.json')}. Blank secrets keep their current value. Fields supplied by the process environment are shown read-only.</p>
     </form>
     {updateSection}
     {help && <div class="overlay" role="dialog" aria-modal="true" aria-label={`Help for ${help.label}`}><section class="help-modal"><button class="close" onClick={() => setHelp(null)}>Close</button><h2>{help.label}</h2><p>{help.help}</p>{help.readOnly && <p><strong>This setting is managed by the process environment and cannot be edited here.</strong></p>}{help.restartRequired && <p><strong>Restart required after changing this setting.</strong></p>}{help.obtain && <><h3>Where to get it</h3><p>{linkify(help.obtain)}</p></>}<button onClick={() => void navigator.clipboard.writeText([help.help, help.obtain].filter(Boolean).join('\n\n')).then(() => setMessage('Help copied.'))}>Copy help</button></section></div>}

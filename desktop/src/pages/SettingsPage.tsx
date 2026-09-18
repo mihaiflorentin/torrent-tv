@@ -5,6 +5,7 @@ import { sharedApi } from '@torrent-tv/web/shared-api';
 import type { Settings as SettingsRecord } from '../bindings/github.com/mihaiflorentin/torrent-tv/internal/platform/config/models';
 import type { SchemaField, SettingsView } from '../bindings/github.com/mihaiflorentin/torrent-tv/internal/adapters/httpapi/models';
 import {
+  DefaultsInUse,
   LoadSettings,
   MissingRequired,
   RestartServer,
@@ -12,15 +13,15 @@ import {
   SettingsSchema,
 } from '../bindings/github.com/mihaiflorentin/torrent-tv/internal/gui/bindings';
 import { openExternal, usePortal, useServerState } from '../lib/state';
+import { LABEL_BY_KEY, TAB_BY_KEY } from '../lib/settings-links';
 
 // Settings page: the shared web Settings component with the bindings as the
 // PRIMARY save transport (works while the server is stopped — that is the
 // point). LoadSettings/SettingsSchema also come from the bindings; only the
 // Test and Maintenance tabs still talk HTTP to the live server, so a stopped
-// server gets the explanatory note above the form. A save that changes
-// restart-required fields surfaces the inline "Restart to apply" action; a
-// save that completes the required settings auto-starts the server purely
-// Go-side, and the state event flips the shell pill to running.
+// server gets the explanatory note inside those tabs. Nothing here gates the
+// server: FileList credentials are advisory (the banner says what degrades),
+// and the server auto-starts on launch Go-side.
 //
 // Portal parity with web: the Account tab exists only while the snapshot
 // says accounts are enabled (an outage or a disabled server unmounts the
@@ -33,6 +34,7 @@ export function SettingsPage({ updates }: { updates: UpdateController }) {
   const [value, setValue] = useState<SettingsView | null>(null);
   const [fields, setFields] = useState<SchemaField[]>([]);
   const [missing, setMissing] = useState<string[]>([]);
+  const [defaultsInUse, setDefaultsInUse] = useState<string[]>([]);
   const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [restartRequired, setRestartRequired] = useState(false);
@@ -44,15 +46,17 @@ export function SettingsPage({ updates }: { updates: UpdateController }) {
     let alive = true;
     void (async () => {
       try {
-        const [view, schema, missingKeys] = await Promise.all([
+        const [view, schema, missingKeys, defaults] = await Promise.all([
           LoadSettings(),
           SettingsSchema(),
           MissingRequired().catch(() => []),
+          DefaultsInUse().catch(() => []),
         ]);
         if (!alive) return;
         setValue(view);
         setFields(schema ?? []);
         setMissing(missingKeys ?? []);
+        setDefaultsInUse(defaults ?? []);
       } catch (e) {
         if (alive) setLoadError((e as Error).message);
       }
@@ -71,6 +75,7 @@ export function SettingsPage({ updates }: { updates: UpdateController }) {
     const result = await SaveSettings(out as unknown as SettingsRecord);
     setRestartRequired(result.restartRequired);
     setMissing(await MissingRequired().catch(() => []) ?? []);
+    setDefaultsInUse(await DefaultsInUse().catch(() => []) ?? []);
     return result;
   }
 
@@ -79,9 +84,9 @@ export function SettingsPage({ updates }: { updates: UpdateController }) {
     setValue(current => (current ? { ...current, ...saved } as SettingsView : current));
   }
 
-  function focusTracker() {
+  function focusTab(tab: string) {
     // The shared component reads its initial tab from the URL hash.
-    history.replaceState(null, '', '#tracker');
+    history.replaceState(null, '', `#${tab}`);
     setFormKey(key => key + 1);
   }
 
@@ -95,31 +100,83 @@ export function SettingsPage({ updates }: { updates: UpdateController }) {
     }
   }
 
+  // One-click fix from the warning card: persist the toggle without
+  // touching anything else, then re-derive the advisories and remount the
+  // form so its state matches the stored file.
+  async function turnOffFileList() {
+    if (!value) return;
+    try {
+      await SaveSettings({ ...value, fileListEnabled: false } as unknown as SettingsRecord);
+      setValue(current => (current ? { ...current, fileListEnabled: false } as SettingsView : current));
+      setMissing(await MissingRequired().catch(() => []) ?? []);
+      setDefaultsInUse(await DefaultsInUse().catch(() => []) ?? []);
+      setFormKey(key => key + 1);
+    } catch (e) {
+      setSaveError((e as Error).message);
+    }
+  }
+
   return (
     <section class="desktop-settings">
       {missing.length > 0 && (
-        <p class="settings-status" role="alert">
-          Required settings missing: {missing.join(', ')}. The server cannot start without them.
-          {' '}
-          <button type="button" onClick={focusTracker}>Set them in the Tracker tab</button>
-        </p>
+        <div class="status-card status-card--warning" role="status">
+          <p class="status-eyebrow">Needs attention</p>
+          <p class="status-title">FileList is on, but its credentials are missing.</p>
+          <p class="status-body">FileList searches fail until they are set. The server starts either way.</p>
+          <div class="status-actions">
+            {missing.map(key => (
+              <button
+                key={key}
+                type="button"
+                class="status-link"
+                aria-label={`Open ${LABEL_BY_KEY[key] ?? key} setting`}
+                onClick={() => focusTab(TAB_BY_KEY[key] ?? 'tracker')}
+              >
+                {LABEL_BY_KEY[key] ?? key}
+              </button>
+            ))}
+            <button type="button" class="status-link" onClick={() => void turnOffFileList()}>
+              Turn off FileList
+            </button>
+          </div>
+        </div>
       )}
-      {saveError && <p class="settings-status" role="alert">{saveError}</p>}
+      {defaultsInUse.length > 0 && (
+        <div class="status-card status-card--info" role="note">
+          <p class="status-eyebrow">Defaults in use</p>
+          <p class="status-title">{defaultsInUse.map(key => LABEL_BY_KEY[key] ?? key).join(defaultsInUse.length === 2 ? ' and ' : ', ')} {defaultsInUse.length === 1 ? 'is' : 'are'} still on the built-in default.</p>
+          <div class="status-actions">
+            {defaultsInUse.map(key => (
+              <button
+                key={key}
+                type="button"
+                class="status-link"
+                aria-label={`Open ${LABEL_BY_KEY[key] ?? key} setting`}
+                onClick={() => focusTab(TAB_BY_KEY[key] ?? 'server')}
+              >
+                {LABEL_BY_KEY[key] ?? key}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {saveError && (
+        <div class="status-card status-card--danger" role="alert">
+          <p class="status-eyebrow">Save failed</p>
+          <p class="status-title">{saveError}</p>
+        </div>
+      )}
       {restartRequired && (
-        <p class="settings-status">
-          Settings saved. Restart the server to apply the changed core settings.
-          {' '}
-          <button class="primary" type="button" onClick={() => void restart()}>Restart to apply</button>
-        </p>
-      )}
-      {server.state !== 'running' && (
-        <p class="supporting" role="note">
-          The server is {server.state}. Start the server to run tests — the Test and Maintenance tabs talk to the
-          live server and show their own errors until it runs. Settings are read from disk either way.
-        </p>
+        <div class="status-card status-card--info" role="status">
+          <p class="status-eyebrow">Restart to apply</p>
+          <p class="status-title">Settings saved. Core settings changed, so the server needs a restart.</p>
+          <div class="status-actions">
+            <button type="button" class="status-link" onClick={() => void restart()}>Restart the server</button>
+          </div>
+        </div>
       )}
       {loadError
-        ? <p class="settings-status" role="alert">Could not load settings: {loadError}</p>
+        ? <div class="status-card status-card--danger" role="alert"><p class="status-eyebrow">Load failed</p><p class="status-title">Could not load settings: {loadError}</p></div>
         : value
           ? <Settings
             key={formKey}
@@ -128,6 +185,7 @@ export function SettingsPage({ updates }: { updates: UpdateController }) {
             save={saveTransport}
             onSaved={onSaved}
             onError={message => setSaveError(message)}
+            serverLive={server.state === 'running'}
             accountsEnabled={portal.snapshot?.accountsEnabled === true}
             updateSection={server.state === 'running' && portal.status
               ? <UpdateSection client={sharedApi()} status={portal.status} connected={portal.connected} failure={portal.failure} controller={updates} openExternal={openExternal} />

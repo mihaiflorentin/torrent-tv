@@ -3189,3 +3189,86 @@ dl .tracker-badge,
  vertical-align: middle;
  margin-left: 6px;
 }
+
+/* Status cards: one device for every tier. The 3px left rail carries
+   severity by color; the eyebrow names the tier in text so it survives
+   color-blindness; actions are text links (navigation), underlined on
+   hover — never pill buttons, which read as disabled form controls. */
+.status-card {
+ margin: 0 0 10px;
+ padding: 12px 16px 12px 14px;
+ background: var(--panel);
+ border: 1px solid var(--line);
+ border-left-width: 3px;
+ border-radius: 10px
+}
+
+.status-card--warning {
+ border-left-color: var(--amber);
+ background: linear-gradient(90deg, #f2b84b12, transparent 55%), var(--panel)
+}
+
+.status-card--info { border-left-color: #a9bac266 }
+
+.status-card--danger {
+ border-left-color: var(--danger);
+ background: linear-gradient(90deg, #ff838312, transparent 55%), var(--panel)
+}
+
+.status-eyebrow {
+ margin: 0 0 2px;
+ font-size: 11px;
+ font-weight: 600;
+ letter-spacing: .08em;
+ text-transform: uppercase
+}
+
+.status-card--warning .status-eyebrow { color: var(--amber) }
+.status-card--info .status-eyebrow { color: var(--muted) }
+.status-card--danger .status-eyebrow { color: var(--danger) }
+
+.status-title {
+ margin: 0;
+ font-size: 14.5px;
+ font-weight: 500;
+ color: var(--text)
+}
+
+.status-body {
+ margin: 2px 0 0;
+ font-size: 13.5px;
+ color: var(--muted)
+}
+
+.status-actions {
+ display: flex;
+ flex-wrap: wrap;
+ gap: 2px 16px;
+ margin-top: 6px
+}
+
+.status-link {
+ display: inline-flex;
+ align-items: center;
+ min-height: 32px;
+ padding: 0;
+ border: 0;
+ background: none;
+ cursor: pointer;
+ font: inherit;
+ font-size: 13.5px;
+ color: var(--teal);
+ text-align: left;
+ text-decoration: underline;
+ text-underline-offset: 3px;
+ text-decoration-color: transparent
+}
+
+.status-link:hover, .status-link:focus-visible { text-decoration-color: currentColor }
+.status-link:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px }
+
+.settings-footer {
+ margin: 6px 0 0;
+ font-size: 12.5px;
+ color: var(--muted)
+}

@@ -93,12 +93,11 @@ func Defaults() Settings {
 }
 
 type Store struct {
-	mu           sync.RWMutex
-	path         string
-	base         Settings
-	value        Settings
-	envManaged   map[string]bool
-	fileProvided map[string]bool
+	mu         sync.RWMutex
+	path       string
+	base       Settings
+	value      Settings
+	envManaged map[string]bool
 }
 
 func Load() (*Store, error) {
@@ -115,7 +114,7 @@ func Load() (*Store, error) {
 // effective store never depends on the process working directory.
 func LoadAt(path string) (*Store, error) {
 	base := Defaults()
-	s := &Store{path: path, envManaged: map[string]bool{}, fileProvided: map[string]bool{}}
+	s := &Store{path: path, envManaged: map[string]bool{}}
 	b, err := os.ReadFile(s.path)
 	if err == nil {
 		if err = json.Unmarshal(b, &base); err != nil {
@@ -135,11 +134,6 @@ func LoadAt(path string) (*Store, error) {
 		var present map[string]json.RawMessage
 		if err := json.Unmarshal(b, &present); err != nil {
 			return nil, fmt.Errorf("decode settings: %w", err)
-		}
-		for _, key := range requiredKeys {
-			if _, ok := present[key]; ok {
-				s.fileProvided[key] = true
-			}
 		}
 		if _, ok := present["evictionRules"]; !ok {
 			base.EvictionRules = []string{"oldest-completed"}
@@ -299,15 +293,6 @@ func (s *Store) Save(next Settings) error {
 		return err
 	}
 	s.base, s.value, s.envManaged = persisted, effective, managed
-	// The file now carries every persisted key: required keys with a usable
-	// value count as file-provided, exactly as if the store had been loaded
-	// from this file. Without this, MissingRequired keeps reporting keys the
-	// user just saved (the GUI's completing-save auto-start reads it).
-	for _, key := range requiredKeys {
-		if strings.TrimSpace(requiredValue(persisted, key)) != "" {
-			s.fileProvided[key] = true
-		}
-	}
 	return nil
 }
 

@@ -51,26 +51,38 @@ func waitRunning(t *testing.T, sup *Supervisor) {
 	}
 }
 
-// TestRunnerBootDoesNotAnchorOrSave pins fix C1, case 1: a fresh boot with
-// incomplete config must NOT write the settings file (no boot-time anchor
-// Save), and MissingRequired still lists all three keys — the setup banner
-// under-asking was the regression.
-func TestRunnerBootDoesNotAnchorOrSave(t *testing.T) {
-	work := t.TempDir()
-	t.Chdir(work) // relative default paths mkdir under the temp CWD, not the repo
+// TestRunnerBootStartsWithIncompleteConfig pins the advisory-credentials
+// contract end to end: a fresh boot with blank FileList credentials starts
+// the server anyway (creds are advisory UI state, never a start gate), and
+// MissingRequired still lists both keys for the setup banner.
+func TestRunnerBootStartsWithIncompleteConfig(t *testing.T) {
+	t.Chdir(t.TempDir())
 	dir := t.TempDir()
-	settings := newRunnerStore(t, filepath.Join(dir, "settings.json"))
+	settingsPath := filepath.Join(dir, "settings.json")
+	body := `{` +
+		`"listenAddress": ":0",` +
+		`"torrentPeerPort": 0` +
+		`}`
+	if err := os.WriteFile(settingsPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	settings := newRunnerStore(t, settingsPath)
+	if got := settings.MissingRequired(); len(got) != 2 {
+		t.Fatalf("MissingRequired must list both FileList credential keys, got %v", got)
+	}
 
 	sup := runnerSupervisor(settings, dir)
-	err := sup.Start()
-	if err == nil || !strings.Contains(err.Error(), "required settings missing") {
-		t.Fatalf("incomplete config must refuse Start, got %v", err)
+	t.Cleanup(func() { _ = sup.Stop() })
+	if err := sup.Start(); err != nil {
+		t.Fatalf("boot must start despite incomplete config, got %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "settings.json")); !os.IsNotExist(err) {
-		t.Fatalf("boot must not create or rewrite the settings file, stat err=%v", err)
+	waitRunning(t, sup)
+
+	if sup.State() != StateRunning {
+		t.Fatalf("supervisor must be running, got %s", sup.State())
 	}
-	if got := settings.MissingRequired(); len(got) != 3 {
-		t.Fatalf("MissingRequired must still list all three keys, got %v", got)
+	if got := settings.MissingRequired(); len(got) != 2 {
+		t.Fatalf("MissingRequired must still list both FileList credential keys while running, got %v", got)
 	}
 }
 
@@ -227,17 +239,87 @@ func TestWireSupervisorRunsConfigureAppOnConstructedApp(t *testing.T) {
 	}
 }
 
-// TestMinimizedHidesOnlyWithCompleteConfig pins the boot fix: autostart
-// pins --minimized, so a wiped settings file must still open the setup
-// window instead of stranding the app as a silent tray-only process.
-func TestMinimizedHidesOnlyWithCompleteConfig(t *testing.T) {
-	if !minimizedHides(true, nil) {
-		t.Fatal("--minimized with complete config must hide the window")
+// TestMinimizedHidesFollowsFlag pins that --minimized alone decides whether the
+// window starts hidden: credentials are advisory and no longer gate startup or
+// window visibility.
+func TestMinimizedHidesFollowsFlag(t *testing.T) {
+	if !minimizedHides(true) {
+		t.Fatal("--minimized must hide the window")
 	}
-	if minimizedHides(true, []string{"fileListPasskey"}) {
-		t.Fatal("--minimized with incomplete config must show the setup window")
-	}
-	if minimizedHides(false, []string{"fileListPasskey"}) {
+	if minimizedHides(false) {
 		t.Fatal("a non-minimized launch always shows the window")
+	}
+}
+
+// TestCanStartCreatesDefaultRootAndSessionDirs pins the new start contract:
+// a settings file without downloadRoot does NOT refuse start for it — the
+// default root is accepted, and CanStart creates the download root and
+// torrent session directory on disk before the server starts.
+func TestCanStartCreatesDefaultRootAndSessionDirs(t *testing.T) {
+	t.Chdir(t.TempDir())
+	dir := t.TempDir()
+	body := `{` +
+		`"listenAddress": ":0",` +
+		`"torrentPeerPort": 0,` +
+		`"databasePath": "data/filelist.db",` +
+		`"fileListUsername": "user",` +
+		`"fileListPasskey": "pass"` +
+		`}`
+	settingsPath := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(settingsPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	settings := newRunnerStore(t, settingsPath)
+	if missing := settings.MissingRequired(); len(missing) != 0 {
+		t.Fatalf("settings without downloadRoot must not report missing keys: %v", missing)
+	}
+
+	sup := runnerSupervisor(settings, dir)
+	t.Cleanup(func() { _ = sup.Stop() })
+	if err := sup.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	waitRunning(t, sup)
+
+	for _, p := range []string{
+		filepath.Join(dir, "downloads"),
+		filepath.Join(dir, "torrent-session"),
+	} {
+		info, err := os.Stat(p)
+		if err != nil || !info.IsDir() {
+			t.Fatalf("start must create directory %s: %v", p, err)
+		}
+	}
+}
+
+// TestCanStartRefusesWhenDownloadRootCannotBeCreated pins the labeled
+// refusal: when downloadRoot sits under a regular file, CanStart refuses
+// with EnsureNativePathsWritable's "cannot create download root" error.
+func TestCanStartRefusesWhenDownloadRootCannotBeCreated(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "file")
+	if err := os.WriteFile(blocker, []byte("regular-file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	body := fmt.Sprintf(`{`+
+		`"listenAddress": ":0",`+
+		`"databasePath": %q,`+
+		`"downloadRoot": %q,`+
+		`"fileListUsername": "user",`+
+		`"fileListPasskey": "pass"`+
+		`}`, filepath.Join(dir, "filelist.db"), filepath.Join(blocker, "subdir"))
+	settingsPath := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(settingsPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	settings := newRunnerStore(t, settingsPath)
+
+	sup := runnerSupervisor(settings, dir)
+	err := sup.Start()
+	if err == nil || !strings.Contains(err.Error(), "cannot create download root") {
+		t.Fatalf("start must refuse with labeled probe error, got %v", err)
+	}
+	if sup.State() != StateStopped {
+		t.Fatalf("refused start must leave state stopped, got %s", sup.State())
 	}
 }

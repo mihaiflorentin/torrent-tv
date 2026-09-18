@@ -58,7 +58,7 @@ export function App() {
           {view === 'downloads' && <DownloadsPage />}
           {view === 'projects' && <ProjectsPage links={portal.snapshot?.links ?? []} openExternal={openExternal} />}
           {view === 'jobs' && <JobsPage />}
-          {view === 'server' && <ServerPage />}
+          {view === 'server' && <ServerPage onOpenSettings={() => setView('settings')} />}
           {view === 'settings' && <SettingsPage updates={updates} />}
         </main>
       </div>

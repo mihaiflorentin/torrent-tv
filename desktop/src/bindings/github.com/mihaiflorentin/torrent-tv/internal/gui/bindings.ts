@@ -52,6 +52,15 @@ export function DataDirInfo(): $CancellablePromise<[string, string]> {
 }
 
 /**
+ * DefaultsInUse lists the settings still running on their built-in default
+ * value (the download root anchored against the settings dir, the listen
+ * address raw) — a customization nudge, never a start blocker.
+ */
+export function DefaultsInUse(): $CancellablePromise<string[] | null> {
+ return $Call.ByName("github.com/mihaiflorentin/torrent-tv/internal/gui.Bindings.DefaultsInUse");
+}
+
+/**
  * DisableAutostart removes the OS launch-on-boot artifact.
  */
 export function DisableAutostart(): $CancellablePromise<void> {
@@ -76,8 +85,10 @@ export function LoadSettings(): $CancellablePromise<httpapi$0.SettingsView> {
 }
 
 /**
- * MissingRequired lists the required settings still absent; the Settings
- * page banners it and deep-links the Tracker tab.
+ * MissingRequired lists the FileList credentials still missing while
+ * FileList is enabled — advisory only: the server starts without them and
+ * FileList searches degrade. The Settings page renders it as a warning
+ * card whose actions deep-link the exact fields.
  */
 export function MissingRequired(): $CancellablePromise<string[] | null> {
  return $Call.ByName("github.com/mihaiflorentin/torrent-tv/internal/gui.Bindings.MissingRequired");
@@ -143,9 +154,7 @@ export function RestartServer(): $CancellablePromise<void> {
 
 /**
  * SaveSettings mirrors the HTTP PUT /api/v1/settings contract: native-path
- * probe, secrets-preserving save, restart-required diff. A save that
- * completes the required settings while the server is stopped auto-starts
- * it (the GUI form of "starts automatically once configuration is set").
+ * probe, secrets-preserving save, restart-required diff.
  */
 export function SaveSettings(next: config$0.Settings): $CancellablePromise<$models.SaveResult> {
  return $Call.ByName("github.com/mihaiflorentin/torrent-tv/internal/gui.Bindings.SaveSettings", next);
@@ -168,8 +177,9 @@ export function SettingsSchema(): $CancellablePromise<httpapi$0.SchemaField[] | 
 }
 
 /**
- * StartServer brings the server up (refused while required settings are
- * missing; that shows setup, not failure).
+ * StartServer brings the server up. Configuration problems (unwritable
+ * download root) refuse it with a labeled error; missing optional
+ * credentials never do.
  */
 export function StartServer(): $CancellablePromise<void> {
  return $Call.ByName("github.com/mihaiflorentin/torrent-tv/internal/gui.Bindings.StartServer");
