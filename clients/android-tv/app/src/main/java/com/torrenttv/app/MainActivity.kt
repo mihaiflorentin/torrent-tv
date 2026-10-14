@@ -3,6 +3,8 @@ package com.torrenttv.app
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.graphics.Color
+import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
@@ -10,6 +12,7 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.SurfaceView
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -89,7 +92,31 @@ class MainActivity : Activity(), ShellHost {
         layout.addView(view, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         setContentView(layout)
+        watchKeyboard(layout)
         view.loadUrl(UrlPolicy.APP_URL)
+    }
+
+    // Reports on-screen keyboard visibility to the page so its edit state
+    // ends when the keyboard hides and the next D-pad press navigates.
+    private fun watchKeyboard(layout: FrameLayout) {
+        val tracker = KeyboardVisibilityTracker()
+        val report = { visible: Boolean ->
+            tracker.update(visible)?.let { changed ->
+                webView?.evaluateJavascript(KeyboardVisibilityScripts.script(changed), null)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            layout.setOnApplyWindowInsetsListener { v, insets ->
+                report(insets.isVisible(WindowInsets.Type.ime()))
+                v.onApplyWindowInsets(insets)
+            }
+        } else {
+            layout.viewTreeObserver.addOnGlobalLayoutListener {
+                val frame = Rect()
+                layout.getWindowVisibleDisplayFrame(frame)
+                report(KeyboardVisibilityScripts.heightImpliesKeyboard(layout.rootView.height, frame.height()))
+            }
+        }
     }
 
     // The WebView is gone for good, so the panel is native; Back exits.
@@ -156,7 +183,7 @@ class MainActivity : Activity(), ShellHost {
         // native key is consumed so the WebView's own focus search can
         // never move focus a second time. Key repeats forward too: held
         // arrows keep scrolling.
-        DpadKeys.downScript(keyCode)?.let { script ->
+        DpadKeys.downScript(keyCode, DpadKeys.isRepeat(event?.repeatCount ?: 0))?.let { script ->
             webView?.evaluateJavascript(script, null)
             return true
         }

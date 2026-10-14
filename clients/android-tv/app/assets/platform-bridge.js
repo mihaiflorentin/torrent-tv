@@ -28,6 +28,13 @@
   },
   // Native Activity pause/resume: feeds the page's onVisibility
   // subscribers so the player saves its position and later reopens.
+  // Native on-screen keyboard show/hide: feeds the page's
+  // onKeyboardVisibility subscribers so edit mode ends on hide.
+  setKeyboardVisible: function(visible) {
+   keyboard.slice().forEach(function(listener) {
+    try { listener(Boolean(visible)); } catch (error) { }
+   });
+  },
   setVisible: function(visible) {
    visibility.slice().forEach(function(listener) {
     try { listener(Boolean(visible)); } catch (error) { }
@@ -36,7 +43,15 @@
  };
 
  var visibility = [];
+ var keyboard = [];
  var platform = window.FileListTVPlatform || {};
+ platform.onKeyboardVisibility = function(listener) {
+  keyboard.push(listener);
+  return function() {
+   var at = keyboard.indexOf(listener);
+   if (at >= 0) keyboard.splice(at, 1);
+  };
+ };
  platform.onVisibility = function(listener) {
   visibility.push(listener);
   return function() {
