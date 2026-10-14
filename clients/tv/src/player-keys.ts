@@ -44,6 +44,12 @@ export interface PlayerKeyPorts {
 /** Seek step: the fixed amount one seek input moves the playback position (GLOSSARY.md). */
 export const SEEK_STEP_MS = 10_000;
 
+/**
+ * Skip step: Next and Previous seek this far. The player has no episode or item queue (an episode is chosen from the
+ * title detail screen), so the keys skip a larger step instead.
+ */
+export const SKIP_STEP_MS = 60_000;
+
 /** Idle time after the last Seek step before the accumulated target is committed to AVPlay. */
 export const SEEK_COMMIT_MS = 550;
 
@@ -83,7 +89,8 @@ export class PlayerKeyController {
     const hidden = !p.controlsVisible() && !menu;
 
     if (action === 'rewind' || action === 'previous' || action === 'fast-forward' || action === 'next') {
-      this.#step(action === 'rewind' || action === 'previous' ? -SEEK_STEP_MS : SEEK_STEP_MS, hidden);
+      const size = action === 'previous' || action === 'next' ? SKIP_STEP_MS : SEEK_STEP_MS;
+      this.#step(action === 'rewind' || action === 'previous' ? -size : size, hidden);
       if (!hidden) p.reveal(menu);
       return;
     }

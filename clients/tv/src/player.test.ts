@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampSeek, formatTime, isDownloadComplete, normalizeTrack, parseVTT, playerAction, preferredAudio, preferredSubtitle, subtitleAt } from './player';
+import { clampSeek, formatTime, isEditableTarget, isDownloadComplete, normalizeTrack, parseVTT, playerAction, preferredAudio, preferredSubtitle, subtitleAt } from './player';
 
 describe('player helpers', () => {
   it('formats player time', () => { expect(formatTime(65_400)).toBe('1:05'); expect(formatTime(3_665_000)).toBe('1:01:05'); });
@@ -46,5 +46,32 @@ describe('playerAction LG back and Tizen media keys', () => {
     expect(playerAction('', 10232)).toBe('previous');
     expect(playerAction('', 10233)).toBe('next');
     expect(playerAction('', 10252)).toBe('play-pause');
+  });
+});
+
+describe('playerAction remote fallbacks', () => {
+  it('maps channel keys to next and previous by name and by keyCode (webOS 427/428, Tizen ChannelUp/Down)', () => {
+    expect(playerAction('ChannelUp', 0)).toBe('next');
+    expect(playerAction('ChannelDown', 0)).toBe('previous');
+    expect(playerAction('', 427)).toBe('next');
+    expect(playerAction('', 428)).toBe('previous');
+  });
+  it('maps the Tizen and webOS keyCodes with no key name', () => {
+    expect(playerAction('Unidentified', 10233)).toBe('next');
+    expect(playerAction('Unidentified', 10232)).toBe('previous');
+    expect(playerAction('', 412)).toBe('rewind');
+    expect(playerAction('', 417)).toBe('fast-forward');
+  });
+  it('leaves unrelated keys unmapped', () => { expect(playerAction('a', 65)).toBeNull(); });
+});
+
+describe('isEditableTarget', () => {
+  it('is true for text fields and editable content only', () => {
+    expect(isEditableTarget({ tagName: 'INPUT', type: 'text' })).toBe(true);
+    expect(isEditableTarget({ tagName: 'TEXTAREA' })).toBe(true);
+    expect(isEditableTarget({ tagName: 'DIV', isContentEditable: true })).toBe(true);
+    expect(isEditableTarget({ tagName: 'INPUT', type: 'checkbox' })).toBe(false);
+    expect(isEditableTarget({ tagName: 'BUTTON' })).toBe(false);
+    expect(isEditableTarget(null)).toBe(false);
   });
 });

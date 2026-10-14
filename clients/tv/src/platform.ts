@@ -2,7 +2,7 @@
 // feature-detected and guarded: webOS TVPlatformHooks when present, Tizen APIs,
 // the Android native bridge, silence when neither exists (spec Parity contract
 // rule 2 — feature detection, never platform branching in UI code).
-const MEDIA_KEYS = ['MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop', 'MediaRewind', 'MediaFastForward', 'MediaTrackPrevious', 'MediaTrackNext'];
+const MEDIA_KEYS = ['MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop', 'MediaRewind', 'MediaFastForward', 'MediaTrackPrevious', 'MediaTrackNext', 'ChannelUp', 'ChannelDown'];
 
 export interface NetworkInfo { ip: string; subnetMask: string; }
 export interface TVPlatformHooks {

@@ -30,11 +30,13 @@ describe('TV focus ring', () => {
   const ordered = stylesheetOrder().flatMap(rules);
   const ringRule = ordered.find(rule => rule.selectors.some(selector => plainFocus.has(selector)) && declaresShadow(rule));
 
-  it('is declared once for buttons, inputs and selects with the teal token', () => {
+  it('is declared once for buttons, inputs and selects with the focus ring token', () => {
     expect(stylesheetOrder()).toContain('tv.css');
     expect(ringRule?.sheet).toBe('tv.css');
     for (const selector of plainFocus) expect(ringRule?.selectors).toContain(selector);
-    expect(ringRule?.body).toContain('var(--teal)');
+    expect(ringRule?.body).toContain('var(--tt-focus-ring)');
+    expect(ringRule?.body).toContain('var(--tt-focus-edge)');
+    expect(ringRule?.body).toContain('var(--tt-focus-shadow-tv)');
   });
 
   it('is not overridden by any later rule on the same elements', () => {

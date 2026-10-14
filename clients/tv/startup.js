@@ -46,7 +46,7 @@
     var element = messageElement();
     if (!element) return;
     element.textContent = message;
-    if (failed) element.style.color = '#ff9b9b';
+    if (failed) element.style.color = 'var(--tt-danger, #ff7b86)';
   }
 
   window.FileListBoot = {
