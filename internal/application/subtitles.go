@@ -107,7 +107,7 @@ func (s *Service) SearchSubtitles(ctx context.Context, downloadID, language stri
 					}
 					lang := embeddedTrackLanguage(track)
 					label := embeddedTrackLabel(track)
-					items = append(items, domain.SubtitleCandidate{ID: strconv.Itoa(track.Index), Provider: "embedded", ProviderLabel: "Embedded", Language: lang, Title: label, FileName: label, ReleaseName: release.Name, Format: track.Codec, HearingImpaired: track.HearingImpaired, Forced: track.Forced, Default: track.Default, Description: "Embedded in the media file", Score: embeddedScore(track, lang, language, fallbackLanguage)})
+					items = append(items, domain.SubtitleCandidate{ID: strconv.Itoa(track.Index), Provider: "embedded", ProviderLabel: "Embedded", Language: lang, Title: embeddedTrackTitle(track, label), FileName: label, ReleaseName: release.Name, Format: track.Codec, HearingImpaired: track.HearingImpaired, Forced: track.Forced, Default: track.Default, Description: "Embedded in the media file", Score: embeddedScore(track, lang, language, fallbackLanguage)})
 				}
 				if bitmap > 0 {
 					warnings = append(warnings, domain.SubtitleProviderWarning{Provider: "embedded", Message: fmt.Sprintf("%d picture-based subtitle track(s) (PGS, VobSub) cannot be shown and were skipped", bitmap)})
@@ -380,6 +380,15 @@ func embeddedScore(track domain.MediaSubtitleTrack, lang, requested, fallback st
 		score += 3
 	}
 	return score
+}
+
+// embeddedTrackTitle is the title shown for a track: the container's own
+// title when it has one, otherwise the composed label.
+func embeddedTrackTitle(track domain.MediaSubtitleTrack, label string) string {
+	if title := strings.TrimSpace(track.Title); title != "" {
+		return title
+	}
+	return label
 }
 
 func embeddedTrackLabel(track domain.MediaSubtitleTrack) string {
