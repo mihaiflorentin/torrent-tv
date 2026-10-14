@@ -301,6 +301,8 @@ func assemble(settings *config.Store, log *slog.Logger) (_ *App, retErr error) {
 		httpapi.WithUpdates(app.Updates),
 	)
 	app.Server = &http.Server{Addr: current.ListenAddress, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 32 << 10}
+	// Shutdown waits for handlers; SSE streams never finish on their own.
+	app.Server.RegisterOnShutdown(service.CloseEventStreams)
 	return app, nil
 }
 

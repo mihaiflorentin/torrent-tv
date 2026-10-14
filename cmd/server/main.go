@@ -150,12 +150,22 @@ func runServe(dataDir string, update bool, log logger) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := app.Server.Shutdown(shutdownCtx); err != nil {
 			log.Error("graceful shutdown failed", "error", err)
+		}
+	}()
+	// ListenAndServe returns the moment Shutdown closes the listener, while
+	// in-flight handlers are still draining. After a signal, wait for the
+	// drain so the deferred app.Close does not shut the database under them.
+	defer func() {
+		if ctx.Err() != nil {
+			<-shutdownDone
 		}
 	}()
 

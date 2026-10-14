@@ -647,15 +647,19 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", event.ID, event.Kind, b)
 		flusher.Flush()
 	}
+	// Subscribe before replaying so events published in between are not
+	// lost; live events already covered by the replay are skipped by id.
+	stream, cancel := a.service.SubscribeEvents()
+	defer cancel()
+	delivered := after
 	if replay {
 		if events, err := a.service.Events(r.Context(), after, 200); err == nil {
 			for _, event := range events {
 				send(event)
+				delivered = max(delivered, event.ID)
 			}
 		}
 	}
-	stream, cancel := a.service.SubscribeEvents()
-	defer cancel()
 	heartbeat := time.NewTicker(20 * time.Second)
 	defer heartbeat.Stop()
 	for {
@@ -664,7 +668,11 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 			if !open {
 				return
 			}
+			if replay && event.ID <= delivered {
+				continue
+			}
 			send(event)
+			delivered = max(delivered, event.ID)
 		case <-heartbeat.C:
 			fmt.Fprint(w, ": keepalive\n\n")
 			flusher.Flush()

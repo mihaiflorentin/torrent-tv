@@ -37,6 +37,7 @@ type Service struct {
 	metaQueue        chan metadataRequest
 	eventMu          sync.Mutex
 	eventSubscribers map[chan domain.Event]struct{}
+	eventsClosed     bool
 	syncMu           sync.Mutex
 	refreshQueue     chan titleRefreshRequest
 	searchQueue      chan trackerSearchRequest
@@ -279,12 +280,14 @@ func (s *Service) publish(kind string, payload any) {
 	default:
 	}
 	b, _ := json.Marshal(payload)
+	// Assign the journal id and fan out under one lock so subscribers see
+	// ids strictly in order.
+	s.eventMu.Lock()
+	defer s.eventMu.Unlock()
 	event, err := s.repo.AppendEvent(context.Background(), kind, string(b))
 	if err != nil {
 		return
 	}
-	s.eventMu.Lock()
-	defer s.eventMu.Unlock()
 	for subscriber := range s.eventSubscribers {
 		select {
 		case subscriber <- event:
@@ -308,7 +311,11 @@ func (s *Service) PublishEvent(kind string, payload any) {
 func (s *Service) SubscribeEvents() (<-chan domain.Event, func()) {
 	ch := make(chan domain.Event, 32)
 	s.eventMu.Lock()
-	s.eventSubscribers[ch] = struct{}{}
+	if s.eventsClosed {
+		close(ch)
+	} else {
+		s.eventSubscribers[ch] = struct{}{}
+	}
 	s.eventMu.Unlock()
 	return ch, func() {
 		s.eventMu.Lock()
@@ -317,6 +324,19 @@ func (s *Service) SubscribeEvents() (<-chan domain.Event, func()) {
 			close(ch)
 		}
 		s.eventMu.Unlock()
+	}
+}
+
+// CloseEventStreams ends every live event subscription and refuses new ones.
+// http.Server.Shutdown waits for in-flight handlers and an SSE handler only
+// returns when its stream closes, so shutdown calls this first to drain.
+func (s *Service) CloseEventStreams() {
+	s.eventMu.Lock()
+	defer s.eventMu.Unlock()
+	s.eventsClosed = true
+	for subscriber := range s.eventSubscribers {
+		close(subscriber)
+		delete(s.eventSubscribers, subscriber)
 	}
 }
 
