@@ -23,6 +23,10 @@ export const UPDATE_DIALOG_REGION = 'update-dialog';
 // constants.
 export const SETTINGS_SAVE_ROW = 11;
 export const UPDATE_RELEASE_LINK_ROW = 12;
+// The Diagnostics disclosure sits between the update notice (12) and the
+// connection tests (13): a half row, so no pinned row renumbers. The tests
+// it reveals stay out of the DOM, and out of the D-pad graph, until it opens.
+export const SETTINGS_DIAGNOSTICS_ROW = UPDATE_RELEASE_LINK_ROW + 0.5;
 export const SETTINGS_TEST_FIRST_ROW = 13;
 export const SETTINGS_CHANGE_SERVER_ROW = 19;
 export const SETTINGS_FORGET_SERVER_ROW = 20;

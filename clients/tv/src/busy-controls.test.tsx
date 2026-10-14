@@ -459,9 +459,18 @@ describe('release link on the Settings screen', () => {
     await settle();
     expect(openExternal).toHaveBeenCalledWith(releaseUrl);
 
-    // Down continues to the connection tests, so the link is not a dead end.
+    // Down continues to the connection tests disclosure, so the link is not a dead end.
+    press('ArrowDown', 40);
+    const diagnostics = control(container, 'settings-diagnostics');
+    expect(document.activeElement).toBe(diagnostics);
+    expect(control(container, 'test-filelist')).toBeNull();
+    press('Enter', 13);
+    await settle();
+    // Opened, the tests follow it and Up walks back to the same controls.
     press('ArrowDown', 40);
     expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('test-filelist');
+    press('ArrowUp', 38);
+    expect(document.activeElement).toBe(diagnostics);
     press('ArrowUp', 38);
     expect(document.activeElement).toBe(link);
   });

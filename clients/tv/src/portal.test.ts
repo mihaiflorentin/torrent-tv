@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { UpdateStatus } from '@torrent-tv/shared';
 import {
   PROJECTS_MENU_ROW,
+  SETTINGS_DIAGNOSTICS_ROW,
   SETTINGS_FORGET_SERVER_ROW,
   SETTINGS_SAVE_ROW,
   SETTINGS_TEST_FIRST_ROW,
@@ -109,6 +110,8 @@ describe('focus identities', () => {
   it('pins the appended TVSettings rows and the projects menu row', () => {
     expect(UPDATE_RELEASE_LINK_ROW).toBe(SETTINGS_SAVE_ROW + 1);
     expect(SETTINGS_TEST_FIRST_ROW).toBe(UPDATE_RELEASE_LINK_ROW + 1);
+    expect(SETTINGS_DIAGNOSTICS_ROW).toBeGreaterThan(UPDATE_RELEASE_LINK_ROW);
+    expect(SETTINGS_DIAGNOSTICS_ROW).toBeLessThan(SETTINGS_TEST_FIRST_ROW);
     expect(UPDATE_CHECK_ROW).toBe(SETTINGS_FORGET_SERVER_ROW + 1);
     expect(UPDATE_APPLY_ROW).toBe(UPDATE_CHECK_ROW + 1);
     expect(PROJECTS_MENU_ROW).toBe(33);

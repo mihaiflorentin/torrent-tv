@@ -22,6 +22,6 @@ describe('TV CSS authored for Chromium 53', () => {
   it('keeps a solid outline on the focus ring besides the box-shadow', () => {
     const css = readFileSync(resolve(here, 'tv.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     const ring = /button:focus,\s*input:focus,\s*select:focus\s*\{([^{}]*)\}/.exec(css)?.[1] ?? '';
-    expect(ring).toMatch(/outline:\s*3px solid var\(--teal\)/);
+    expect(ring).toMatch(/outline:\s*4px solid var\(--tt-focus-ring\)/);
   });
 });
