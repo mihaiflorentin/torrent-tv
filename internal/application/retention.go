@@ -54,11 +54,11 @@ func (r retentionRoute) completedAt() time.Time {
 // toggles of the current run's settings snapshot (ADR-0004): incomplete and
 // actively-streamed (leased) downloads default to protected, favorites and
 // never-watched media are opt-in.
-func retentionProtected(route retentionRoute, settings config.Settings) bool {
+func (s *Service) retentionProtected(route retentionRoute, settings config.Settings) bool {
 	if settings.ProtectIncomplete && routeIncomplete(route) {
 		return true
 	}
-	if settings.ProtectLeased && routeLeased(route) {
+	if settings.ProtectLeased && s.routeLeased(route) {
 		return true
 	}
 	if settings.ProtectFavorites && route.favorite {
@@ -85,9 +85,9 @@ func routeIncomplete(route retentionRoute) bool {
 }
 
 // routeLeased reports whether any pinned row is being actively streamed.
-func routeLeased(route retentionRoute) bool {
+func (s *Service) routeLeased(route retentionRoute) bool {
 	for _, row := range route.rows {
-		if row.Leased {
+		if s.rowLeased(row) {
 			return true
 		}
 	}
@@ -319,7 +319,7 @@ func retentionDeficit(plan retentionPlan, settings config.Settings) (string, boo
 func (s *Service) evictNext(ctx context.Context, plan retentionPlan, reason string, settings config.Settings, rules []string) (retentionRoute, bool, error) {
 	candidates := make([]retentionRoute, 0, len(plan.routes))
 	for _, route := range plan.routes {
-		if !retentionProtected(route, settings) {
+		if !s.retentionProtected(route, settings) {
 			candidates = append(candidates, route)
 		}
 	}

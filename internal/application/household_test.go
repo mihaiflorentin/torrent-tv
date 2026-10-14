@@ -141,8 +141,7 @@ func TestHouseholdStateAndRemovalLifecycle(t *testing.T) {
 	if err := service.Manage(ctx, missing.ID, "remove", false); err == nil {
 		t.Fatal("leased download removal should be rejected")
 	}
-	missing.Leased = false
-	if err := repo.SaveDownload(ctx, missing); err != nil {
+	if err := repo.SetLease(ctx, missing.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	engine.err = domain.ErrTorrentNotFound
