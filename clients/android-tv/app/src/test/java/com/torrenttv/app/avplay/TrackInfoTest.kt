@@ -24,4 +24,16 @@ class TrackInfoTest {
         assertTrue(text.getString("extra_info").contains("ron"))
     }
     @Test fun `empty track list serializes to an empty array`() = assertEquals("[]", TrackInfo.toJson(emptyList()))
+    @Test fun `indices are numbered per type across mixed groups`() {
+        val json = TrackInfo.toJson(listOf(
+            TrackInfo.Track(type = "VIDEO", language = "", codec = "video/avc"),
+            TrackInfo.Track(type = "AUDIO", language = "eng", codec = "audio/eac3"),
+            TrackInfo.Track(type = "AUDIO", language = "ron", codec = "audio/ac3"),
+            TrackInfo.Track(type = "TEXT", language = "eng", codec = "text/vtt"),
+            TrackInfo.Track(type = "TEXT", language = "ron", codec = "text/vtt"),
+        ))
+        val parsed = org.json.JSONArray(json)
+        val indices = (0 until parsed.length()).map { parsed.getJSONObject(it).let { t -> t.getString("type") to t.getInt("index") } }
+        assertEquals(listOf("VIDEO" to 0, "AUDIO" to 0, "AUDIO" to 1, "TEXT" to 0, "TEXT" to 1), indices)
+    }
 }

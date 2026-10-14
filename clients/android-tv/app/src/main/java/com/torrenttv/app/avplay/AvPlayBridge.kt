@@ -108,8 +108,8 @@ class AvPlayBridge(private val surface: SurfaceView, private val dispatch: (Stri
     fun getDuration(): Double = lastDurationMs.toDouble()
 
     fun getTotalTrackInfo(): String {
-        val exo = player ?: return "[]"
-        return TrackInfo.toJson(tracksOf(exo))
+        // Called on the JS bridge thread; ExoPlayer is only readable on the main looper.
+        return onMainBlocking { player?.let { TrackInfo.toJson(tracksOf(it)) } } ?: "[]"
     }
 
     fun setSelectTrack(type: String, index: Int): Boolean {
@@ -163,14 +163,17 @@ class AvPlayBridge(private val surface: SurfaceView, private val dispatch: (Stri
     private fun tracksOf(exo: ExoPlayer): List<TrackInfo.Track> {
         val tracks = mutableListOf<TrackInfo.Track>()
         for (group in exo.currentTracks.groups) {
-            val format = group.mediaTrackGroup.getFormat(0)
             val type = when (group.type) {
                 C.TRACK_TYPE_AUDIO -> "AUDIO"
                 C.TRACK_TYPE_TEXT -> "TEXT"
                 C.TRACK_TYPE_VIDEO -> "VIDEO"
                 else -> continue
             }
-            tracks.add(TrackInfo.Track(type, format.language ?: "", format.sampleMimeType ?: ""))
+            // One entry per track, as setSelectTrack counts them.
+            for (trackIndex in 0 until group.mediaTrackGroup.length) {
+                val format = group.mediaTrackGroup.getFormat(trackIndex)
+                tracks.add(TrackInfo.Track(type, format.language ?: "", format.sampleMimeType ?: ""))
+            }
         }
         return tracks
     }
@@ -221,6 +224,19 @@ class AvPlayBridge(private val surface: SurfaceView, private val dispatch: (Stri
 
     private fun onMain(block: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) block() else main.post(block)
+    }
+
+    private fun <T> onMainBlocking(block: () -> T?): T? {
+        if (Looper.myLooper() == Looper.getMainLooper()) return block()
+        val result = AtomicReference<T?>(null)
+        val failure = AtomicReference<Throwable?>(null)
+        val done = CountDownLatch(1)
+        main.post {
+            try { result.set(block()) } catch (error: Throwable) { failure.set(error) } finally { done.countDown() }
+        }
+        done.await()
+        failure.get()?.let { throw it }
+        return result.get()
     }
 
     private fun withPlayer(block: (ExoPlayer) -> Unit) {
