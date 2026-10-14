@@ -70,12 +70,17 @@ The initial listener is `:8097`; requests are accepted only from loopback and RF
 
 Beyond the client address, the API checks the request's `Host` and `Origin` (ADR-0012):
 
-- `Host` must be an IP address or `localhost`. A request that arrives under any other hostname (a reverse proxy name, `torrenttv.local`) gets `403` until you list the name in `TORRENT_TV_ALLOWED_HOSTS`.
-- `Origin` is optional. Requests without one (curl, the TV runtimes that send none) pass. Browsers and packaged TV apps may send the server's own origin, `null` (Tizen and webOS), `https://appassets.androidplatform.net` (Android TV) or an origin you list in `TORRENT_TV_ALLOWED_ORIGINS`. Anything else gets `403`, and allowed origins are echoed back in `Access-Control-Allow-Origin` with `Vary: Origin`.
-- Settings, dependency tests and updates (`/api/v1/settings*`, `/api/v1/dependencies/*`, `/api/v1/updates/*`) accept only same-origin requests or requests with no `Origin`. `null` and the extra origins do not apply there.
-- `ffmpegPath` and `ffprobePath` must be absolute paths whose base name is `ffmpeg` or `ffprobe` (`.exe` on Windows). A changed value saved through the API must also be an executable file whose `-version` output starts with `ffmpeg version` or `ffprobe version`. A settings file holding a path with another base name is replaced by the default at startup, with a warning in the log.
+- `Host`: any value is accepted by default (IP, `torrenttv.local`, a router hostname), so the server works under whatever name the LAN uses.
+- `Origin` is optional. Requests without one (curl, the TV runtimes that send none) pass. Browsers and packaged TV apps may send the server's own origin, `null` (Tizen and webOS), `https://appassets.androidplatform.net` (Android TV), or any origin on the local network: `localhost`, loopback, RFC1918 and link-local IPs (`::1`, `fc00::/7`, `fe80::/10` included), and single-label, `.local`, `.lan` or `.home.arpa` names. Public web origins get `403`. Allowed origins are echoed back in `Access-Control-Allow-Origin` with `Vary: Origin`.
+- Settings, dependency tests and updates (`/api/v1/settings*`, `/api/v1/dependencies/*`, `/api/v1/updates/*`) accept requests with no `Origin`, the same origin, or a LAN origin. `null`, the Android asset origin and public origins are rejected there.
+- Because any Host is accepted, a public page that rebinds its DNS name to the server's LAN address is not blocked by default. Keep the server off the internet, or use the two variables below.
 
-Both environment variables take comma-separated values, for example `TORRENT_TV_ALLOWED_HOSTS=tv.home,proxy.lan` and `TORRENT_TV_ALLOWED_ORIGINS=https://tv.example`.
+Set these only if you expose the server publicly (and add your own authentication in front of it); both take comma-separated values and are unset by default:
+
+- `TORRENT_TV_ALLOWED_HOSTS`: a strict `Host` allowlist (port ignored). Any other `Host` gets `403`. Example: `TORRENT_TV_ALLOWED_HOSTS=tv.example.com`.
+- `TORRENT_TV_ALLOWED_ORIGINS`: a strict `Origin` allowlist. It turns off the LAN default and the built-in client origins, so only requests with no `Origin`, the same origin, or a listed origin pass; administration endpoints then accept only no `Origin` or the same origin. Add `null` and `https://appassets.androidplatform.net` to the list to keep the packaged TV clients working. Example: `TORRENT_TV_ALLOWED_ORIGINS=https://tv.example.com,null`.
+
+- `ffmpegPath` and `ffprobePath` must be absolute paths whose base name is `ffmpeg` or `ffprobe` (`.exe` on Windows). A changed value saved through the API must also be an executable file whose `-version` output starts with `ffmpeg version` or `ffprobe version`. A settings file holding a path with another base name is replaced by the default at startup, with a warning in the log.
 
 `instanceName` identifies the server in TV discovery results on both Tizen and webOS. Choose a short household-friendly name when more than one server exists on the LAN. Discovery validates `/api/v1/system/info`; it does not broadcast credentials or settings.
 

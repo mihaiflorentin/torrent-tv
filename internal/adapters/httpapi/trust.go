@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strings"
 )
 
-// Environment variables that widen the trust policy as a safety valve for
-// households behind a reverse proxy or a custom client. Both take a comma
+// Environment variables for exposing the server beyond the LAN. Unset, the
+// policy is the LAN default: any Host, and Origins limited to the LAN and the
+// packaged clients. Set, each becomes a strict allowlist. Both take a comma
 // separated list. See ADR-0012.
 const (
 	envAllowedOrigins = "TORRENT_TV_ALLOWED_ORIGINS"
@@ -23,20 +25,23 @@ var builtinClientOrigins = []string{"https://appassets.androidplatform.net"}
 
 // trustPolicy decides which Host and Origin values the API accepts.
 type trustPolicy struct {
-	origins map[string]bool // client tier: exact, lowercase
-	hosts   map[string]bool // extra hostnames without port, lowercase
+	origins map[string]bool // strict origin allowlist, exact and lowercase; nil means LAN default
+	hosts   map[string]bool // strict Host allowlist without port, lowercase; nil means any Host
 }
 
 func newTrustPolicy(getenv func(string) string) *trustPolicy {
-	p := &trustPolicy{origins: map[string]bool{"null": true}, hosts: map[string]bool{}}
-	for _, o := range builtinClientOrigins {
-		p.origins[o] = true
+	p := &trustPolicy{}
+	if list := splitList(getenv(envAllowedOrigins)); len(list) > 0 {
+		p.origins = map[string]bool{}
+		for _, o := range list {
+			p.origins[strings.TrimRight(o, "/")] = true
+		}
 	}
-	for _, o := range splitList(getenv(envAllowedOrigins)) {
-		p.origins[strings.TrimRight(o, "/")] = true
-	}
-	for _, h := range splitList(getenv(envAllowedHosts)) {
-		p.hosts[hostOnly(h)] = true
+	if list := splitList(getenv(envAllowedHosts)); len(list) > 0 {
+		p.hosts = map[string]bool{}
+		for _, h := range list {
+			p.hosts[hostOnly(h)] = true
+		}
 	}
 	return p
 }
@@ -60,18 +65,41 @@ func hostOnly(hostport string) string {
 	return strings.Trim(h, "[]")
 }
 
-// hostAllowed accepts IP literals, localhost and configured hostnames. A
-// DNS-rebinding page reaches the server under its own hostname, which none
-// of these admit.
+// hostAllowed accepts any Host unless TORRENT_TV_ALLOWED_HOSTS is set, in
+// which case only the listed names pass. The default trades DNS-rebinding
+// protection for working under any LAN name (IP, mDNS, router hostname).
 func (p *trustPolicy) hostAllowed(hostport string) bool {
-	h := hostOnly(hostport)
+	if p.hosts == nil {
+		return true
+	}
+	return p.hosts[hostOnly(hostport)]
+}
+
+// isLANOrigin reports whether origin is an http(s) origin whose host is
+// localhost, a loopback/private/link-local IP, or a single-label, .local,
+// .lan or .home.arpa name.
+func isLANOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return false
+	}
+	h := strings.ToLower(u.Hostname())
 	if h == "" {
 		return false
 	}
-	if _, err := netip.ParseAddr(h); err == nil {
+	if addr, err := netip.ParseAddr(h); err == nil {
+		addr = addr.Unmap()
+		return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast()
+	}
+	if h == "localhost" || !strings.Contains(h, ".") {
 		return true
 	}
-	return h == "localhost" || p.hosts[h]
+	for _, suffix := range []string{".local", ".lan", ".home.arpa"} {
+		if strings.HasSuffix(h, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // sameOrigin reports whether origin names the same authority as the request
@@ -84,13 +112,26 @@ func sameOrigin(origin, host string) bool {
 	return strings.EqualFold(u.Host, host)
 }
 
-// originAllowed applies the tier rule. Admin: no Origin or same-origin only.
-// Client: additionally "null", the packaged-client origins and configured ones.
+// originAllowed applies the tier rule. A missing or same-origin Origin always
+// passes. With TORRENT_TV_ALLOWED_ORIGINS set, only the listed origins pass
+// (client tier only). Otherwise the client tier also takes "null", the
+// packaged-client origins and LAN origins, and the admin tier takes LAN
+// origins but not "null" (a sandboxed iframe on any site sends it).
 func (p *trustPolicy) originAllowed(origin, host string, admin bool) bool {
 	if origin == "" || sameOrigin(origin, host) {
 		return true
 	}
-	return !admin && p.origins[strings.TrimRight(strings.ToLower(origin), "/")]
+	if p.origins != nil {
+		return !admin && p.origins[strings.TrimRight(strings.ToLower(origin), "/")]
+	}
+	if isLANOrigin(origin) {
+		return true
+	}
+	if admin {
+		return false
+	}
+	lower := strings.TrimRight(strings.ToLower(origin), "/")
+	return lower == "null" || slices.Contains(builtinClientOrigins, lower)
 }
 
 // isAdminPath marks the browser-only administration surface: settings
