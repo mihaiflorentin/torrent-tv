@@ -220,7 +220,7 @@ export function ServerPage({ onOpenSettings }: { onOpenSettings?: () => void } =
             {portal.status.selfUpdate && <button class="primary" type="button" disabled={transitioning} onClick={() => void run(async () => { await applyServerUpdate() })}>Download and install — Torrent TV restarts</button>}
           </p>
         )}
-        <div class="fields">
+        <div class="button-row">
           {server.state === 'running' || server.state === 'starting'
             ? <button class="primary" type="button" disabled={transitioning} onClick={() => void run(StopServer)}>Stop server</button>
             : <button class="primary" type="button" disabled={transitioning} onClick={() => void run(StartServer)}>Start server</button>}
@@ -253,24 +253,25 @@ export function ServerPage({ onOpenSettings }: { onOpenSettings?: () => void } =
       <fieldset>
         <legend>Details</legend>
         <p class="supporting">Version {version || '…'}</p>
-        <p class="supporting">Settings file: {settingsPath || '…'}</p>
-        <p class="supporting">
-          Data folder: {dataDir || '…'}{dataDirSource ? ` (from ${dataDirSource})` : ''}
-          {' '}
-          <button type="button" disabled={!dataDir} onClick={() => void run(() => OpenPath('data'))}>Open data folder</button>
-          {' '}
-          <button type="button" disabled={!dataDir} onClick={() => void run(() => OpenPath('logs'))}>Open logs folder</button>
-          {' '}
-          <button type="button" disabled={!dataDir} aria-expanded={logsOpen} onClick={() => setLogsOpen(open => !open)}>View logs</button>
-          {' '}
-          <button type="button" disabled={!dataDir} onClick={openChange}>Change…</button>
-        </p>
-        {logError && <p class="settings-status" role="alert">{logError}</p>}
-        {logsOpen && (
-          <pre class="log-view" ref={logView} onScroll={onLogScroll} aria-label="Server log tail">
-            {logLines.length ? logLines.map(line => renderLogLine(line) + '\n') : 'No log lines yet.'}
-          </pre>
-        )}
+        <details class="advanced-group" open={logsOpen || undefined}>
+          <summary>Folders and logs</summary>
+          <p class="supporting">Settings file: {settingsPath || '…'}</p>
+          <p class="supporting">
+            Data folder: {dataDir || '…'}{dataDirSource ? ` (from ${dataDirSource})` : ''}
+          </p>
+          <div class="button-row">
+            <button type="button" disabled={!dataDir} onClick={() => void run(() => OpenPath('data'))}>Open data folder</button>
+            <button type="button" disabled={!dataDir} onClick={() => void run(() => OpenPath('logs'))}>Open logs folder</button>
+            <button type="button" disabled={!dataDir} aria-expanded={logsOpen} onClick={() => setLogsOpen(open => !open)}>View logs</button>
+            <button type="button" disabled={!dataDir} onClick={openChange}>Change…</button>
+          </div>
+          {logError && <p class="settings-status" role="alert">{logError}</p>}
+          {logsOpen && (
+            <pre class="log-view" ref={logView} onScroll={onLogScroll} aria-label="Server log tail">
+              {logLines.length ? logLines.map(line => renderLogLine(line) + '\n') : 'No log lines yet.'}
+            </pre>
+          )}
+        </details>
       </fieldset>
       {changeOpen && (
         <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="change-data-dir-heading">

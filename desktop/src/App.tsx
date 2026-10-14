@@ -35,9 +35,11 @@ export function App() {
   const serverRunning = server.state === 'running';
   return (
     <div class="shell">
+      <a class="skip-link" href="#content">Skip to content</a>
       <nav class="shell-nav" aria-label="Sections">
+        <div class="shell-brand"><span class="brand-mark" aria-hidden="true">TT</span><strong>Torrent <span>TV</span></strong></div>
         {sections.map(s => (
-          <button key={s.id} class={view === s.id ? 'active' : ''} onClick={() => setView(s.id)}>
+          <button key={s.id} type="button" class={view === s.id ? 'active' : ''} aria-current={view === s.id ? 'page' : undefined} onClick={() => setView(s.id)}>
             <span class={`dot dot-${server.state}`} aria-hidden="true" />
             {s.label}
           </button>
@@ -46,14 +48,14 @@ export function App() {
       </nav>
       <div class="shell-main">
         <header class="shell-header">
-          <h1>Torrent TV</h1>
+          <h1>{sections.find(section => section.id === view)?.label}</h1>
           <span class={`pill pill-${server.state}`}>
             <span class={`dot dot-${server.state}`} aria-hidden="true" />
             {server.state === 'running' ? `Running${server.address ? ` · ${server.address}` : ''}`
               : server.state === 'failed' ? 'Failed' : server.state[0].toUpperCase() + server.state.slice(1)}
           </span>
         </header>
-        <main>
+        <main id="content">
           {serverRunning && portal.status?.available && (
             <UpdateNotice status={portal.status} controller={updates} openExternal={openExternal} />
           )}

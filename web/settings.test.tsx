@@ -227,6 +227,7 @@ describe('settings tabs', () => {
   await act(async () => { Array.from(panel().querySelectorAll<HTMLButtonElement>('.diagnostics button')).find(button => button.textContent === 'Test FileList')!.click() });
   await settle();
   expect(led().className).toContain('pass');
+  expect(panel().querySelector('.group-status')!.textContent).toContain('Connected');
   expect(panel().textContent).toContain('/dependencies/filelist/test ok');
   vi.spyOn(API.prototype, 'call').mockImplementation(async (path: string, init?: RequestInit) => {
    if (path === '/dependencies/tmdb/test') throw new Error('TMDB unreachable');
@@ -235,9 +236,49 @@ describe('settings tabs', () => {
   await act(async () => { Array.from(panel().querySelectorAll<HTMLButtonElement>('.diagnostics button')).find(button => button.textContent === 'Test TMDB')!.click() });
   await settle();
   expect(led().className).toContain('fail');
+  expect(panel().querySelector('.group-status')!.textContent).toContain('Needs attention');
   expect(panel().textContent).toContain('TMDB unreachable');
 
 
+ });
+
+ it('says nothing about a group until a connection check has run', async () => {
+  await openSettings();
+  expect(panel().querySelector('.group-status')).toBeNull();
+ });
+
+ it('keeps raw paths, ports and ids under an Advanced group on each tab', async () => {
+  await openSettings();
+  const inAdvanced = (label: string) => Boolean(fieldInput(label).closest('details.advanced-group'));
+  expect(inAdvanced('Metadata providers')).toBe(true);
+  expect(inAdvanced('FileList URL')).toBe(false);
+  await act(async () => { settingsTabs()[1].click() });
+  await settle();
+  expect(inAdvanced('Artwork cache path')).toBe(true);
+  expect(inAdvanced('Download root')).toBe(false);
+  await act(async () => { settingsTabs()[2].click() });
+  await settle();
+  expect(inAdvanced('Subtitle cache path')).toBe(true);
+  expect(inAdvanced('ffprobe path')).toBe(true);
+  expect(inAdvanced('Initial buffer')).toBe(false);
+  await act(async () => { settingsTabs()[3].click() });
+  await settle();
+  expect(inAdvanced('Database path')).toBe(true);
+  expect(inAdvanced('Listen address')).toBe(false);
+  // Closed by default, labelled for what it holds.
+  const advanced = panel().querySelector('details.advanced-group')!;
+  expect(advanced.hasAttribute('open')).toBe(false);
+  expect(advanced.querySelector('summary')!.textContent).toBe('Advanced');
+ });
+
+ it('holds an Advanced group open while one of its fields has an unsaved edit', async () => {
+  await openSettings();
+  await act(async () => { settingsTabs()[3].click() });
+  await settle();
+  const advanced = () => panel().querySelector('details.advanced-group')!;
+  expect(advanced().hasAttribute('open')).toBe(false);
+  await act(async () => { setFieldInput('Database path', '/tmp/other.db') });
+  expect(advanced().hasAttribute('open')).toBe(true);
  });
 
  it('lists every storage folder with its status after the storage test', async () => {
