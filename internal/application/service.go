@@ -2515,6 +2515,10 @@ func (s *Service) UpdatePlayback(ctx context.Context, sourceID string, positionM
 	threshold := int64(s.settings.Get().WatchedThresholdPercent)
 	if durationMS > 0 && positionMS*100 >= durationMS*threshold {
 		p.Watched = true
+	} else if p.Watched && positionMS > 0 && durationMS > 0 && positionMS*200 < durationMS*threshold {
+		// A rewatch that is well short of the threshold is a partial watch
+		// again; small scrubs near the end and zero-position saves keep it.
+		p.Watched = false
 	}
 	p.UpdatedAt = time.Now().UTC()
 	if err := s.repo.SavePlayback(ctx, p); err != nil {
@@ -2688,6 +2692,12 @@ func (s *Service) HouseholdState(ctx context.Context) (domain.HouseholdState, er
 			downloadByTitle[titleID] = download
 		}
 	}
+	// One snapshot of the library for every item: reading it per row made
+	// the cost quadratic in the playback history.
+	var libraryState *catalogStateIndex
+	if snapshot, snapErr := s.catalogState(ctx); snapErr == nil {
+		libraryState = &snapshot
+	}
 	for _, p := range playback {
 		playbackBySource[p.SourceID] = p
 		if titleID := releaseTitle[p.ReleaseID]; titleID != "" {
@@ -2695,7 +2705,14 @@ func (s *Service) HouseholdState(ctx context.Context) (domain.HouseholdState, er
 				latestByTitle[titleID] = p
 			}
 		}
-		item, ok := s.householdItem(ctx, p, false, titleSources[releaseTitle[p.ReleaseID]], releaseTitle[p.ReleaseID])
+		// Building an item is the expensive step; skip rows no list can
+		// still take (the display caps are checked again below for dedupe).
+		if len(state.Recent) >= 30 &&
+			(!p.Watched || len(state.Watched) >= 50) &&
+			(p.Watched || p.PositionMS <= 0 || len(state.ContinueWatching) >= 50) {
+			continue
+		}
+		item, ok := s.householdItem(ctx, p, false, titleSources[releaseTitle[p.ReleaseID]], releaseTitle[p.ReleaseID], libraryState)
 		if !ok {
 			continue
 		}
@@ -2741,7 +2758,7 @@ func (s *Service) HouseholdState(ctx context.Context) (domain.HouseholdState, er
 		if !hasPlayback {
 			p = domain.PlaybackState{ProfileID: householdProfile, ReleaseID: sources[0].Release.ID, FileIndex: -1}
 		}
-		item, ok := s.householdItem(ctx, p, true, sources, f.TitleID)
+		item, ok := s.householdItem(ctx, p, true, sources, f.TitleID, libraryState)
 		if ok {
 			state.Favorites = append(state.Favorites, item)
 		}
@@ -2765,7 +2782,7 @@ func betterHouseholdDownload(candidate, current domain.Download) bool {
 	return candidate.UpdatedAt.After(current.UpdatedAt)
 }
 
-func (s *Service) householdItem(ctx context.Context, p domain.PlaybackState, favorite bool, sources []domain.CatalogSource, titleID string) (domain.HouseholdItem, bool) {
+func (s *Service) householdItem(ctx context.Context, p domain.PlaybackState, favorite bool, sources []domain.CatalogSource, titleID string, library *catalogStateIndex) (domain.HouseholdItem, bool) {
 	release, err := s.repo.GetRelease(ctx, p.ReleaseID)
 	if err != nil {
 		return domain.HouseholdItem{}, false
@@ -2783,8 +2800,8 @@ func (s *Service) householdItem(ctx context.Context, p domain.PlaybackState, fav
 	if len(sources) > 0 {
 		title := groupCatalog(sources, false)[0]
 		s.applyCachedMetadata(&title)
-		if state, stateErr := s.catalogState(ctx); stateErr == nil {
-			title.LibraryState = state.sourcesState(sources)
+		if library != nil {
+			title.LibraryState = library.sourcesState(sources)
 		}
 		item.Catalog = &title
 		item.TitleID = title.ID
