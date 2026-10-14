@@ -55,10 +55,14 @@ type API struct {
 	// integration routes are only mounted when present.
 	portal  *portal.Hub
 	updates Coordinator
+	// internalToken authenticates the server's own ffmpeg/ffprobe requests
+	// back into the stream route, so they work whatever the listen address
+	// and trusted CIDRs are.
+	internalToken string
 }
 
 func New(service *application.Service, settings *config.Store, log *slog.Logger, version string, opts ...Option) http.Handler {
-	a := &API{service: service, settings: settings, log: log, version: version}
+	a := &API{service: service, settings: settings, log: log, version: version, internalToken: newInternalToken()}
 	for _, opt := range opts {
 		opt(a)
 	}
@@ -128,7 +132,7 @@ func New(service *application.Service, settings *config.Store, log *slog.Logger,
 	mux.HandleFunc("GET /api/v1/streams/{id}/browser", a.browserStream)
 	mux.HandleFunc("GET /api/v1/streams/{id}/snap", a.streamSnap)
 	mux.Handle("/", appShell(webFS))
-	return recoverer(log, access(log, trusted(settings, guard(newTrustPolicy(os.Getenv), mux))))
+	return recoverer(log, access(log, internalFetch(a.internalToken, mux, trusted(settings, guard(newTrustPolicy(os.Getenv), mux)))))
 }
 
 // appShell serves the embedded web build. A GET outside /api/ that matches no
@@ -1154,14 +1158,13 @@ func copyFlush(w io.Writer, r io.Reader) error {
 // start instead of the requested position.
 func (a *API) streamSnap(w http.ResponseWriter, r *http.Request) {
 	settings := a.settings.Get()
-	_, port, err := net.SplitHostPort(settings.ListenAddress)
-	if err != nil || port == "" {
+	input, err := internalStreamURL(settings.ListenAddress, r.PathValue("id"))
+	if err != nil {
 		problem(w, http.StatusInternalServerError, fmt.Errorf("invalid listen address for browser audio compatibility"))
 		return
 	}
 	requested := parseStartQuery(r.URL.Query().Get("startMs"), 0)
-	input := "http://127.0.0.1:" + port + "/api/v1/streams/" + r.PathValue("id")
-	start, probed := snapStartToVideoKeyframe(r.Context(), settings.FFprobePath, input, requested, a.log)
+	start, probed := snapStartToVideoKeyframe(r.Context(), settings.FFprobePath, input, requested, a.log, "-headers", internalFetchHeader+": "+a.internalToken+"\r\n")
 	write(w, 200, map[string]any{"requested": requested, "startMs": start, "snapped": probed})
 }
 
@@ -1171,11 +1174,12 @@ func (a *API) streamSnap(w http.ResponseWriter, r *http.Request) {
 // progressive playback strategy remains authoritative while a torrent grows.
 func (a *API) browserStream(w http.ResponseWriter, r *http.Request) {
 	settings := a.settings.Get()
-	_, port, err := net.SplitHostPort(settings.ListenAddress)
-	if err != nil || port == "" {
+	input, err := internalStreamURL(settings.ListenAddress, r.PathValue("id"))
+	if err != nil {
 		problem(w, http.StatusInternalServerError, fmt.Errorf("invalid listen address for browser audio compatibility"))
 		return
 	}
+	inputHeaders := []string{"-headers", internalFetchHeader + ": " + a.internalToken + "\r\n"}
 	info, complete, err := a.service.MediaInfo(r.Context(), r.PathValue("id"))
 	if err != nil {
 		if !complete {
@@ -1186,7 +1190,6 @@ func (a *API) browserStream(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	input := "http://127.0.0.1:" + port + "/api/v1/streams/" + r.PathValue("id")
 	// Stream-copied video resumes on the previous keyframe while re-encoded
 	// audio resumes exactly at the target, so a raw seek leaves the audio
 	// leading the picture by up to one GOP. Snap the target onto the
@@ -1195,7 +1198,7 @@ func (a *API) browserStream(w http.ResponseWriter, r *http.Request) {
 	// a second probe per seek.
 	startMs := parseStartQuery(r.URL.Query().Get("startMs"), info.DurationMS)
 	if r.URL.Query().Get("snapped") != "1" {
-		probed, _ := snapStartToVideoKeyframe(r.Context(), settings.FFprobePath, input, startMs, a.log)
+		probed, _ := snapStartToVideoKeyframe(r.Context(), settings.FFprobePath, input, startMs, a.log, inputHeaders...)
 		startMs = probed
 	}
 	args, _, err := browserStreamArgs(input, info, r.URL.Query().Get("audioTrack"), strconv.FormatInt(startMs, 10))
@@ -1203,6 +1206,8 @@ func (a *API) browserStream(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusBadRequest, err)
 		return
 	}
+	// -headers is an input option: it must precede the single -i.
+	args = append(append([]string{}, inputHeaders...), args...)
 	cmd := exec.CommandContext(r.Context(), settings.FFmpegPath, args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
