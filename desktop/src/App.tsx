@@ -8,6 +8,8 @@ import { JobsPage } from './pages/JobsPage';
 import { ServerPage } from './pages/ServerPage';
 import { SettingsPage } from './pages/SettingsPage';
 import './shell.css';
+import '@torrent-tv/shared/design/fonts.css';
+import '@torrent-tv/shared/design/tokens.css';
 import '@torrent-tv/web/style.css';
 
 // The Projects section mounts the shared web view against the desktop's

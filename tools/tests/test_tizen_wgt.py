@@ -263,6 +263,14 @@ class WGTTests(unittest.TestCase):
                     ):
                         tizen_wgt.validate_archive(inline, target)
 
+    def test_allows_the_shared_design_tokens_and_font_sheets(self):
+        design = Path(__file__).resolve().parents[2] / "clients/shared/design"
+        css = (design / "tokens.css").read_bytes() + (design / "fonts.css").read_bytes()
+        output = self.make_archive(VALID_CONFIG, VALID_HTML, {"app.css": css})
+        for target in ("5.0", "7.0"):
+            with self.subTest(target=target):
+                self.assertIn(f"target=Tizen {target}", tizen_wgt.validate_archive(output, target))
+
     def test_allows_css_near_misses(self):
         css = (
             b".a{box-shadow:inset 0 0 0 1px #000;top:0;right:0;bottom:0;left:0;accent-color:red}"

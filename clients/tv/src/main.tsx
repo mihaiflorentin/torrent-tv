@@ -10,6 +10,8 @@ import { discoverServers, DiscoveredServer, normalizeServerURL } from './discove
 import { appIdentity } from './app-name';
 import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL, registerMediaKeys } from './platform';
 import { detectCapabilities } from './capability';
+import '@torrent-tv/shared/design/fonts.css';
+import '@torrent-tv/shared/design/tokens.css';
 import './tv.css';
 import './performance.css';
 

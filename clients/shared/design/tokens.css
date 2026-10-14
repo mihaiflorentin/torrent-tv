@@ -1,0 +1,122 @@
+/* Torrent TV design tokens: the single source of design values for the browser
+   app (web/, desktop/) and the television client (clients/tv, webOS, Android TV).
+   Direction "Velvet Booth", dark only; the rules live in DESIGN.md.
+
+   Authoring limits (Tizen 5.0 Chromium 63, webOS 4 Chromium 53): custom
+   properties only (Chromium 49+), nothing on the forbidden-CSS lists in
+   tools/tizen_wgt.py and tools/webos_ipk.py, translucent colors written as
+   rgba(), no var() inside @media, no looping animation. The packaging
+   validators scan comments too, so this file never spells out a forbidden
+   construct. Checked by clients/shared/src/design-tokens.test.ts.
+
+   The --tt- prefix keeps these apart from the legacy --teal/--panel variables
+   still used by screens that have not migrated yet. */
+:root {
+ /* Surfaces: aubergine-black, so saffron is a complement and not a gold-on-grey default. */
+ --tt-ink: #0e0a15;
+ --tt-surface: #17111f;
+ --tt-raised: #221a2e;
+ --tt-overlay: #2c2239;
+ --tt-line: #3b3050;
+ --tt-line-strong: #7a6e92;
+
+ /* Text. Both clear 7:1 on every surface; --tt-text-muted is for secondary copy, never for the only carrier of a fact. */
+ --tt-text: #f8f2ea;
+ --tt-text-muted: #bdb3cc;
+
+ /* Saffron accent: selection, the primary action, progress. Never the only signal of a state. */
+ --tt-accent: #ffab2e;
+ --tt-accent-hover: #ffbc55;
+ --tt-accent-deep: #d98a0b;
+ --tt-on-accent: #1d1200;
+ --tt-accent-soft: rgba(255, 171, 46, 0.16);
+ --tt-accent-line: rgba(255, 171, 46, 0.5);
+
+ /* Status. Always paired with an icon or a word, never color alone. */
+ --tt-ok: #5fdca4;
+ --tt-warn: #ffd166;
+ --tt-danger: #ff7b86;
+ --tt-info: #8fc4ff;
+
+ /* Focus: two signals, a white inner edge plus a saffron outline drawn outside an offset gap,
+    so the ring contrasts with the surrounding surface and survives a saffron fill. */
+ --tt-focus-ring: #ffc861;
+ --tt-focus-edge: #ffffff;
+ --tt-focus-width-web: 3px;
+ --tt-focus-width-tv: 4px;
+ --tt-focus-offset: 3px;
+ --tt-focus-scale-tv: 1.045;
+ --tt-focus-shadow-tv: 0 0 0 7px rgba(255, 200, 97, 0.32), 0 16px 40px rgba(0, 0, 0, 0.6);
+
+ /* Type. One variable family (fonts.css); engines that skip it keep the platform sans. */
+ --tt-font-sans: "Bricolage Grotesque", system-ui, "Segoe UI", Arial, "Helvetica Neue", sans-serif;
+ --tt-weight-regular: 400;
+ --tt-weight-medium: 500;
+ --tt-weight-bold: 700;
+ --tt-weight-black: 800;
+ --tt-leading-tight: 1.15;
+ --tt-leading-body: 1.45;
+
+ /* Web type scale (rem, 16px root). */
+ --tt-text-xs: 0.8125rem;
+ --tt-text-sm: 0.9375rem;
+ --tt-text-md: 1rem;
+ --tt-text-lg: 1.25rem;
+ --tt-text-xl: 1.625rem;
+ --tt-text-2xl: 2.25rem;
+ --tt-text-display: 3.25rem;
+
+ /* TV type scale (px on the fixed 1920x1080 canvas, read at 3 m). Nothing a viewer must read goes below meta. */
+ --tt-tv-text-meta: 26px;
+ --tt-tv-text-body: 30px;
+ --tt-tv-text-lead: 36px;
+ --tt-tv-text-heading: 46px;
+ --tt-tv-text-title: 64px;
+ --tt-tv-text-display: 92px;
+
+ /* Spacing (4 px base; compose with margins on the TV engines) and TV safe area (5% of 1920x1080). */
+ --tt-space-1: 4px;
+ --tt-space-2: 8px;
+ --tt-space-3: 12px;
+ --tt-space-4: 16px;
+ --tt-space-5: 24px;
+ --tt-space-6: 32px;
+ --tt-space-7: 48px;
+ --tt-space-8: 64px;
+ --tt-space-9: 96px;
+ --tt-tv-safe-x: 96px;
+ --tt-tv-safe-y: 54px;
+
+ /* Touch and remote target sizes. */
+ --tt-target-web: 44px;
+ --tt-tv-target: 72px;
+
+ /* Radii. */
+ --tt-radius-sm: 6px;
+ --tt-radius-md: 10px;
+ --tt-radius-lg: 16px;
+ --tt-radius-pill: 999px;
+
+ /* Motion: short transitions on opacity, color, transform and shadow only. Nothing loops. */
+ --tt-dur-fast: 120ms;
+ --tt-dur-base: 180ms;
+ --tt-dur-slow: 260ms;
+ --tt-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+ /* Backdrop art: one blurred poster layer behind the rows, scrimmed so text always clears 4.5:1.
+    The TV blur is smaller because it runs on a half-resolution layer scaled up. */
+ --tt-scrim-top: rgba(14, 10, 21, 0.55);
+ --tt-scrim-text: rgba(14, 10, 21, 0.84);
+ --tt-scrim-bottom: rgba(14, 10, 21, 0.97);
+ --tt-veil: rgba(8, 5, 12, 0.8);
+ --tt-backdrop-blur-web: 36px;
+ --tt-backdrop-blur-tv: 18px;
+ --tt-backdrop-art-opacity: 0.55;
+
+ /* Player controls: a solid-enough bar and menus (no backdrop-filter), sized for 3 m, faded in and out as one layer. */
+ --tt-controls-surface: rgba(23, 17, 31, 0.92);
+ --tt-menu-surface: #221a2e;
+ --tt-tv-timeline-height: 12px;
+ --tt-tv-timeline-height-focus: 20px;
+ --tt-controls-fade: 200ms;
+}

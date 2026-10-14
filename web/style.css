@@ -1,5 +1,7 @@
 :root {
- font: 16px/1.5 "Segoe UI Variable", "Aptos", system-ui, sans-serif;
+ font-size: 16px;
+ line-height: 1.5;
+ font-family: var(--tt-font-sans, system-ui, sans-serif);
  color: #f4f7f8;
  background: #071014;
  --ink: #071014;

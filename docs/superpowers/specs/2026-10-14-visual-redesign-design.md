@@ -1,7 +1,7 @@
 # Visual redesign design
 
 Date: 2026-10-14
-Status: Draft, awaiting user review. The concrete visual direction is intentionally open and is decided at implementation.
+Status: Direction decided in #29 (Velvet Booth: aubergine-black, saffron accent, bundled Bricolage Grotesque, shared tokens, dark only). The record is `DESIGN.md` and `docs/design/direction-prototypes.html`; components and screens follow in #30 and #31.
 
 ## Problem
 

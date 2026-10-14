@@ -35,9 +35,11 @@ The server runs on a Raspberry Pi on the private LAN alongside qBittorrent. The 
 ## Brand Commitments
 
 - Product name: Torrent TV; television label: Torrent TV.
-- Original dark charcoal identity with restrained emerald/teal accents.
-- Plex is the primary information-architecture and media-library reference. Netflix is secondary inspiration for cinematic discovery, artwork-led rails, and an expanding navigation rail.
-- The result must be recognizably original rather than a trademark or palette imitation.
+- Identity "Velvet Booth": a dark aubergine-black screening room with one saffron accent (`#ffab2e`), one bundled variable typeface (Bricolage Grotesque, SIL OFL), and a blurred poster backdrop that follows focus. Dark only; there is no light theme.
+- One visual language for the browser app and the television client, built from the same shared design tokens (`clients/shared/design`). Density differs by platform, the palette does not.
+- Plex is the reference for information architecture and media-library structure only. The look, palette, type and layout must be recognizably original and must not imitate any streaming or media-server product.
+- Each screen shows only the data that helps the next decision. Title, year, state and one clear action come first; tracker names, release names, paths and raw counts sit behind details. Per-screen priorities are in `DESIGN.md`.
+- Hard limits: readable at 3 m on the television, an obvious focus state on every control, no looping decorative animation, and CSS that runs on Chromium 53 and 63.
 
 ## Evidence on Hand
 
@@ -57,4 +59,4 @@ The server runs on a Raspberry Pi on the private LAN alongside qBittorrent. The 
 
 ## Accessibility & Inclusion
 
-All browser functionality must be keyboard accessible. Television focus must be immediately visible at viewing distance, never become trapped, and restore predictably across routes and overlays. Motion must respect reduced-motion preferences, and meaningful artwork must have text alternatives.
+All browser functionality must be keyboard accessible. Television focus must be immediately visible at viewing distance, never become trapped, and restore predictably across routes and overlays. Text and focus indicators meet WCAG AA contrast. Motion must respect reduced-motion preferences, and meaningful artwork must have text alternatives.

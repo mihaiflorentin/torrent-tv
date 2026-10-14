@@ -1,6 +1,6 @@
 /* Spacing convention: flex/grid gap is off-limits on the Tizen 5.0 floor (ADR-0006); emulate with adjacent-sibling margins plus compensating container margins. */
 :root {
- font-family: Arial, "Helvetica Neue", sans-serif;
+ font-family: var(--tt-font-sans, Arial, "Helvetica Neue", sans-serif);
  color: #f4f7f8;
  background: #090d10;
  --ink: #090d10;

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Torrent TV visual direction prototypes</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!--
+  Design record for ticket #29 (spec #9). Three directions, one chosen: A, "Velvet Booth".
+  Static mock-ups with fictional gradient "posters"; no licensed artwork. This file is a
+  review artifact, not shipped CSS, so it may use grid, gap and filter freely. The shipped
+  tokens live in clients/shared/design/tokens.css. Only direction A renders in its real
+  face (the bundled Bricolage Grotesque); B and C use system faces as stand-ins for the
+  faces they would have needed.
+-->
+<style>
+@font-face{font-family:"Bricolage Grotesque";font-weight:200 800;font-display:swap;
+  src:url("../../clients/shared/design/fonts/bricolage-grotesque-latin-wght.woff2") format("woff2-variations")}
+*{box-sizing:border-box}
+body{margin:0;padding:40px;background:#0b0b0d;color:#eee;font:16px/1.5 system-ui,sans-serif}
+h1{font-size:28px;margin:0 0 6px}
+.lede{max-width:880px;color:#bbb;margin:0 0 32px}
+.dir{margin:0 0 56px}
+.dir h2{font-size:20px;margin:0 0 4px}
+.dir .verdict{color:#bbb;margin:0 0 14px;max-width:880px}
+.chosen h2::after{content:"  CHOSEN";font-size:12px;letter-spacing:.12em;padding:3px 8px;margin-left:10px;border-radius:99px;background:#ffab2e;color:#1d1200;vertical-align:middle}
+.frame{position:relative;width:960px;height:660px;overflow:hidden;border-radius:6px}
+.swatches{display:flex;gap:8px;margin:12px 0 0;flex-wrap:wrap}
+.sw{width:112px;height:56px;border-radius:6px;padding:6px 8px;font-size:11px;line-height:1.3;display:flex;align-items:flex-end;border:1px solid rgba(255,255,255,.15)}
+.bd{position:absolute;left:-60px;top:-60px;right:-60px;bottom:-60px;filter:blur(36px);opacity:.95}
+.scrim{position:absolute;left:0;right:0;top:0;bottom:0}
+.hero{position:absolute;left:56px;top:40px;width:520px}
+.hero small{display:block;margin-bottom:8px}
+.hero h3{margin:0 0 8px;font-size:48px;line-height:1.05}
+.hero p{margin:0 0 16px;font-size:18px;max-width:460px}
+.btn{display:inline-block;padding:12px 24px;border-radius:10px;font-weight:700;font-size:18px}
+.row{position:absolute;left:56px;right:56px;top:322px;display:flex;gap:18px}
+.row h4{position:absolute;top:-30px;margin:0;font-size:18px}
+.card{width:150px}
+.poster{height:170px;border-radius:8px;display:flex;align-items:flex-end;padding:10px;font-weight:800;font-size:44px;color:rgba(255,255,255,.9)}
+.card b{display:block;margin-top:8px;font-size:17px}
+.card span{font-size:15px}
+.spec{position:absolute;left:56px;right:56px;bottom:14px;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-radius:10px}
+.spec .facts span{margin-right:16px;font-size:17px}
+/* A: Velvet Booth */
+.A{background:#0e0a15;color:#f8f2ea;font-family:"Bricolage Grotesque",Arial,sans-serif}
+.A .bd{background:radial-gradient(circle at 70% 30%,#c1521f,transparent 55%),radial-gradient(circle at 30% 80%,#4a2a8a,transparent 55%)}
+.A .scrim{background:linear-gradient(180deg,rgba(14,10,21,.35),rgba(14,10,21,.84) 62%,rgba(14,10,21,.97))}
+.A small{color:#ffab2e;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:15px}
+.A .btn{background:#ffab2e;color:#1d1200}
+.A .poster{background:linear-gradient(160deg,#3b2a63,#7a2e55)}
+.A .card:nth-child(2) .poster{background:linear-gradient(160deg,#c1521f,#5a1d3a)}
+.A .card:nth-child(3) .poster{background:linear-gradient(160deg,#1d4a5a,#3b2a63)}
+.A .card:nth-child(4) .poster{background:linear-gradient(160deg,#7a2e55,#14304a)}
+.A .card:nth-child(5) .poster{background:linear-gradient(160deg,#5a4a1d,#3b2a63)}
+.A .card{opacity:.72}
+.A .card.focus{opacity:1;transform:scale(1.045)}
+.A .card.focus .poster{outline:4px solid #ffc861;outline-offset:3px;border:3px solid #fff;box-shadow:0 0 0 7px rgba(255,200,97,.32),0 16px 40px rgba(0,0,0,.6)}
+.A .card span{color:#bdb3cc}
+.A .spec{background:rgba(23,17,31,.92);border:1px solid #3b3050}
+.A .spec .facts span{color:#f8f2ea}.A .spec .facts span:first-child{color:#ffab2e;font-weight:700}
+/* B: Lamplit Study */
+.B{background:#15100b;color:#f3ead9;font-family:Georgia,serif}
+.B .bd{background:radial-gradient(circle at 25% 35%,#b0701c,transparent 55%),radial-gradient(circle at 80% 70%,#5b3a1c,transparent 50%)}
+.B .scrim{background:linear-gradient(90deg,rgba(21,16,11,.92),rgba(21,16,11,.6) 60%,rgba(21,16,11,.9))}
+.B small{color:#e5a13a;font-style:italic;font-size:17px}
+.B h3{font-weight:400}
+.B .btn{border:2px solid #e5a13a;color:#f3ead9;border-radius:2px;background:transparent}
+.B .poster{background:linear-gradient(160deg,#6b4a2a,#2a1c10);border-radius:2px}
+.B .card.focus .poster{outline:3px solid #e5a13a;outline-offset:4px}
+.B .card span{color:#c8b99c}
+.B .spec{background:#1d160f;border-top:2px solid #e5a13a;border-radius:0}
+.B .spec .facts span{color:#f3ead9}
+/* C: Graphite Gate */
+.C{background:#0c0f12;color:#e8ecef;font-family:system-ui,sans-serif}
+.C .bd{background:radial-gradient(circle at 60% 40%,#2c4a66,transparent 55%),radial-gradient(circle at 20% 80%,#444,transparent 50%);opacity:.45}
+.C .scrim{background:linear-gradient(180deg,rgba(12,15,18,.7),rgba(12,15,18,.95))}
+.C small{color:#8d98a2;font-family:ui-monospace,monospace;letter-spacing:.06em}
+.C .btn{background:#e8ecef;color:#0c0f12;border-radius:2px}
+.C .poster{background:linear-gradient(160deg,#2a3642,#161c22);border-radius:2px}
+.C .card.focus .poster{outline:4px solid #ffab2e;outline-offset:3px}
+.C .card span{color:#8d98a2;font-family:ui-monospace,monospace}
+.C .spec{background:#12171c;border:1px solid #2a323a;border-radius:2px;font-family:ui-monospace,monospace}
+.C .spec .facts span{color:#e8ecef}
+</style>
+</head>
+<body>
+<h1>Visual direction for Torrent TV</h1>
+<p class="lede">Three dark directions with a saffron accent and a blurred poster backdrop, as decided for ticket #29. Each frame shows the same moment: Home, the focused title, and a source row. Posters are fictional gradients. Each direction was checked against the hard limits: original look, readable at 3 m, obvious focus, no looping animation, Chromium 53 and 63 CSS.</p>
+
+<section class="dir chosen">
+<h2>A. Velvet Booth</h2>
+<p class="verdict">Aubergine-black ink with saffron: orange against violet is a complement, so the accent reads as projector light in a dark room and not as a gold-on-grey streaming default. Bricolage Grotesque gives titles an opinionated voice at weight 700 to 800 and stays plain at 400. Signature: the backdrop follows focus, so the focused poster becomes the blurred room light while its neighbours dim. Source facts sit in a spec strip (resolution, codec, size, seeders). Chosen: it is the only one of the three that is distinct on all of palette, type and signature, and the signature costs nothing at runtime beyond one opacity crossfade.</p>
+<div class="frame A">
+  <div class="bd"></div><div class="scrim"></div>
+  <div class="hero"><small>Series · 2019</small><h3>The Long Reel</h3><p>A projectionist inherits a cinema and the films nobody collected.</p><span class="btn">View versions</span></div>
+  <div class="row"><h4>Continue watching</h4>
+    <div class="card"><div class="poster">L</div><b>Lanterns</b><span>2021 · 2160p</span></div>
+    <div class="card focus"><div class="poster">T</div><b>The Long Reel</b><span>S01E03 · 41% watched</span></div>
+    <div class="card"><div class="poster">N</div><b>Night Ferry</b><span>2018 · 1080p</span></div>
+    <div class="card"><div class="poster">O</div><b>Orchard Street</b><span>2022 · 1080p</span></div>
+    <div class="card"><div class="poster">V</div><b>Vesper</b><span>2020 · 720p</span></div>
+  </div>
+  <div class="spec"><div class="facts"><span>2160p HDR</span><span>HEVC</span><span>18.4 GB</span><span>214 seeders</span></div><span class="btn" style="background:#ffab2e;color:#1d1200;padding:8px 20px;font-size:16px">Play and download</span></div>
+</div>
+<div class="swatches">
+  <div class="sw" style="background:#0e0a15">ink #0e0a15</div><div class="sw" style="background:#17111f">surface #17111f</div><div class="sw" style="background:#221a2e">raised #221a2e</div>
+  <div class="sw" style="background:#ffab2e;color:#1d1200">saffron #ffab2e</div><div class="sw" style="background:#f8f2ea;color:#0e0a15">text #f8f2ea</div><div class="sw" style="background:#bdb3cc;color:#0e0a15">muted #bdb3cc</div>
+</div>
+</section>
+
+<section class="dir">
+<h2>B. Lamplit Study</h2>
+<p class="verdict">Warm umber ink, cream text, a serif display face and an underline-style focus. Quiet and literary, with a flat editorial layout. Rejected: warm brown with gold and a serif is one of the common defaults for "premium dark", it sits close to existing gold-on-brown media apps, and a serif display face is weakest at 3 m on a low-density TV panel.</p>
+<div class="frame B">
+  <div class="bd"></div><div class="scrim"></div>
+  <div class="hero"><small>Series, 2019</small><h3>The Long Reel</h3><p>A projectionist inherits a cinema and the films nobody collected.</p><span class="btn">View versions</span></div>
+  <div class="row"><h4>Continue watching</h4>
+    <div class="card"><div class="poster">L</div><b>Lanterns</b><span>2021 · 2160p</span></div>
+    <div class="card focus"><div class="poster">T</div><b>The Long Reel</b><span>S01E03 · 41% watched</span></div>
+    <div class="card"><div class="poster">N</div><b>Night Ferry</b><span>2018 · 1080p</span></div>
+    <div class="card"><div class="poster">O</div><b>Orchard Street</b><span>2022 · 1080p</span></div>
+    <div class="card"><div class="poster">V</div><b>Vesper</b><span>2020 · 720p</span></div>
+  </div>
+  <div class="spec"><div class="facts"><span>2160p HDR</span><span>HEVC</span><span>18.4 GB</span><span>214 seeders</span></div><span class="btn" style="padding:8px 20px;font-size:16px">Play and download</span></div>
+</div>
+</section>
+
+<section class="dir">
+<h2>C. Graphite Gate</h2>
+<p class="verdict">Cool graphite, a single saffron signal reserved for focus and selection, monospace for source facts to push the "source quality at the decision point" principle. Rejected: near-black with one bright accent is the other common default, and a monospace data face repeats the tracker-table look the product set out to avoid. Its one good idea, technical facts set apart from titles, is kept in A as the spec strip.</p>
+<div class="frame C">
+  <div class="bd"></div><div class="scrim"></div>
+  <div class="hero"><small>SERIES / 2019</small><h3>The Long Reel</h3><p>A projectionist inherits a cinema and the films nobody collected.</p><span class="btn">View versions</span></div>
+  <div class="row"><h4>Continue watching</h4>
+    <div class="card"><div class="poster">L</div><b>Lanterns</b><span>2021 · 2160p</span></div>
+    <div class="card focus"><div class="poster">T</div><b>The Long Reel</b><span>S01E03 · 41%</span></div>
+    <div class="card"><div class="poster">N</div><b>Night Ferry</b><span>2018 · 1080p</span></div>
+    <div class="card"><div class="poster">O</div><b>Orchard Street</b><span>2022 · 1080p</span></div>
+    <div class="card"><div class="poster">V</div><b>Vesper</b><span>2020 · 720p</span></div>
+  </div>
+  <div class="spec"><div class="facts"><span>2160p HDR</span><span>HEVC</span><span>18.4 GB</span><span>214 seeders</span></div><span class="btn" style="padding:8px 20px;font-size:16px">Play and download</span></div>
+</div>
+</section>
+</body>
+</html>

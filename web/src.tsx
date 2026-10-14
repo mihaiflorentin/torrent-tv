@@ -12,6 +12,8 @@ import { Jobs } from './jobs';
 import { ProjectsPage } from './projects';
 import { PortalAccountDialog, PortalSidebarDock, UpdateApplyConfirm, UpdateNotice, UpdateSection, useUpdateController } from './portal';
 import { sharedApi } from './shared-api';
+import '@torrent-tv/shared/design/fonts.css';
+import '@torrent-tv/shared/design/tokens.css';
 import './style.css';
 
 const api = sharedApi();

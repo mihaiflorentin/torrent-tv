@@ -568,6 +568,11 @@ echo "corrupt-archive" > "$out_dir/bad.ipk"
     def test_accepts_chromium53_safe_built_css(self):
         self.assertIn("Compatible webOS package", self.validate_css(self.GOOD_CSS))
 
+    def test_accepts_the_shared_design_tokens_and_font_sheets(self):
+        design = Path(__file__).resolve().parents[2] / "clients/shared/design"
+        shared = (design / "tokens.css").read_bytes() + (design / "fonts.css").read_bytes()
+        self.assertIn("Compatible webOS package", self.validate_css(shared + self.GOOD_CSS))
+
     def test_rejects_four_and_eight_digit_hex_in_built_css(self):
         for color in (b"#000b", b"#0c1216f5", b"#FFFA"):
             with self.subTest(color=color):
