@@ -92,6 +92,9 @@ func assemble(settings *config.Store, log *slog.Logger) (_ *App, retErr error) {
 	// paths do not exist, persisting what is found. A missing tool only
 	// degrades subtitle probing and audio fallback at runtime, so warn
 	// instead of failing startup.
+	for _, warning := range settings.StartupWarnings() {
+		log.Warn("settings value replaced at startup", "reason", warning)
+	}
 	unfound, err := settings.ResolveMediaTools()
 	if err != nil {
 		return nil, err

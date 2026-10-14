@@ -27,7 +27,7 @@ func newShellHandler(t *testing.T) http.Handler {
 func TestAppShellServesClientRoutes(t *testing.T) {
 	handler := newShellHandler(t)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/library/downloads", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/library/downloads", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /library/downloads status = %d, want 200", rec.Code)
 	}
@@ -42,7 +42,7 @@ func TestAppShellServesClientRoutes(t *testing.T) {
 func TestAppShellServesRoot(t *testing.T) {
 	handler := newShellHandler(t)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `id="app"`) {
 		t.Fatalf("GET / status = %d body = %q, want the app shell", rec.Code, rec.Body.String())
 	}
@@ -51,7 +51,7 @@ func TestAppShellServesRoot(t *testing.T) {
 func TestAppShellStillServesAssets(t *testing.T) {
 	handler := newShellHandler(t)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/assets/app.js", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/assets/app.js", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /assets/app.js status = %d, want 200", rec.Code)
 	}
@@ -63,12 +63,12 @@ func TestAppShellStillServesAssets(t *testing.T) {
 func TestAppShellKeepsAPIRouting(t *testing.T) {
 	handler := newShellHandler(t)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/unknown", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/unknown", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("GET /api/v1/unknown status = %d, want 404", rec.Code)
 	}
 	rec = httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/system/info", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/system/info", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /api/v1/system/info status = %d, want 200", rec.Code)
 	}

@@ -99,6 +99,6 @@ The server writes structured JSON to both stdout/journald and `data/logs/server.
 
 ## Security model
 
-Release 1 has no client login. Remote addresses must fall within the configured trusted CIDRs; forwarded-address headers are ignored. FileList passkeys, Basic headers, torrent download URLs, qB credentials, settings contents, and absolute media paths are never returned to clients or written to normal logs.
+Release 1 has no client login. Remote addresses must fall within the configured trusted CIDRs; forwarded-address headers are ignored. The API also validates `Host` (IP literal, `localhost` or a configured name), restricts cross-origin access to the packaged clients, and limits administration endpoints to same-origin requests; see ADR-0012 and `docs/CONFIGURATION.md`. FileList passkeys, Basic headers, torrent download URLs, qB credentials, settings contents, and absolute media paths are never returned to clients or written to normal logs.
 
 Incomplete torrent paths use qBittorrent's effective `temp_path`; completed paths use `content_path`, falling back to `save_path` for older responses. Temporary and final locations must resolve beneath the configured download root or the request is rejected. The production service runs as `torrent-tv` with supplementary membership in the `qbittorrent` group so it can traverse and read the download tree.

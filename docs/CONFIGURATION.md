@@ -68,6 +68,15 @@ The optional TMDB API key is entered in browser settings and stored only in `dat
 
 The initial listener is `:8097`; requests are accepted only from loopback and RFC1918 private network ranges. Narrow the trusted CIDRs to the actual LAN when practical. Keep the service behind the home firewall and never port-forward it. Changing the listener requires restart.
 
+Beyond the client address, the API checks the request's `Host` and `Origin` (ADR-0012):
+
+- `Host` must be an IP address or `localhost`. A request that arrives under any other hostname (a reverse proxy name, `torrenttv.local`) gets `403` until you list the name in `TORRENT_TV_ALLOWED_HOSTS`.
+- `Origin` is optional. Requests without one (curl, the TV runtimes that send none) pass. Browsers and packaged TV apps may send the server's own origin, `null` (Tizen and webOS), `https://appassets.androidplatform.net` (Android TV) or an origin you list in `TORRENT_TV_ALLOWED_ORIGINS`. Anything else gets `403`, and allowed origins are echoed back in `Access-Control-Allow-Origin` with `Vary: Origin`.
+- Settings, dependency tests and updates (`/api/v1/settings*`, `/api/v1/dependencies/*`, `/api/v1/updates/*`) accept only same-origin requests or requests with no `Origin`. `null` and the extra origins do not apply there.
+- `ffmpegPath` and `ffprobePath` must be absolute paths whose base name is `ffmpeg` or `ffprobe` (`.exe` on Windows). A changed value saved through the API must also be an executable file whose `-version` output starts with `ffmpeg version` or `ffprobe version`. A settings file holding a path with another base name is replaced by the default at startup, with a warning in the log.
+
+Both environment variables take comma-separated values, for example `TORRENT_TV_ALLOWED_HOSTS=tv.home,proxy.lan` and `TORRENT_TV_ALLOWED_ORIGINS=https://tv.example`.
+
 `instanceName` identifies the server in TV discovery results on both Tizen and webOS. Choose a short household-friendly name when more than one server exists on the LAN. Discovery validates `/api/v1/system/info`; it does not broadcast credentials or settings.
 
 ## Logs

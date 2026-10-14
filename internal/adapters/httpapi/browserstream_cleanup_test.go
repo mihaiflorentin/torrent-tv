@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -98,7 +97,7 @@ func TestBrowserStreamWriteFailureKillsFFmpegAndLogsItsStderr(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/streams/source/browser", nil)
+		req := newRequest(http.MethodGet, "/api/v1/streams/source/browser", nil)
 		handler.ServeHTTP(&brokenWriter{header: http.Header{}}, req)
 	}()
 	select {

@@ -101,7 +101,7 @@ func (s *Store) ResolveMediaTools() ([]string, error) {
 	if found, ok := discovered["ffmpegPath"]; ok {
 		next.FFmpegPath = found
 	}
-	if err := s.Save(next); err != nil {
+	if err := s.save(next, false); err != nil {
 		return missing, fmt.Errorf("save discovered media tools: %w", err)
 	}
 	return missing, nil
