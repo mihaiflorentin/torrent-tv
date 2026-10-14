@@ -77,6 +77,7 @@ type MetadataProvider interface {
 type MediaProbe interface {
 	ProbeMedia(context.Context, string) (domain.MediaInfo, error)
 	ProbeSubtitles(context.Context, string) ([]domain.MediaSubtitleTrack, error)
+	// ExtractSubtitle converts the ordinal-th subtitle stream (ffmpeg -map 0:s:N) of a completed file to WebVTT.
 	ExtractSubtitle(context.Context, string, int, string) error
 }
 type Repository interface {

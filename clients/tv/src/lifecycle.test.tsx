@@ -774,6 +774,47 @@ describe('Player track selection and subtitle behavior honesty', () => {
     expect(mockApi.updatePlaybackPreferences).not.toHaveBeenCalled();
   });
 
+  it('does not auto-install an other-language embedded track and falls through to remote search in the preferred then fallback language', async () => {
+    mockAVPlay.getTotalTrackInfo = vi.fn(() => [mockTracks[0], mockTracks[1]]);
+    const subtitles = vi.fn(async (_id: string, language: string, scope: string) => ({
+      items: scope === 'local' ? [{ id: '9', provider: 'embedded', language: 'fr', title: 'Français', format: 'subrip', score: 60, cached: false }] : [],
+      warnings: [],
+      language,
+    }));
+    (mockApi as unknown as { subtitles: unknown }).subtitles = subtitles;
+    render(h(Player, { api: mockApi, download: mockDownload, resumeMs: 0, preferences: { ...defaultPreferences, subtitleMode: 'auto' }, onClose, onStateChanged, onComplete }), container);
+    await tick();
+    mockAVPlay.triggerPrepareSuccess();
+    await tick(30);
+    expect(mockApi.prepareSubtitle).not.toHaveBeenCalled();
+    expect(subtitles.mock.calls.filter(call => call[2] === 'remote').map(call => call[1])).toEqual(['ro', 'en']);
+    expect(mockApi.updatePlaybackPreferences).not.toHaveBeenCalled();
+  });
+
+  it('auto-installs a full track before a forced-only track and never rewrites the language for an undetermined pick', async () => {
+    mockAVPlay.getTotalTrackInfo = vi.fn(() => [mockTracks[0], mockTracks[1]]);
+    (mockApi as unknown as { subtitles: unknown }).subtitles = vi.fn().mockResolvedValue({
+      items: [
+        { id: '2', provider: 'embedded', language: 'ro', title: 'Forced', format: 'subrip', forced: true, score: 270, cached: false },
+        { id: '4', provider: 'embedded', language: '', title: 'Track', format: 'subrip', score: 250, cached: false },
+      ],
+      warnings: [],
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => 'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHi\n' })));
+    try {
+      render(h(Player, { api: mockApi, download: mockDownload, resumeMs: 0, preferences: { ...defaultPreferences, subtitleMode: 'auto' }, onClose, onStateChanged, onComplete }), container);
+      await tick();
+      mockAVPlay.triggerPrepareSuccess();
+      await tick(30);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect((mockApi.prepareSubtitle as Mock).mock.calls[0].slice(1, 3)).toEqual(['embedded', '4']);
+    const saved = (mockApi.updatePlaybackPreferences as Mock).mock.calls[0]?.[1];
+    expect(saved.subtitleLanguage).toBe('ro');
+    expect(saved.subtitleCandidateId).toBe('4');
+  });
+
   it('successful audio selection persists preferences and shows the selected toast', async () => {
     render(
       h(Player, {
