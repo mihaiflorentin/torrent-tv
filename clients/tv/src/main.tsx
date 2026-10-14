@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { API, canonicalHouseholdItems, canonicalLanguage, ControlsVisibility, subtitleRank, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, resumeSummary, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
 import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation } from './navigation';
 import { PROJECTS_MENU_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
-import { AVTrack, clampSeek, formatTime, hiddenKeyRoute, isDownloadComplete, normalizeTrack, parseVTT, playerAction, preferredAudio, SubtitleCue, subtitleAt } from './player';
+import { AVTrack, clampSeek, formatTime, isDownloadComplete, normalizeTrack, parseVTT, playerAction, preferredAudio, SubtitleCue, subtitleAt } from './player';
+import { PlayerKeyController, type PlayerFocus } from './player-keys';
 import { householdSections, nearEnd, trackerCategories } from './catalog-data';
 import { discoverServers, DiscoveredServer, normalizeServerURL } from './discovery';
 import { appIdentity } from './app-name';
@@ -76,13 +77,14 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  const messageRef = useRef(message);
  const menuRef = useRef(menu);
  const lastControlFocus = useRef('play');
+ const keysRef = useRef<PlayerKeyController | null>(null);
  const menuLauncher = useRef('play');
  phaseRef.current = phase;
  messageRef.current = message;
  menuRef.current = menu;
  controlsVisibleRef.current = controlsVisible;
  subtitleDelayRef.current = subtitleDelay;
- const controls = useMemo(() => new ControlsVisibility({ policy: { armWhilePaused: true, statusHolds: false }, onChange: value => { controlsVisibleRef.current = value; setControlsVisible(value); } }), []);
+ const controls = useMemo(() => new ControlsVisibility({ policy: { armWhilePaused: true, statusHolds: false }, onChange: value => { controlsVisibleRef.current = value; setControlsVisible(value); if (!value) keysRef.current?.controlsHidden(); } }), []);
  const save = async () => { if (duration.current > 0) try { await api.updatePlayback(download.id, current.current, duration.current); onStateChanged() } catch { } };
  const savePreferences = async (value: PlaybackPreferences) => { preferenceRef.current = value; try { preferenceRef.current = await api.updatePlaybackPreferences(download.id, value) } catch { } };
 
@@ -112,7 +114,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  function focusControl(key = lastControlFocus.current) {
   window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-player-control="${key}"]`)), 0);
  }
- function keepControl(key: string, action: () => void) { lastControlFocus.current = key; action(); focusControl(key) }
+ function keepControl(key: string, action: () => void) { lastControlFocus.current = key; action(); revealControls(); focusControl(key) }
 
  function openMenu(next: Exclude<typeof menu, null>, launcher: string) {
   menuLauncher.current = launcher;
@@ -126,8 +128,8 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  function closeMenu() {
   const launcher = menuLauncher.current;
   setMenu(null);
-  revealControls();
   controls.setPanelOpen(false);
+  revealControls();
   focusControl(launcher);
  }
  function switchMenu(next: Exclude<typeof menu, null>, openerKey: string) {
@@ -140,11 +142,13 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  function seek(target: number) {
   const av = window.webapis?.avplay;
   const next = clampSeek(target, duration.current);
-  try { av?.seekTo(next); current.current = next; setPosition(next); revealControls(); } catch { }
+  try { av?.seekTo(next); current.current = next; setPosition(next); } catch { }
  }
 
- function scrub(delta: number) {
-  const next = clampSeek((scrubTarget.current ?? current.current) + delta, duration.current); scrubTarget.current = next; setPosition(next); revealControls(true); focusControl('timeline'); window.clearTimeout(scrubTimer.current); scrubTimer.current = window.setTimeout(() => { const target = scrubTarget.current; scrubTarget.current = null; if (target !== null) seek(target); focusControl('timeline'); }, 550);
+ function scrub(delta: number, hidden = false) {
+  const next = clampSeek((scrubTarget.current ?? current.current) + delta, duration.current); scrubTarget.current = next; setPosition(next);
+  if (hidden) showTransientMessage(`${formatTime(next)} / ${formatTime(duration.current)}`, 1500);
+  window.clearTimeout(scrubTimer.current); scrubTimer.current = window.setTimeout(() => { const target = scrubTarget.current; scrubTarget.current = null; if (target !== null) seek(target); }, 550);
  }
 
  function refreshTracks() { const av = window.webapis?.avplay; try { const all = (av?.getTotalTrackInfo?.() || []).map(normalizeTrack); if (all.length) setTracks(all); } catch { } }
@@ -277,42 +281,41 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    const key = target?.dataset.playerControl;
    if (key && key !== 'timeline') lastControlFocus.current = key;
   };
+  const controlElements = () => Array.from(document.querySelectorAll<HTMLElement>(menuRef.current ? '.player-dialog button' : '[data-player-control]')).filter(element => element.offsetWidth > 0);
+  const focused = (): PlayerFocus => {
+   const active = document.activeElement as HTMLElement | null;
+   if (!active || !controlElements().includes(active)) return { where: 'none', key: null, row: null };
+   const row = active.dataset.focusRow ?? null;
+   if (menuRef.current) return { where: 'menu', key: null, row };
+   const key = active.dataset.playerControl ?? null;
+   return { where: key === 'timeline' ? 'timeline' : 'toolbar', key, row };
+  };
+  const keys = new PlayerKeyController({
+   controlsVisible: () => controlsVisibleRef.current,
+   menuOpen: () => menuRef.current !== null,
+   focused,
+   remembered: () => lastControlFocus.current,
+   remember: key => { lastControlFocus.current = key; },
+   reveal: hold => revealControls(hold),
+   seek: (delta, hidden) => scrub(delta, hidden),
+   focusControl: key => focusControl(key),
+   activateControl: key => document.querySelector<HTMLElement>(`[data-player-control="${key}"]`)?.click(),
+   activateFocused: () => (document.activeElement as HTMLElement | null)?.click(),
+   focusFirstMenuItem: () => focusElement(controlElements()[0] || null),
+   navigate: direction => { const active = document.activeElement as HTMLElement | null; const target = active ? chooseStructuredTarget(active, controlElements(), direction) : null; if (target) focusElement(target); },
+   togglePlayback: force => togglePlayback(force),
+   back: () => { if (menuRef.current) closeMenu(); else { save(); onClose(); } },
+  });
+  keysRef.current = keys;
   const key = (event: KeyboardEvent) => {
    const action = playerAction(event.key, event.keyCode);
    if (!action) return;
    event.preventDefault();
-   if (!controlsVisibleRef.current && !menuRef.current) {
-    const hiddenRoute = hiddenKeyRoute(action);
-    if (hiddenRoute === 'scrub-left') { revealControls(); scrub(-10_000); return; }
-    if (hiddenRoute === 'scrub-right') { revealControls(); scrub(10_000); return; }
-    if (hiddenRoute === 'refocus') { revealControls(); focusControl(); return; }
-    revealControls();
-   }
-   if (action === 'back' || action === 'stop') { if (menuRef.current) closeMenu(); else { save(); onClose(); } return; }
-   if (action === 'play') { togglePlayback(true); return; }
-   if (action === 'pause') { togglePlayback(false); return; }
-   if (action === 'play-pause') { togglePlayback(); return; }
-   if (action === 'rewind' || action === 'previous') { scrub(-10_000); return; }
-   if (action === 'fast-forward' || action === 'next') { scrub(10_000); return; }
-   revealControls(menuRef.current !== null);
-   const selector = menuRef.current ? '.player-dialog button' : '[data-player-control]';
-   const elements = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(element => element.offsetWidth > 0);
-   const active = document.activeElement as HTMLElement | null;
-   if (action === 'enter') { if (active && elements.includes(active)) active.click(); else focusElement(elements[0] || null); return; }
-   if (!menuRef.current && active?.dataset.playerControl === 'timeline' && (action === 'left' || action === 'right')) {
-    scrub(action === 'left' ? -10_000 : 10_000);
-    return;
-   }
-   if (!active || !elements.includes(active)) { focusElement(elements[0] || null); return; }
-   if (menuRef.current && (action === 'left' || action === 'right')) return;
-   if (!menuRef.current && active.dataset.playerControl === 'timeline' && action === 'down') { focusControl(lastControlFocus.current === 'timeline' ? 'play' : lastControlFocus.current); return; }
-   if (!menuRef.current && active.dataset.focusRow === '1' && action === 'up') { focusElement(document.querySelector<HTMLElement>('[data-player-control="timeline"]')); return; }
-   const target = chooseStructuredTarget(active, elements, action);
-   if (target) focusElement(target);
+   keys.handle(action);
   };
   addEventListener('focusin', remember);
   addEventListener('keydown', key);
-  return () => { removeEventListener('focusin', remember); removeEventListener('keydown', key); };
+  return () => { keysRef.current = null; removeEventListener('focusin', remember); removeEventListener('keydown', key); };
  }, [download.id]);
 
  function chooseTrack(type: 'AUDIO' | 'TEXT', index: number | null) {
@@ -385,7 +388,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
   {message && <div class="player-message" aria-live="polite">{message}</div>}
   <div class="player-controls">
    <div class="player-title">{download.filePath}</div>
-   <button class="player-timeline" data-player-control="timeline" data-focus-region="player-controls" data-focus-row="0" data-focus-col="0" data-focus-key="player-timeline" onClick={() => { revealControls(true); focusControl('timeline') }} aria-label="Playback timeline; use left and right to seek"><span style={{ width: `${percent}%` }}></span></button>
+   <button class="player-timeline" data-player-control="timeline" data-focus-region="player-controls" data-focus-row="0" data-focus-col="0" data-focus-key="player-timeline" onClick={() => { revealControls(); focusControl('timeline') }} aria-label="Playback timeline; use left and right to seek"><span style={{ width: `${percent}%` }}></span></button>
    <div class="player-time"><span>{formatTime(position)}</span><span>{formatTime(total)}</span></div>
    <div class="player-toolbar">
     <button data-player-control="restart" data-focus-region="player-controls" data-focus-row="1" data-focus-col="0" data-focus-key="player-restart" onClick={() => keepControl('restart', () => seek(0))}>Restart</button><button data-player-control="back-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="1" data-focus-key="player-back-10" onClick={() => keepControl('back-10', () => seek(current.current - 10_000))}>−10s</button>
