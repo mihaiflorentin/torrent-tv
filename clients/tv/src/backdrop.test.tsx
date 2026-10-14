@@ -117,4 +117,30 @@ describe('Backdrop', () => {
     await settle();
     expect(front()?.style.backgroundImage).toContain('a.jpg');
   });
+
+  it('keeps the previous art when the next artwork fails to load', async () => {
+    vi.stubGlobal('Image', class { onload: (() => void) | null = null; onerror: (() => void) | null = null; set src(value: string) { queueMicrotask(() => (value.includes('dead') ? this.onerror : this.onload)?.()); } });
+    const { card } = await mount('http://s/a.jpg');
+    focusOn(card('http://s/dead.jpg'));
+    await settle();
+    expect(front()?.style.backgroundImage).toContain('a.jpg');
+    expect(art().some(layer => (layer.style.backgroundImage ?? '').includes('dead.jpg'))).toBe(false);
+    await settle(2000);
+    expect(front()?.style.backgroundImage).toContain('a.jpg');
+  });
+
+  it('does not flicker blank when a held key crosses a missing poster', async () => {
+    vi.stubGlobal('Image', class { onload: (() => void) | null = null; onerror: (() => void) | null = null; set src(value: string) { queueMicrotask(() => (value.includes('dead') ? this.onerror : this.onload)?.()); } });
+    const { card } = await mount('http://s/a.jpg');
+    const seen: string[] = [];
+    const watch = new MutationObserver(() => seen.push(front()?.style.backgroundImage ?? ''));
+    watch.observe(host, { attributes: true, subtree: true });
+    focusOn(card('http://s/dead.jpg'));
+    await settle();
+    focusOn(card('http://s/b.jpg'));
+    await settle();
+    watch.disconnect();
+    expect(seen.every(value => value !== '')).toBe(true);
+    expect(front()?.style.backgroundImage).toContain('b.jpg');
+  });
 });

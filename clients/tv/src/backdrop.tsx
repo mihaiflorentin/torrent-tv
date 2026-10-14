@@ -49,7 +49,8 @@ export function Backdrop({ initial = '', follow = true }: { initial?: string; fo
       const finish = () => { if (!done) { done = true; apply(url, token); } };
       const image = new Image();
       image.onload = finish;
-      image.onerror = finish;
+      // A dead URL is never shown: keep the art already on screen until focus reaches something that loads.
+      image.onerror = () => { if (!done) { done = true; if (token === generation) window.clearTimeout(guard); } };
       guard = window.setTimeout(finish, PRELOAD_GUARD_MS);
       image.src = url;
     };
