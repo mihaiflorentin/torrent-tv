@@ -214,6 +214,8 @@ type SubtitleCandidate struct {
 	Format          string  `json:"format,omitempty"`
 	Uploader        string  `json:"uploader,omitempty"`
 	HearingImpaired bool    `json:"hearingImpaired,omitempty"`
+	Forced          bool    `json:"forced,omitempty"`
+	Default         bool    `json:"default,omitempty"`
 	Description     string  `json:"description,omitempty"`
 	Score           float64 `json:"score"`
 	Cached          bool    `json:"cached"`
@@ -247,10 +249,16 @@ type SubtitleAsset struct {
 }
 
 type MediaSubtitleTrack struct {
-	Index           int       `json:"index"`
-	Language        string    `json:"language,omitempty"`
-	Title           string    `json:"title,omitempty"`
-	Codec           string    `json:"codec,omitempty"`
+	Index int `json:"index"`
+	// Ordinal is the track's position among the file's subtitle streams, the
+	// N of ffmpeg's `-map 0:s:N`. Index is the absolute stream index.
+	Ordinal  int    `json:"ordinal"`
+	Language string `json:"language,omitempty"`
+	Title    string `json:"title,omitempty"`
+	Codec    string `json:"codec,omitempty"`
+	// Bitmap marks picture subtitles (PGS, VobSub, DVB, XSUB) that cannot be
+	// converted to text.
+	Bitmap          bool      `json:"bitmap,omitempty"`
 	Default         bool      `json:"default,omitempty"`
 	Forced          bool      `json:"forced,omitempty"`
 	HearingImpaired bool      `json:"hearingImpaired,omitempty"`
