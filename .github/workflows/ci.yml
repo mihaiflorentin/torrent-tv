@@ -72,7 +72,9 @@ jobs:
         run: npm run build
       - name: Package and validate unsigned Apps2Samsung WGT
         run: make tizen-wgt validate-tizen-wgt
-      - name: Validate the same WGT against the Tizen 5.0 support floor
+      # Compat gate (#24): the validator scans the built app.js/startup.js and
+      # CSS for APIs above Chromium 63 and fails naming the offending API.
+      - name: Check the built bundle for banned APIs against the Tizen 5.0 support floor
         run: make validate-tizen-wgt TIZEN_TARGET=5.0
       - name: Headless old-engine boot smoke on the pinned Chrome 63 floor
         run: make smoke-tizen-engine

@@ -157,6 +157,19 @@ class WGTTests(unittest.TestCase):
         ("Promise.any", b"Promise.any(jobs).catch(function(){});"),
         (".at", b"var first=row.at(0);"),
         ("ResizeObserver", b"var ro=new ResizeObserver(function(){});"),
+        ("trimStart", b"var s=text.trimStart();"),
+        ("trimEnd", b"var s=text.trimEnd();"),
+        ("replaceChildren", b"node.replaceChildren(a,b);"),
+        ("Object.hasOwn", b"var own=Object.hasOwn(map,key);"),
+        ("findLast", b"var last=list.findLast(function(x){return x;});"),
+        ("findLast", b"var last=list.findLastIndex(function(x){return x;});"),
+        ("toSorted", b"var sorted=list.toSorted();"),
+        ("toReversed", b"var rev=list.toReversed();"),
+        ("Promise.withResolvers", b"var d=Promise.withResolvers();"),
+        ("regex named groups", b"var m=/(?<year>\\d{4})/.exec(text);"),
+        ("Unicode property escapes", b"var letters=/\\p{L}+/u.test(text);"),
+        ("new AbortController", b"var controller=new AbortController();"),
+        ("new AbortController", b"var controller=new AbortController;"),
     )
 
     def test_rejects_floor_missing_apis(self):
@@ -192,6 +205,75 @@ class WGTTests(unittest.TestCase):
             with self.subTest(target=target):
                 report = tizen_wgt.validate_archive(output, target)
                 self.assertIn(f"requires Tizen 5.0, target=Tizen {target}", report)
+
+    def test_allows_guarded_abort_controller(self):
+        guarded = (
+            b"function a(){if(typeof AbortController!=='function')return null;return new AbortController();}",
+            b"function b(c){var x=c.supportsAbortController?new AbortController:null;return x;}",
+            b"function c(e){if(!e.supportsAbortController)return probe();var r=new AbortController();return r;}",
+        )
+        for index, snippet in enumerate(guarded):
+            output = self.make_archive(VALID_CONFIG, VALID_HTML, {"app.js": self.valid_app() + snippet})
+            with self.subTest(case=index):
+                report = tizen_wgt.validate_archive(output, "5.0")
+                self.assertIn("requires Tizen 5.0, target=Tizen 5.0", report)
+
+    def test_rejects_abort_controller_with_only_a_distant_guard(self):
+        snippet = b"function a(){return typeof AbortController;}" + b" " * 600 + b"function b(){return new AbortController();}"
+        output = self.make_archive(VALID_CONFIG, VALID_HTML, {"app.js": self.valid_app() + snippet})
+        with self.assertRaisesRegex(tizen_wgt.WGTError, r"floor-missing API\(s\): new AbortController;"):
+            tizen_wgt.validate_archive(output, "5.0")
+
+    def test_allows_new_api_near_misses(self):
+        app = self.valid_app() + (
+            b"var a=text.trimLeft();var b=text.trimRight();var c=list.findIndex(f);"
+            b"var d=list.sort();var e=list.reverse();var f=/(?<=a)b(?<!c)/.test(t);"
+            b"var g=Object.hasOwnProperty.call(o,k);var h=/\\d+/u.test(t);"
+            b"var i=typeof AbortController;"
+        )
+        output = self.make_archive(VALID_CONFIG, VALID_HTML, {"app.js": app})
+        report = tizen_wgt.validate_archive(output, "5.0")
+        self.assertIn("requires Tizen 5.0, target=Tizen 5.0", report)
+
+    CSS_RULE_SNIPPETS = (
+        ("inset", b".a{position:absolute;inset:0}"),
+        ("aspect-ratio", b".a{aspect-ratio:16/9}"),
+        (":is()", b".a:is(.b,.c){color:red}"),
+        (":where()", b":where(.a,.b){color:red}"),
+        (":focus-visible", b".a:focus-visible{outline:0}"),
+        ("min()", b".a{width:min(100%,40rem)}"),
+        ("max()", b".a{width:calc(10px + max(1px,2vw))}"),
+        ("clamp()", b".a{font-size:clamp(1rem,2vw,3rem)}"),
+    )
+
+    def test_rejects_unsupported_css_features(self):
+        for name, css in self.CSS_RULE_SNIPPETS:
+            output = self.make_archive(VALID_CONFIG, VALID_HTML, {"app.css": css})
+            inline = self.make_archive(VALID_CONFIG, VALID_HTML + b"<style>" + css + b"</style>")
+            for target in ("5.0", "7.0"):
+                with self.subTest(feature=name, target=target):
+                    with self.assertRaisesRegex(
+                        tizen_wgt.WGTError,
+                        rf"'app\.css' uses unsupported CSS {re.escape(name)};",
+                    ):
+                        tizen_wgt.validate_archive(output, target)
+                    with self.assertRaisesRegex(
+                        tizen_wgt.WGTError,
+                        rf"'index\.html' uses unsupported CSS {re.escape(name)};",
+                    ):
+                        tizen_wgt.validate_archive(inline, target)
+
+    def test_allows_css_near_misses(self):
+        css = (
+            b".a{box-shadow:inset 0 0 0 1px #000;top:0;right:0;bottom:0;left:0;accent-color:red}"
+            b".b:focus{outline:0}.c:not(.d){color:red}.e:hover{color:red}"
+            b"@media (min-width:100px) and (max-width:900px){.f{color:#fff}}"
+            b".g{background:url(img/min-max.png);margin:calc(1px + 2px);padding:0 0 0 0}"
+            b".is-open{color:red}.where{color:red}.inset-box{color:red}"
+        )
+        output = self.make_archive(VALID_CONFIG, VALID_HTML, {"app.css": css})
+        report = tizen_wgt.validate_archive(output, "5.0")
+        self.assertIn("requires Tizen 5.0, target=Tizen 5.0", report)
 
     def test_rejects_generic_tv_profile(self):
         config = VALID_CONFIG.replace(b'name="tv-samsung"', b'name="tv"')
