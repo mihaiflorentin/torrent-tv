@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/sqlite"
@@ -1199,7 +1200,9 @@ func (a *API) browserStream(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusInternalServerError, err)
 		return
 	}
-	cmd.Stderr = io.Discard
+	// Keep the tail of ffmpeg's diagnostics so a failed stream says why.
+	stderr := &tailBuffer{limit: 4 << 10}
+	cmd.Stderr = stderr
 	if err = cmd.Start(); err != nil {
 		problem(w, http.StatusServiceUnavailable, fmt.Errorf("start browser audio compatibility stream: %w", err))
 		return
@@ -1209,12 +1212,40 @@ func (a *API) browserStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	copyErr := copyFlush(w, stdout)
+	if copyErr != nil {
+		// Nobody reads ffmpeg's output any more: stop it instead of
+		// leaving it blocked on a full pipe until the request context ends.
+		_ = cmd.Process.Kill()
+	}
 	waitErr := cmd.Wait()
 	if copyErr != nil && !errors.Is(copyErr, context.Canceled) {
-		a.log.Warn("browser compatibility stream stopped", "sourceId", r.PathValue("id"), "error", copyErr)
+		a.log.Warn("browser compatibility stream stopped", "sourceId", r.PathValue("id"), "error", copyErr, "ffmpegStderr", stderr.String())
 	} else if waitErr != nil && r.Context().Err() == nil {
-		a.log.Warn("browser compatibility transcode stopped", "sourceId", r.PathValue("id"), "error", waitErr)
+		a.log.Warn("browser compatibility transcode stopped", "sourceId", r.PathValue("id"), "error", waitErr, "ffmpegStderr", stderr.String())
 	}
+}
+
+// tailBuffer keeps the last limit bytes written to it.
+type tailBuffer struct {
+	mu    sync.Mutex
+	limit int
+	buf   []byte
+}
+
+func (t *tailBuffer) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.buf = append(t.buf, p...)
+	if len(t.buf) > t.limit {
+		t.buf = t.buf[len(t.buf)-t.limit:]
+	}
+	return len(p), nil
+}
+
+func (t *tailBuffer) String() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return strings.TrimSpace(string(t.buf))
 }
 
 // browserStreamArgs selects the requested (default, then English) audio track
