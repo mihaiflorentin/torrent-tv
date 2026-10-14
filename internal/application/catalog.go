@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -153,12 +154,22 @@ func (s *Service) CatalogDetail(ctx context.Context, id string) (domain.CatalogD
 // minutes so catalog reads do not hammer a struggling provider.
 func (s *Service) seriesSeasons(ctx context.Context, provider, providerID string) (domain.SeriesSeasons, error) {
 	language := s.settings.Get().MetadataLanguage
-	if cached, err := s.repo.GetSeriesSeasons(ctx, provider, providerID, language); err == nil && cached.ExpiresAt.After(time.Now()) && len(cached.Seasons) > 0 {
-		return cached, nil
+	cached, cacheErr := s.repo.GetSeriesSeasons(ctx, provider, providerID, language)
+	if cacheErr == nil && cached.ExpiresAt.After(time.Now()) {
+		if len(cached.Seasons) > 0 {
+			return cached, nil
+		}
+		return domain.SeriesSeasons{}, errors.New("provider seasons unavailable (negatively cached)")
 	}
 	seasons, err := s.metadata.SeriesSeasons(ctx, provider, providerID, language)
 	if err != nil {
 		now := time.Now().UTC()
+		if cacheErr == nil && len(cached.Seasons) > 0 {
+			// Stale-if-error: keep serving the last good payload and back off.
+			cached.ExpiresAt = now.Add(10 * time.Minute)
+			_ = s.repo.SaveSeriesSeasons(ctx, cached)
+			return cached, nil
+		}
 		_ = s.repo.SaveSeriesSeasons(ctx, domain.SeriesSeasons{Provider: provider, ProviderID: providerID, Language: language, FetchedAt: now, ExpiresAt: now.Add(10 * time.Minute)})
 		return domain.SeriesSeasons{}, err
 	}

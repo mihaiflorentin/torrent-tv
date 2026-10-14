@@ -236,7 +236,14 @@ func (s *Service) runMetadataRequest(request metadataRequest) {
 	now := time.Now().UTC()
 	metadata.TitleID = request.TitleID
 	if err != nil {
-		metadata = domain.CatalogMetadata{TitleID: request.TitleID, Provider: "tmdb", FetchedAt: now, ExpiresAt: now.Add(10 * time.Minute), LastError: err.Error()}
+		failure := domain.CatalogMetadata{TitleID: request.TitleID, Provider: "tmdb", FetchedAt: now, ExpiresAt: now.Add(10 * time.Minute), LastError: err.Error()}
+		// A transient failure must not wipe a row that already holds a
+		// provider match: keep the payload, only back off and note the error.
+		if existing, getErr := s.repo.GetCatalogMetadata(context.Background(), request.TitleID); getErr == nil && existing.ProviderID != "" {
+			existing.ExpiresAt, existing.LastError = failure.ExpiresAt, failure.LastError
+			failure = existing
+		}
+		metadata = failure
 		s.jobLog(job, "error", "metadata-match", "TMDB metadata lookup did not produce a usable media match", map[string]any{"provider": "tmdb", "imdbId": request.IMDbID, "requestedKind": request.Kind, "error": err.Error()})
 		s.failOrWait(&job, err, "metadata")
 	} else {
@@ -343,7 +350,10 @@ func (s *Service) ensureMetadata(ctx context.Context, titleIDs []string, force b
 			// A row is complete when its provider identity, title, and year
 			// survived the lookup; rating votes are TMDB-specific and must
 			// not force keyless providers to be re-fetched forever.
-			if metadata, err := s.repo.GetCatalogMetadata(ctx, id); err == nil && metadata.ExpiresAt.After(time.Now()) && metadata.ProviderID != "" && metadata.Title != "" && metadata.Year > 0 {
+			if metadata, err := s.repo.GetCatalogMetadata(ctx, id); err == nil && metadata.ExpiresAt.After(time.Now()) &&
+				((metadata.ProviderID != "" && metadata.Title != "" && metadata.Year > 0) || metadata.LastError != "") {
+				// Complete rows and recent failures (negative cache) both wait
+				// for their expiry; only force bypasses.
 				continue
 			}
 		}
