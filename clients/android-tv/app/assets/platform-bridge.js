@@ -25,8 +25,26 @@
     delete callbacks[event.token];
     try { callback.apply(null, event.args || []); } catch (error) { }
    }
+  },
+  // Native Activity pause/resume: feeds the page's onVisibility
+  // subscribers so the player saves its position and later reopens.
+  setVisible: function(visible) {
+   visibility.slice().forEach(function(listener) {
+    try { listener(Boolean(visible)); } catch (error) { }
+   });
   }
  };
+
+ var visibility = [];
+ var platform = window.FileListTVPlatform || {};
+ platform.onVisibility = function(listener) {
+  visibility.push(listener);
+  return function() {
+   var at = visibility.indexOf(listener);
+   if (at >= 0) visibility.splice(at, 1);
+  };
+ };
+ window.FileListTVPlatform = platform;
 
  function registerCallback(callback) {
   var token = 'cb' + Math.random().toString(36).slice(2);
