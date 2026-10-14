@@ -50,11 +50,11 @@ describe('playerAction LG back and Tizen media keys', () => {
 });
 
 describe('playerAction remote fallbacks', () => {
-  it('maps channel keys to next and previous by name and by keyCode (webOS 427/428, Tizen ChannelUp/Down)', () => {
-    expect(playerAction('ChannelUp', 0)).toBe('next');
-    expect(playerAction('ChannelDown', 0)).toBe('previous');
-    expect(playerAction('', 427)).toBe('next');
-    expect(playerAction('', 428)).toBe('previous');
+  it('maps channel keys to episode skips by name and by keyCode (webOS 427/428, Tizen ChannelUp/Down)', () => {
+    expect(playerAction('ChannelUp', 0)).toBe('next-episode');
+    expect(playerAction('ChannelDown', 0)).toBe('previous-episode');
+    expect(playerAction('', 427)).toBe('next-episode');
+    expect(playerAction('', 428)).toBe('previous-episode');
   });
   it('maps the Tizen and webOS keyCodes with no key name', () => {
     expect(playerAction('Unidentified', 10233)).toBe('next');

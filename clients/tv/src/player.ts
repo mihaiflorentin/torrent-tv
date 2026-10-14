@@ -1,6 +1,6 @@
 import { canonicalLanguage, languageDisplayName, type Download } from '@torrent-tv/shared';
 
-export type PlayerAction = 'left' | 'right' | 'up' | 'down' | 'enter' | 'back' | 'play' | 'pause' | 'play-pause' | 'stop' | 'rewind' | 'fast-forward' | 'previous' | 'next' | null;
+export type PlayerAction = 'left' | 'right' | 'up' | 'down' | 'enter' | 'back' | 'play' | 'pause' | 'play-pause' | 'stop' | 'rewind' | 'fast-forward' | 'previous' | 'next' | 'previous-episode' | 'next-episode' | null;
 
 export function formatTime(milliseconds: number): string {
   const total = Math.max(0, Math.floor(milliseconds / 1000));
@@ -36,8 +36,8 @@ export function playerAction(key: string, keyCode: number): PlayerAction {
   if (key === 'MediaFastForward') return 'fast-forward';
   if (key === 'MediaTrackPrevious') return 'previous';
   if (key === 'MediaTrackNext') return 'next';
-  if (key === 'ChannelUp') return 'next';
-  if (key === 'ChannelDown') return 'previous';
+  if (key === 'ChannelUp') return 'next-episode';
+  if (key === 'ChannelDown') return 'previous-episode';
   if (key === 'GoBack' || key === 'BrowserBack' || keyCode === 27) return 'back';
   if (key === 'ArrowLeft' || keyCode === 37) return 'left';
   if (key === 'ArrowRight' || keyCode === 39) return 'right';
@@ -52,8 +52,9 @@ export function playerAction(key: string, keyCode: number): PlayerAction {
   if (keyCode === 412) return 'rewind';
   if (keyCode === 417) return 'fast-forward';
   if (keyCode === 10232) return 'previous';
-  if (keyCode === 10233 || keyCode === 427) return 'next';
-  if (keyCode === 428) return 'previous';
+  if (keyCode === 10233) return 'next';
+  if (keyCode === 427) return 'next-episode';
+  if (keyCode === 428) return 'previous-episode';
   return null;
 }
 

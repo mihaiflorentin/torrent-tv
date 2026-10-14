@@ -605,6 +605,56 @@ func TestDisabledOnlyTitleDetailFavoriteNextEpisode(t *testing.T) {
 	}
 }
 
+// TestPreviousEpisodeWalksBackwardsAndStopsAtFirst proves PreviousEpisode
+// mirrors NextEpisode: it materializes the prior persisted sibling and
+// returns nil at the first episode.
+func TestPreviousEpisodeWalksBackwardsAndStopsAtFirst(t *testing.T) {
+	h := newTrackerHarness(t, 4)
+	strict := &strictTracker{}
+	registry := registryOf(t, disabledTrackerRegistration(t, strict))
+	repo := h.openRepo(t)
+	release := domain.TorrentRelease{
+		ID: "filelist:pack8", TrackerID: "filelist", TrackerName: "FileList", ProviderID: "pack8",
+		Name: "Other.S01.1080p.WEB-DL", Category: "Series HD", FileCount: 2,
+	}
+	stored, err := repo.UpsertReleases(context.Background(), []domain.TorrentRelease{release})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	names := []string{"Other.S01E01.1080p.mkv", "Other.S01E02.1080p.mkv"}
+	files := make([]domain.TorrentFile, len(names))
+	for i, name := range names {
+		path := filepath.Join(h.dir, "downloads", name)
+		writeMediaFile(t, path, 1<<20)
+		download := domain.Download{
+			ID: sourceID(stored[0].ID, name), ReleaseID: stored[0].ID, EngineID: "qb:pack8hash",
+			FileIndex: i, FilePath: name, AbsolutePath: path,
+			SizeBytes: 1 << 20, Progress: 1, State: "pausedUP",
+			TrackerID: "filelist", TrackerName: "FileList", CreatedAt: now, UpdatedAt: now,
+		}
+		if err := repo.SaveDownload(context.Background(), download); err != nil {
+			t.Fatal(err)
+		}
+		files[i] = domain.TorrentFile{Index: i, Path: name, SizeBytes: 1 << 20, Playable: true}
+	}
+	if err := repo.SaveTorrentManifest(context.Background(), domain.TorrentManifest{ReleaseID: stored[0].ID, Files: files, Metainfo: []byte("d8:infod5:filesee"), FetchedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	service := h.newService(t, registry, &strictEngine{t: t}, repo)
+	prev, err := service.PreviousEpisode(context.Background(), sourceID(stored[0].ID, names[1]))
+	if err != nil {
+		t.Fatalf("PreviousEpisode: %v", err)
+	}
+	if prev == nil || prev.FileIndex != 0 {
+		t.Fatalf("PreviousEpisode returned the wrong sibling: %+v", prev)
+	}
+	first, err := service.PreviousEpisode(context.Background(), sourceID(stored[0].ID, names[0]))
+	if err != nil || first != nil {
+		t.Fatalf("first episode must have no previous: %+v, %v", first, err)
+	}
+}
+
 func mustRead(t *testing.T, path string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(path)

@@ -60,6 +60,8 @@ Selecting media in My Library or Tracker opens its details. A series item record
 - A completed download marker means every known episode has at least one completed version.
 - Watch markers are calculated independently per episode and per season.
 
+**Skipping episodes.** While a series episode plays, the web player shows **Previous episode** and **Next episode** buttons and accepts the **P** and **N** keys. On a TV remote, **Channel up** starts the next episode and **Channel down** the previous one (not yet verified on real TVs); the Previous and Next media keys still jump 60 seconds. Your position in the current episode is saved first. At the first or last episode, or in a movie, the player shows a short notice instead.
+
 Starting a complete-season pack leaves the series page open. As the pack is registered, each playable file appears under its matching episode and can be played independently.
 
 The Downloads page refreshes progress, speed, peers, and state in place. Existing tiles do not reorder or scroll the page. Every tile expands enough to show its selected-file size/index and complete-torrent size/seeders without clipping. A genuinely new download can appear while the page is open; if you are reading farther down, the current visible tile remains anchored.

@@ -64,7 +64,7 @@ function Icon({ name }: { name: string }) {
  return <svg class="tv-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={ICON_PATHS[name]} />{name === 'audio' && <path d="M16 9a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />}{name === 'subtitles' && <rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" />}</svg>;
 }
 
-export function Player({ api, download, resumeMs, preferences, onClose, onStateChanged, onComplete }: { api: API; download: Download; resumeMs: number; preferences?: PlaybackPreferences; onClose: () => void; onStateChanged: () => void; onComplete: (preferences: PlaybackPreferences) => void }) {
+export function Player({ api, download, resumeMs, preferences, onClose, onStateChanged, onComplete, onEpisode }: { api: API; download: Download; resumeMs: number; preferences?: PlaybackPreferences; onClose: () => void; onStateChanged: () => void; onComplete: (preferences: PlaybackPreferences) => void; onEpisode?: (next: Download, preferences: PlaybackPreferences) => void }) {
  const [message, setMessage] = useState('Opening stream…');
  const [phase, setPhase] = useState<'opening' | 'playing' | 'paused' | 'buffering' | 'waiting' | 'failed'>('opening');
  const [position, setPosition] = useState(resumeMs);
@@ -101,6 +101,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  const lastControlFocus = useRef('play');
  const keysRef = useRef<PlayerKeyController | null>(null);
  const menuLauncher = useRef('play');
+ const episodeBusy = useRef(false);
  phaseRef.current = phase;
  messageRef.current = message;
  menuRef.current = menu;
@@ -109,6 +110,24 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  const controls = useMemo(() => new ControlsVisibility({ policy: { armWhilePaused: true, statusHolds: false }, onChange: value => { controlsVisibleRef.current = value; setControlsVisible(value); if (!value) keysRef.current?.controlsHidden(); } }), []);
  const save = async () => { if (duration.current > 0) try { await api.updatePlayback(download.id, current.current, duration.current); onStateChanged() } catch { } };
  const savePreferences = async (value: PlaybackPreferences) => { preferenceRef.current = value; setChoice(playerChoiceLine(value)); try { preferenceRef.current = await api.updatePlaybackPreferences(download.id, value); setChoice(playerChoiceLine(preferenceRef.current)) } catch { } };
+
+ // Channel Up / Down: save progress, ask the server for the sibling episode, and hand it to the app. A result that
+ // arrives after the player closed or suspended (session changed) is dropped, like a stale stream-completed event.
+ async function skipEpisode(direction: 'next' | 'previous') {
+  if (!onEpisode || episodeBusy.current) return;
+  episodeBusy.current = true;
+  const token = session.current;
+  try {
+   await save();
+   showTransientMessage(direction === 'next' ? 'Loading next episode…' : 'Loading previous episode…', 10_000);
+   const target = await (direction === 'next' ? api.nextEpisode(download.id) : api.previousEpisode(download.id));
+   if (token !== session.current) return;
+   if (!target) { showTransientMessage(direction === 'next' ? 'No next episode' : 'No previous episode'); return; }
+   onEpisode(target, preferenceRef.current);
+  } catch (error) {
+   if (token === session.current) showTransientMessage(`Could not start the ${direction} episode: ${(error as Error).message}`, 5000);
+  } finally { episodeBusy.current = false; }
+ }
 
  function stopAVPlay() {
   const av = window.webapis?.avplay;
@@ -324,6 +343,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    navigate: direction => { const active = document.activeElement as HTMLElement | null; const target = active ? chooseStructuredTarget(active, controlElements(), direction) : null; if (target) focusElement(target); },
    togglePlayback: force => togglePlayback(force),
    back: () => { if (menuRef.current) closeMenu(); else { save(); onClose(); } },
+   skipEpisode: direction => { void skipEpisode(direction); },
   });
   keysRef.current = keys;
   const key = (event: KeyboardEvent) => {
@@ -1204,6 +1224,7 @@ export function App() {
    throw error;
   }
  }
+ function switchEpisode(next: Download, preferences: PlaybackPreferences) { void Promise.all([loadState(), refreshDownloads()]); setPlayer({ download: next, resumeMs: 0, preferences: { ...preferences, sourceId: next.id, subtitleMode: preferences.subtitleMode === 'off' ? 'off' : 'auto', subtitleProvider: '', subtitleCandidateId: '' } }) }
  async function advanceEpisode(preferences: PlaybackPreferences) { if (!api || !player) return; try { const next = await api.nextEpisode(player.download.id); await Promise.all([loadState(), refreshDownloads()]); if (next) setPlayer({ download: next, resumeMs: 0, preferences: { ...preferences, sourceId: next.id, subtitleMode: preferences.subtitleMode === 'off' ? 'off' : 'auto', subtitleProvider: '', subtitleCandidateId: '' } }); else setPlayer(null) } catch (error) { setStatus(`Could not start the next episode: ${(error as Error).message}`); setPlayer(null) } }
  async function manageDownload(download: Download, action: string) { if (!api) throw new Error('Server is not connected.'); try { if (action === 'remove') await api.deleteDownload(download.id); else await api.call(`/downloads/${encodeURIComponent(download.id)}/${action}`, { method: 'POST' }); const incoming = (await api.downloads()).items; setDownloads(current => reconcileDownloads(current, incoming)); } catch (error) { setStatus((error as Error).message); throw error } }
  useEffect(() => { registerMediaKeys(); if (server) void connect(server); }, []);
@@ -1281,7 +1302,7 @@ export function App() {
   open();
   return () => { stopped = true; disposeVisibility(); window.clearTimeout(timer); stream?.close() };
  }, [api]);
- if (player && api) return <Player key={player.download.id} api={api} download={player.download} resumeMs={player.resumeMs} preferences={player.preferences} onStateChanged={() => loadState()} onComplete={advanceEpisode} onClose={() => setPlayer(null)} />;
+ if (player && api) return <Player key={player.download.id} api={api} download={player.download} resumeMs={player.resumeMs} preferences={player.preferences} onStateChanged={() => loadState()} onComplete={advanceEpisode} onEpisode={switchEpisode} onClose={() => setPlayer(null)} />;
  if (!api) return <Setup draft={draft} server={server} status={status} onDraft={setDraft} onConnect={url => void connect(url)} onForget={() => { localStorage.removeItem(STORAGE); setServer(''); setDraft(''); setStatus('Saved server forgotten.') }} />;
  return <Catalog api={api} status={status} titles={titles} facets={facets} household={household} downloads={downloads} jobs={jobs} restoreFocus={catalogFocus.current} portal={portal} updateStatus={updateStatus} onUpdateStatus={setUpdateStatus} onFocus={key => { catalogFocus.current = key; }} onRetry={() => void connect(server)} onChangeServer={() => { cancelPrepare(); setAPI(null); }} onForgetServer={() => { cancelPrepare(); localStorage.removeItem(STORAGE); setAPI(null); setServer(''); setDraft(''); }} onPlay={play} onPlayDownload={download => void api.playback(download.id).then(value => setPlayer({ download, resumeMs: value.watched ? 0 : value.positionMs })).catch(() => setPlayer({ download, resumeMs: 0 }))} onManageDownload={manageDownload} onManageSeasonPack={manageSeasonPack} onRefreshDownloads={refreshDownloads} onFavorite={favorite} preparing={preparing} onCancelPrepare={cancelPrepare} onRetryPrepare={retryPrepare} />;
 }

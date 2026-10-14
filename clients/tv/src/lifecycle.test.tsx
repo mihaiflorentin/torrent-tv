@@ -845,3 +845,103 @@ describe('Player track selection and subtitle behavior honesty', () => {
     expect(container.querySelector<HTMLButtonElement>('[data-player-control="audio"]')?.textContent).toBe('Audio (1)');
   });
 });
+
+describe('Player Channel key episode skipping', () => {
+  let container: HTMLDivElement;
+  let mockAVPlay: MockAVPlayInstance;
+  let visibilityListener: ((visible: boolean) => void) | null = null;
+  let mockApi: API;
+  let onEpisode: Mock;
+  const sibling: Download = { ...mockDownload, id: 'dl-test-2', fileIndex: 1, filePath: 'video2.mkv' };
+
+  const press = (key: string, keyCode: number) => window.dispatchEvent(new KeyboardEvent('keydown', { key, keyCode, bubbles: true, cancelable: true }));
+  const mount = async () => {
+    render(h(Player, { api: mockApi, download: mockDownload, resumeMs: 5_000, preferences: defaultPreferences, onClose: vi.fn(), onStateChanged: vi.fn(), onComplete: vi.fn(), onEpisode } as never), container);
+    await tick();
+    mockAVPlay.triggerPrepareSuccess();
+    mockAVPlay.listener.oncurrentplaytime?.(45_000);
+  };
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    mockAVPlay = createMockAVPlay();
+    (window as unknown as { webapis?: { avplay: unknown } }).webapis = { avplay: mockAVPlay };
+    window.FileListTVPlatform = {
+      getNetworkInfo: async () => null,
+      openExternal: async () => false,
+      exit: () => { },
+      onKeyboardVisibility: () => () => { },
+      onVisibility: listener => { visibilityListener = listener; return () => { visibilityListener = null; }; },
+    } as TVPlatformHooks;
+    onEpisode = vi.fn();
+    mockApi = {
+      base: 'http://server.lan:8097',
+      streamURL: (path: string) => `http://server.lan:8097${path}`,
+      updatePlayback: vi.fn().mockResolvedValue({}),
+      playbackPreferences: vi.fn().mockResolvedValue(defaultPreferences),
+      updatePlaybackPreferences: vi.fn().mockResolvedValue({}),
+      downloads: vi.fn().mockResolvedValue({ items: [mockDownload], nextCursor: null, total: 1 }),
+      subtitles: vi.fn().mockResolvedValue({ items: [] }),
+      diagnostic: vi.fn().mockResolvedValue(undefined),
+      nextEpisode: vi.fn().mockResolvedValue(sibling),
+      previousEpisode: vi.fn().mockResolvedValue(null),
+      call: vi.fn().mockResolvedValue({}),
+    } as unknown as API;
+  });
+
+  afterEach(() => {
+    render(null, container);
+    container.remove();
+    delete (window as unknown as { webapis?: unknown }).webapis;
+    delete window.FileListTVPlatform;
+  });
+
+  it('ChannelUp saves progress, then switches to the next episode', async () => {
+    await mount();
+    press('ChannelUp', 0);
+    await tick();
+    expect(mockApi.updatePlayback).toHaveBeenCalledWith('dl-test-1', 45_000, 120_000);
+    expect(mockApi.nextEpisode).toHaveBeenCalledWith('dl-test-1');
+    expect(onEpisode).toHaveBeenCalledWith(sibling, expect.objectContaining({ audioLanguage: 'en' }));
+    expect(mockAVPlay.seekTo).toHaveBeenCalledTimes(1); // only the initial resume seek
+  });
+
+  it('keyCode 428 asks for the previous episode and shows a notice when there is none', async () => {
+    await mount();
+    press('', 428);
+    await tick();
+    expect(mockApi.previousEpisode).toHaveBeenCalledWith('dl-test-1');
+    expect(onEpisode).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('No previous episode');
+  });
+
+  it('shows "No next episode" for a movie', async () => {
+    (mockApi.nextEpisode as Mock).mockResolvedValue(null);
+    await mount();
+    press('ChannelUp', 0);
+    await tick();
+    expect(onEpisode).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('No next episode');
+  });
+
+  it('ignores a resolved skip delivered after suspension', async () => {
+    let resolve: (value: Download) => void = () => { };
+    (mockApi.nextEpisode as Mock).mockReturnValue(new Promise<Download>(r => { resolve = r; }));
+    await mount();
+    press('ChannelUp', 0);
+    await tick();
+    visibilityListener?.(false);
+    resolve(sibling);
+    await tick();
+    expect(onEpisode).not.toHaveBeenCalled();
+  });
+
+  it('MediaTrackNext still seeks instead of skipping an episode', async () => {
+    await mount();
+    press('MediaTrackNext', 0);
+    await tick(700);
+    expect(mockApi.nextEpisode).not.toHaveBeenCalled();
+    expect(mockAVPlay.seekTo).toHaveBeenCalled();
+  });
+});

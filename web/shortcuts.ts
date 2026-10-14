@@ -13,6 +13,8 @@ export type PlayerCommand =
   | { kind: 'toggle-mute' }
   | { kind: 'toggle-fullscreen' }
   | { kind: 'open-subtitles' }
+  | { kind: 'next-episode' }
+  | { kind: 'previous-episode' }
   | { kind: 'escape' };
 
 export type ResolvedShortcut = { command: PlayerCommand; repeatable: boolean } | null;
@@ -33,6 +35,8 @@ const BINDINGS: Record<string, PlayerCommand> = {
   m: { kind: 'toggle-mute' },
   f: { kind: 'toggle-fullscreen' },
   s: { kind: 'open-subtitles' },
+  n: { kind: 'next-episode' },
+  p: { kind: 'previous-episode' },
   MediaPlayPause: { kind: 'toggle-playback' },
   MediaPlay: { kind: 'play' },
   MediaPause: { kind: 'pause' },

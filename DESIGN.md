@@ -104,18 +104,20 @@ One table for every remote, handled in the Player by `playerAction` and `PlayerK
 | Stop | `MediaStop` | 413 | Saves and leaves the Player, like Back. |
 | Rewind | `MediaRewind` | 412 | One Seek step back (10 s). |
 | Fast-forward | `MediaFastForward` | 417 | One Seek step forward (10 s). |
-| Previous | `MediaTrackPrevious`, `ChannelDown` | 10232, 428 | Skip step back (60 s). |
-| Next | `MediaTrackNext`, `ChannelUp` | 10233, 427 | Skip step forward (60 s). |
+| Previous | `MediaTrackPrevious` | 10232 | Skip step back (60 s). |
+| Next | `MediaTrackNext` | 10233 | Skip step forward (60 s). |
+| Previous episode | `ChannelDown` | 428 | Series: saves progress and starts the previous episode. Otherwise the OSD says "No previous episode". |
+| Next episode | `ChannelUp` | 427 | Series: saves progress and starts the next episode. Otherwise the OSD says "No next episode". |
 | Back | `GoBack`, `BrowserBack`, `XF86Back`, `Back` | 27, 10009 (Tizen), 461 (webOS) | Closes a Player panel, else leaves. |
 
 Rules:
 
-- The Player has no episode or item queue: an episode is chosen on the title detail screen. Next and Previous therefore skip a larger step (`SKIP_STEP_MS`, 60 s) rather than change item. They use the same pending seek target, commit timer and clamping as Rewind and Fast-forward, so any mix of the four accumulates into one committed seek.
+- Channel up and down are the episode skip (the episode queue): `POST /downloads/{id}/next-episode` and `/previous-episode` resolve the sibling from the series hierarchy. The Player saves the current progress first, drops any pending seek target, and swaps the player to the sibling; a result that arrives after the Player closed or suspended is discarded. A movie, or the first or last episode, gets a brief OSD notice instead. The Wake model is untouched: the keys never move Control focus, and held repeats are ignored. The media-track keys keep the plain seek: Next and Previous skip a larger step (`SKIP_STEP_MS`, 60 s) rather than change item. They use the same pending seek target, commit timer and clamping as Rewind and Fast-forward, so any mix of the four accumulates into one committed seek.
 - Rewind, Fast-forward, Next and Previous work with the controls hidden or visible, repeat while held, and never move Control focus. Hidden, they show the new position on the OSD and leave the controls hidden (the Wake model above); visible, they re-arm the hide timer. Play, Pause and Play/Pause reveal the controls through the existing playback state change and do not move focus either.
 - A media key typed while a text field has focus is ignored by the Player (`isEditableTarget`).
-- Outside the Player the media keys are not mapped at all (`remoteAction` in `navigation.ts` returns null for them), so D-pad navigation, OK and Back are unaffected. Channel up and down are only Next and Previous inside the Player.
+- Outside the Player the media keys are not mapped at all (`remoteAction` in `navigation.ts` returns null for them), so D-pad navigation, OK and Back are unaffected. Channel up and down are only the episode skip inside the Player.
 - Tizen registers the eight media names plus `ChannelUp` and `ChannelDown`. The colour keys (`ColorF0Red` to `ColorF3Blue`) are deliberately not registered: nothing in the client uses them. The `tv.inputdevice` privilege is already in `clients/tizen/config.xml` and required by `tools/tizen_wgt.py`; the key names themselves are not listed in the config or the validator.
-- Not verified on hardware: that each physical remote sends these codes (Samsung and LG remotes differ, and many have no Previous or Next button), that Tizen 5.0 firmware accepts every name, and that Channel up and down reach the page on both platforms. See the Remote keys rows in `docs/TIZEN.md` and `docs/WEBOS-VERIFICATION.md`.
+- Not verified on hardware: that each physical remote sends these codes (Channel up and down as episode skip is likewise unverified on hardware) (Samsung and LG remotes differ, and many have no Previous or Next button), that Tizen 5.0 firmware accepts every name, and that Channel up and down reach the page on both platforms. See the Remote keys rows in `docs/TIZEN.md` and `docs/WEBOS-VERIFICATION.md`.
 
 ## Player controls surface
 

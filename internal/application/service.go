@@ -1809,6 +1809,18 @@ func (s *Service) prepareExistingTorrentFile(ctx context.Context, release domain
 }
 
 func (s *Service) NextEpisode(ctx context.Context, sourceID string) (*domain.Download, error) {
+	return s.siblingEpisode(ctx, sourceID, 1)
+}
+
+// PreviousEpisode mirrors NextEpisode, walking the series hierarchy backwards.
+// It returns nil at the first episode and for non-series releases.
+func (s *Service) PreviousEpisode(ctx context.Context, sourceID string) (*domain.Download, error) {
+	return s.siblingEpisode(ctx, sourceID, -1)
+}
+
+// siblingEpisode resolves the episode adjacent to the current one: direction 1
+// is the nearest later episode, -1 the nearest earlier one.
+func (s *Service) siblingEpisode(ctx context.Context, sourceID string, direction int) (*domain.Download, error) {
 	current, err := s.repo.GetDownload(ctx, sourceID)
 	if err != nil {
 		return nil, err
@@ -1847,10 +1859,18 @@ func (s *Service) NextEpisode(ctx context.Context, sourceID string) (*domain.Dow
 	for _, season := range detail.Seasons {
 		for _, episode := range season.Episodes {
 			key := seasonEpisodeKey{season.Number, episode.Number}
-			if key.season < currentKey.season || (key.season == currentKey.season && key.episode <= currentKey.episode) {
+			if direction > 0 {
+				if key.season < currentKey.season || (key.season == currentKey.season && key.episode <= currentKey.episode) {
+					continue
+				}
+			} else if key.season > currentKey.season || (key.season == currentKey.season && key.episode >= currentKey.episode) {
 				continue
 			}
-			if nextKey.episode == 0 || key.season < nextKey.season || (key.season == nextKey.season && key.episode < nextKey.episode) {
+			closer := key.season < nextKey.season || (key.season == nextKey.season && key.episode < nextKey.episode)
+			if direction < 0 {
+				closer = key.season > nextKey.season || (key.season == nextKey.season && key.episode > nextKey.episode)
+			}
+			if nextKey.episode == 0 || closer {
 				nextKey, candidates = key, append([]domain.CatalogSource(nil), episode.Sources...)
 			}
 		}

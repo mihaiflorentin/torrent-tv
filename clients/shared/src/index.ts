@@ -214,6 +214,7 @@ export class API {
  downloads() { return this.call<Page<Download>>('/downloads') }
  mediaInfo(id: string) { return this.call<MediaInfo>(`/downloads/${encodeURIComponent(id)}/media-info`) }
  nextEpisode(id: string) { return this.call<Download | null>(`/downloads/${encodeURIComponent(id)}/next-episode`, { method: 'POST' }) }
+ previousEpisode(id: string) { return this.call<Download | null>(`/downloads/${encodeURIComponent(id)}/previous-episode`, { method: 'POST' }) }
  deleteDownload(id: string) { return this.call<void>(`/downloads/${encodeURIComponent(id)}`, { method: 'DELETE' }) }
  jobs(query: Record<string, string | number | undefined> = {}) { const params = new URLSearchParams(); for (const [key, value] of Object.entries(query)) { if (value !== undefined && value !== '') params.set(key, String(value)) } return this.call<Page<Job>>('/jobs?' + params.toString()) }
  job(id: string) { return this.call<{ job: Job; logs: Array<JobLog & { at: string }> }>(`/jobs/${encodeURIComponent(id)}`) }

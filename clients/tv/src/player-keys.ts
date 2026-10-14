@@ -39,6 +39,8 @@ export interface PlayerKeyPorts {
   togglePlayback(force?: boolean): void;
   /** Close the open Player panel, else save and leave the player. */
   back(): void;
+  /** Channel Up / Down: save progress and switch to the next or previous episode. Absent where the player has no queue. */
+  skipEpisode?(direction: 'next' | 'previous'): void;
 }
 
 /** Seek step: the fixed amount one seek input moves the playback position (GLOSSARY.md). */
@@ -79,11 +81,17 @@ export class PlayerKeyController {
   handle(action: PlayerAction, repeat = false): void {
     const p = this.#ports;
     if (!action) return;
-    if (repeat && (action === 'enter' || action === 'back' || action === 'stop' || action === 'play-pause')) return;
+    if (repeat && (action === 'enter' || action === 'back' || action === 'stop' || action === 'play-pause' || action === 'next-episode' || action === 'previous-episode')) return;
     if (action === 'back' || action === 'stop') return p.back();
     if (action === 'play') return p.togglePlayback(true);
     if (action === 'pause') return p.togglePlayback(false);
     if (action === 'play-pause') return p.togglePlayback();
+    if (action === 'next-episode' || action === 'previous-episode') {
+      if (!p.skipEpisode) return;
+      // The pending seek belongs to the episode being left: drop it so it cannot land on the new one.
+      this.dispose();
+      return p.skipEpisode(action === 'next-episode' ? 'next' : 'previous');
+    }
 
     const menu = p.menuOpen();
     const hidden = !p.controlsVisible() && !menu;

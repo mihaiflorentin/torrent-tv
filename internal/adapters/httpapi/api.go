@@ -89,6 +89,7 @@ func New(service *application.Service, settings *config.Store, log *slog.Logger,
 	mux.HandleFunc("GET /api/v1/downloads/{id}/audio-anchor", a.audioAnchor)
 	mux.HandleFunc("DELETE /api/v1/downloads/{id}", a.deleteDownload)
 	mux.HandleFunc("POST /api/v1/downloads/{id}/next-episode", a.nextEpisode)
+	mux.HandleFunc("POST /api/v1/downloads/{id}/previous-episode", a.previousEpisode)
 	mux.HandleFunc("GET /api/v1/jobs", a.jobs)
 	mux.HandleFunc("GET /api/v1/jobs/{id}", a.job)
 	mux.HandleFunc("GET /api/v1/jobs/{id}/logs", a.jobLogs)
@@ -536,7 +537,15 @@ func (a *API) downloads(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) nextEpisode(w http.ResponseWriter, r *http.Request) {
-	next, err := a.service.NextEpisode(r.Context(), r.PathValue("id"))
+	a.writeSibling(w, r, a.service.NextEpisode)
+}
+
+func (a *API) previousEpisode(w http.ResponseWriter, r *http.Request) {
+	a.writeSibling(w, r, a.service.PreviousEpisode)
+}
+
+func (a *API) writeSibling(w http.ResponseWriter, r *http.Request, find func(context.Context, string) (*domain.Download, error)) {
+	next, err := find(r.Context(), r.PathValue("id"))
 	if err != nil {
 		problem(w, http.StatusConflict, err)
 		return
