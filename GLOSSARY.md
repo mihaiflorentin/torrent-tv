@@ -92,6 +92,22 @@ _Avoid_: dialog, popup
 The transient on-screen feedback a Player command triggers; it auto-hides.
 _Avoid_: toast, notification
 
+**Wake**:
+A remote key press that reveals the hidden TV player controls and returns to the control the viewer last used, without changing the playback position. A Wake never seeks.
+_Avoid_: reveal, show controls
+
+**Control focus**:
+The player control the viewer last used on the TV; it stays selected after every action and is where a Wake returns.
+_Avoid_: cursor position, default focus
+
+**Timeline focus**:
+The state where the TV player's timeline is the selected control; Left and Right seek only here.
+_Avoid_: scrub mode
+
+**Seek step**:
+The fixed amount a single seek input moves the playback position: ten seconds, from the timeline's Left and Right or from the fast-forward and rewind keys.
+_Avoid_: skip, jump
+
 ### Subtitles
 
 **Subtitle candidate**:
@@ -121,6 +137,10 @@ The configured cap on total bytes of the service's stored torrent content, incom
 
 **Eviction**:
 Automatic deletion of a torrent and its files — every Managed download sharing that Engine route — to bring stored content back within the Allocation. Catalog rows and Household state survive.
+
+**Stream lease**:
+The protection a Managed download holds against Eviction and removal while at least one playback stream is reading it. It lasts until the last stream ends and does not survive a server restart.
+_Avoid_: lock, pin
 
 ### Devices
 
