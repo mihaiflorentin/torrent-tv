@@ -1027,6 +1027,10 @@ dl .tracker-badge,
  outline: none;
 }
 
+.home-sentinel {
+ height: 1px;
+}
+
 .recent-searches {
  display: flex;
  flex-wrap: wrap;

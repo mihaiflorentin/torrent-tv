@@ -127,6 +127,9 @@ Menus display `contained` — and provider candidates already downloaded — as 
 **Household**:
 The single server-side profile: favorites, resume positions, watched state. Survives torrent deletion.
 
+**My List**:
+The on-screen name of the Household's favorites in both clients (Home rail, sidebar entry, title button). Routes, API names and stored data keep the word favorites.
+
 **Job**:
 A persisted unit of background work with a dedupe key, states, and retries.
 

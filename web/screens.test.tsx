@@ -81,6 +81,8 @@ afterEach(() => {
 
 describe('Home hero', () => {
   it('shows title, year, kind, genre, overview and one action', async () => {
+    // Nothing in progress: the hero is the newest title. With Continue watching it resumes instead (home.test.tsx).
+    vi.spyOn(API.prototype, 'state').mockResolvedValue({ ...household, continueWatching: [] });
     await mountApp();
     const hero = document.querySelector('.hero')!;
     expect(text(hero.querySelector('h2'))).toBe('Lanterns');
@@ -98,6 +100,7 @@ describe('Home hero', () => {
   });
 
   it('offers episodes for a series and leaves out an unknown overview and genre', async () => {
+    vi.spyOn(API.prototype, 'state').mockResolvedValue({ ...household, continueWatching: [] });
     vi.spyOn(API.prototype, 'titles').mockResolvedValue({ items: [vesper], nextCursor: null, total: 1 });
     await mountApp();
     const hero = document.querySelector('.hero')!;
@@ -108,6 +111,7 @@ describe('Home hero', () => {
   });
 
   it('turns an empty catalog into a setup prompt with one action', async () => {
+    vi.spyOn(API.prototype, 'state').mockResolvedValue({ ...household, continueWatching: [] });
     vi.spyOn(API.prototype, 'titles').mockResolvedValue({ items: [], nextCursor: null, total: 0 });
     await mountApp();
     const hero = document.querySelector('.hero')!;

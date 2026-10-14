@@ -5,7 +5,7 @@ import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation } f
 import { PROJECTS_MENU_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_DIAGNOSTICS_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, UPDATE_RELEASE_LINK_ROW, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
 import { AVTrack, clampSeek, formatTime, isDownloadComplete, isEditableTarget, normalizeTrack, parseVTT, playerAction, preferredAudio, SubtitleCue, subtitleAt } from './player';
 import { PlayerKeyController, type PlayerFocus } from './player-keys';
-import { householdSections, nearEnd, trackerCategories } from './catalog-data';
+import { HOME_ROW, homeExtraRowsDue, homeHero, homeRowItems, homeRowSpecs, householdSections, nearEnd, trackerCategories } from './catalog-data';
 import { discoverServers, DiscoveredServer, normalizeServerURL } from './discovery';
 import { Backdrop } from './backdrop';
 import { cardMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
@@ -18,6 +18,7 @@ import './tv.css';
 import './performance.css';
 
 const STORAGE = 'filelist.serverUrl';
+const HOME_SPECS = homeRowSpecs();
 const emptyState: HouseholdState = { favorites: [], continueWatching: [], recent: [], watched: [] };
 const emptyFacets: CatalogFacets = { categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] };
 const needsEpisodeExpansion = (detail: CatalogDetail) => detail.title.kind === 'series' && detail.seasons.some(season => (season.packSources?.length || 0) > 0 && season.episodes.length === 0);
@@ -512,7 +513,7 @@ export function Setup({ draft, server, status, onDraft, onConnect, onForget }: {
 const artURL = (api: API, title?: Pick<CatalogTitle, 'backdropUrl' | 'posterUrl'>) => { const path = title?.backdropUrl || title?.posterUrl; return path ? api.streamURL(path) : '' };
 const HOUSEHOLD_EMPTY: Record<string, string> = {
  continue: 'Nothing to resume yet. Start a title and it appears here.',
- favorites: 'No favorites yet. Open a title and choose Add to favorites.',
+ favorites: 'Your list is empty. Open a title and choose Add to My List.',
  recent: 'Nothing viewed recently. Titles you open appear here.',
  watched: 'Nothing watched yet. Titles you finish appear here.',
 };
@@ -522,7 +523,7 @@ function EmptyState({ title, children }: { title: string; children: string }) { 
 type TVRoute = 'home' | 'search' | 'library' | 'continue' | 'favorites' | 'watched' | 'downloads' | 'library-categories' | 'tracker' | 'browse' | 'categories' | 'jobs' | 'events' | 'settings' | 'projects';
 const menuGroups: Array<{ label: string; items: Array<{ id: TVRoute; label: string; icon: string }> }> = [
  { label: '', items: [{ id: 'home', label: 'Home', icon: '⌂' }, { id: 'search', label: 'Search', icon: '⌕' }] },
- { label: 'My Library', items: [{ id: 'library', label: 'Dashboard', icon: '◫' }, { id: 'continue', label: 'Continue watching', icon: '▶' }, { id: 'favorites', label: 'Favorites', icon: '★' }, { id: 'watched', label: 'Watched', icon: '✓' }, { id: 'downloads', label: 'Downloads', icon: '↓' }, { id: 'library-categories', label: 'Categories', icon: '≡' }] },
+ { label: 'My Library', items: [{ id: 'library', label: 'Dashboard', icon: '◫' }, { id: 'continue', label: 'Continue watching', icon: '▶' }, { id: 'favorites', label: 'My List', icon: '★' }, { id: 'watched', label: 'Watched', icon: '✓' }, { id: 'downloads', label: 'Downloads', icon: '↓' }, { id: 'library-categories', label: 'Categories', icon: '≡' }] },
  { label: 'Tracker', items: [{ id: 'tracker', label: 'Dashboard', icon: '◉' }, { id: 'browse', label: 'Browse', icon: '▦' }, { id: 'categories', label: 'Categories', icon: '≡' }] },
  { label: '', items: [{ id: 'jobs', label: 'Jobs', icon: '↻' }, { id: 'events', label: 'Events', icon: '!' }, { id: 'settings', label: 'Settings', icon: '⚙' }] },
 ];
@@ -565,6 +566,11 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
  const [category, setCategory] = useState('');
  const [sort, setSort] = useState<'newest' | 'seeders' | 'title' | 'rating'>('newest');
  const [remoteTitles, setRemoteTitles] = useState(titles.slice(0, 12));
+ // Discovery rows under Recently added load one at a time as focus reaches the row before. They are dropped with the route, so Home holds at most four extra rows of ten posters.
+ const [extraRows, setExtraRows] = useState<Record<string, CatalogTitle[]>>({});
+ const [homeDepth, setHomeDepth] = useState(0);
+ const homeRequested = useRef<Record<string, boolean>>({});
+ const homeGeneration = useRef(0);
  const [nextCursor, setNextCursor] = useState<string | null>(null);
  const loadingMore = useRef(false);
  const [detail, setDetail] = useState<CatalogDetail | null>(null);
@@ -590,6 +596,20 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
  // A metadata update patches the matching card in place so loaded pages,
  // query, category and sort survive it.
  useEffect(() => { const patch = (event: Event) => { const updated = (event as CustomEvent).detail?.title as CatalogTitle | undefined; if (!updated?.id) return; setRemoteTitles(current => current.some(item => item.id === updated.id) ? current.map(item => item.id === updated.id ? updated : item) : current) }; window.addEventListener('catalog-metadata-updated', patch); return () => window.removeEventListener('catalog-metadata-updated', patch) }, []);
+ useEffect(() => {
+  if (route !== 'home') return;
+  const generation = homeGeneration.current;
+  for (const spec of homeExtraRowsDue(homeDepth, HOME_SPECS)) {
+   if (homeRequested.current[spec.key]) continue;
+   homeRequested.current[spec.key] = true;
+   api.titles(spec.query).then(page => {
+    if (generation !== homeGeneration.current || !catalogMounted.current) return;
+    const items = homeRowItems(spec, page.items);
+    setExtraRows(current => ({ ...current, [spec.key]: items }));
+    void api.ensureMetadata(items.map(item => item.id)).catch(() => { });
+   }).catch(() => { });
+  }
+ }, [homeDepth, route]);
  // Entering a catalog view with nothing held loads its first page; leaving
  // one drops the accumulated pages so memory resets between sections.
  useEffect(() => { if (['home', 'browse', 'search', 'tracker'].includes(route) && remoteTitles.length === 0) void fetchPage('').catch(() => { }) }, [route]);
@@ -634,7 +654,7 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
    if (!isAcquire) { setDetailMessage((error as Error).message); throw error; }
   }
  };
- const chooseRoute = (next: TVRoute) => { setNotice(''); if (!['home', 'browse', 'search', 'tracker'].includes(next)) { setRemoteTitles([]); setNextCursor(null); } setRoute(next); setDetail(null); setMenuOpen(false); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-region="content"]')), 0); };
+ const chooseRoute = (next: TVRoute) => { setNotice(''); homeGeneration.current++; homeRequested.current = {}; setExtraRows({}); setHomeDepth(0); if (!['home', 'browse', 'search', 'tracker'].includes(next)) { setRemoteTitles([]); setNextCursor(null); } setRoute(next); setDetail(null); setMenuOpen(false); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-region="content"]')), 0); };
  // Projects route: activation hands the link to the platform browser. When
  // no browser takes it (several ATV boxes ship none) the address stays on
  // the card and the hint says so — the URL is the fallback.
@@ -692,7 +712,7 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
  }, [preparing?.error, preparing?.label, onCancelPrepare]);
  const onBack = () => { if (preparing) { onCancelPrepare?.(); return; } if (updateConfirm) { closeUpdateConfirm(); return; } if (detail) { setDetail(null); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(lastContent.current ? `[data-focus-key="${lastContent.current}"]` : '[data-focus-region="content"]')), 0); return; } if (menuOpen) { setMenuOpen(false); window.setTimeout(() => focusElement(lastContent.current ? document.querySelector<HTMLElement>(`[data-focus-key="${lastContent.current}"]`) : document.querySelector<HTMLElement>('[data-focus-region="content"]')), 0); return; } setMenuOpen(true); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-menu-route="${route}"]`)), 0); };
  useTVNavigation({
-  getInitialFocus: () => first.current || document.querySelector<HTMLElement>('[data-focus-region="content"]'), restoreKey: restoreFocus, onFocusKey: key => { onFocus(key); if (document.activeElement instanceof HTMLElement && document.activeElement.dataset.focusRegion === 'content') lastContent.current = key; }, onBack, onLongBack: exitApplication, onDirection: (direction, current) => {
+  getInitialFocus: () => first.current || document.querySelector<HTMLElement>('[data-focus-region="content"]'), restoreKey: restoreFocus, onFocusKey: key => { onFocus(key); if (route === 'home' && document.activeElement instanceof HTMLElement) { const row = Number(document.activeElement.dataset.focusRow); if (row >= HOME_ROW.recent) setHomeDepth(depth => Math.max(depth, row)) } if (document.activeElement instanceof HTMLElement && document.activeElement.dataset.focusRegion === 'content') lastContent.current = key; }, onBack, onLongBack: exitApplication, onDirection: (direction, current) => {
    if (detail || updateConfirm) return false;
    // Near the end of a title rail, fire the next page without consuming the
    // keypress: focus still moves while the append lands.
@@ -713,9 +733,11 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
  if (category) visible = visible.filter(title => title.categories.includes(category));
  if (sort === 'seeders') visible = [...visible].sort((a, b) => b.bestSeeders - a.bestSeeders); if (sort === 'title') visible = [...visible].sort((a, b) => a.title.localeCompare(b.title)); if (sort === 'rating') visible = [...visible].sort((a, b) => Number(Boolean(b.ratingVotes)) - Number(Boolean(a.ratingVotes)) || (b.rating || 0) - (a.rating || 0));
  const heading = menuGroups.reduce<Array<{ id: TVRoute; label: string; icon: string }>>((items, group) => items.concat(group.items), []).find(item => item.id === route)?.label || (route === 'projects' ? 'Other projects' : 'Home');
- const hero = visible[0] || titles[0];
- const rows: Array<{ key: string; title: string; items: CatalogTitle[] }> = route === 'home' ? [
-  { key: 'new', title: 'Recently added', items: remoteTitles },
+ const resumeHero = route === 'home' ? homeHero(librarySections.filter(section => section.key === 'continue').reduce<HouseholdItem[]>((all, section) => all.concat(section.items), []), undefined) : undefined;
+ const hero = resumeHero?.title || visible[0] || titles[0];
+ const rows: Array<{ key: string; title: string; items: CatalogTitle[]; row?: number; keyPrefix?: string }> = route === 'home' ? [
+  { key: 'new', title: 'Recently added', items: remoteTitles, row: HOME_ROW.recent },
+  ...HOME_SPECS.map((spec, index) => ({ key: `rail-${spec.key}`, title: spec.title, items: extraRows[spec.key] || [], row: HOME_ROW.extra + index, keyPrefix: `rail-${spec.key}` })),
  ] : route === 'tracker' ? [{ key: 'tracker-new', title: 'Recently added', items: visible }, { key: 'tracker-seeded', title: 'Strong swarms', items: [...visible].sort((a, b) => b.bestSeeders - a.bestSeeders) }] : ['continue', 'favorites', 'watched', 'library', 'downloads', 'library-categories', 'jobs', 'events', 'settings', 'categories'].includes(route) ? [] : [{ key: route, title: heading, items: visible }];
  const libraryArt = librarySections[0]?.items[0]?.catalog;
  const initialArt = artURL(api, route === 'home' ? hero : librarySections.length > 0 ? libraryArt : visible[0]);
@@ -748,10 +770,10 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
    {route === 'search' && !draftQuery && recent.length > 0 && <div class="tv-recent" role="group" aria-label="Recent searches">{recent.map((term, index) => <button data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`recent-${index}`} onClick={() => runRecent(term)}>{term}</button>)}<button data-focus-region="content" data-focus-row="2" data-focus-col={recent.length} data-focus-key="recent-clear" onClick={forgetRecent}>Clear recent</button></div>}
    {['tracker', 'browse', 'categories', 'search'].includes(route) && <div class="tv-filters"><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="0" data-focus-key="sort-newest" class={sort === 'newest' ? 'active' : ''} onClick={() => setSort('newest')}>Newest</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="1" data-focus-key="sort-seeders" class={sort === 'seeders' ? 'active' : ''} onClick={() => setSort('seeders')}>Most seeded</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="2" data-focus-key="sort-rating" class={sort === 'rating' ? 'active' : ''} onClick={() => setSort('rating')}>Rating</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="3" data-focus-key="sort-title" class={sort === 'title' ? 'active' : ''} onClick={() => setSort('title')}>A–Z</button>{category && <button data-focus-region="content" data-focus-row={sortRow} data-focus-col="4" data-focus-key="clear-category" onClick={() => setCategory('')}>Clear {category}</button>}</div>}
    {route === 'projects' ? <section class="tv-projects"><p class="tv-muted">Project sites published with this server. Press OK on a card to open it.</p>{portal && portal.links.length > 0 ? portal.links.map((link, index) => <button class="tv-project" key={link.id} data-focus-region="content" data-focus-row={3 + index} data-focus-col="0" data-focus-key={`project-${link.id}`} onClick={() => openProjectLink(link)}><strong>{link.title}</strong>{link.description && <p>{link.description}</p>}<code>{link.url}</code></button>) : <EmptyState title="No project links yet">They appear here when the server publishes them.</EmptyState>}{projectsMessage && <p class="focus-hint" aria-live="polite">{projectsMessage}</p>}</section> : route === 'settings' ? <TVSettings api={api} onChangeServer={onChangeServer} onForgetServer={onForgetServer} updateStatus={updateStatus} onUpdateStatus={onUpdateStatus} confirmOpen={updateConfirm} onConfirmOpen={openUpdateConfirm} onConfirmClose={closeUpdateConfirm} /> : route === 'events' ? <TVEvents api={api} /> : route === 'downloads' ? <TVDownloads items={downloads} onPlay={onPlayDownload} onManage={onManageDownload} /> : route === 'library-categories' ? <TVLibraryCategories api={api} onOpen={openLibraryItem} /> : route === 'jobs' ? <TVJobs api={api} items={jobs} /> : route === 'categories' ? trackerCategories(facets).length === 0 ? <EmptyState title="No categories yet">Categories appear after the first catalog sync. Open Events and choose Fetch latest.</EmptyState> : <section class="tv-category-grid">{trackerCategories(facets).map((name, index) => <button data-focus-region="content" data-focus-row={3 + Math.floor(index / 4)} data-focus-col={index % 4} data-focus-key={`category-${name}`} onClick={() => { setCategory(name); setRoute('browse') }}><strong>{name}</strong><span>Browse titles</span></button>)}</section> : <>
-    {route === 'home' && hero && <section class="tv-hero"><div class="tv-hero-copy"><span class="eyebrow">{heroFacts(hero).join(' · ')}</span><h2>{hero.title}</h2>{hero.overview && <p class="tv-hero-overview">{hero.overview}</p>}{hero.genres && hero.genres.length > 0 && <p class="tv-hero-genres">{hero.genres.slice(0, 3).join(' · ')}</p>}<button ref={first} data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key={`hero-${hero.id}`} data-art={artURL(api, hero)} class="primary" onClick={() => void openTitle(hero)}>View versions</button></div></section>}
+    {route === 'home' && hero && <section class="tv-hero"><div class="tv-hero-copy"><span class="eyebrow">{heroFacts(hero).join(' · ')}</span><h2>{hero.title}</h2>{hero.overview && <p class="tv-hero-overview">{hero.overview}</p>}{hero.genres && hero.genres.length > 0 && <p class="tv-hero-genres">{hero.genres.slice(0, 3).join(' · ')}</p>}{resumeHero?.resume && <p class="tv-hero-genres">{libraryCardLine(resumeHero.resume)}</p>}<button ref={first} data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key={`hero-${hero.id}`} data-art={artURL(api, hero)} class="primary" onClick={() => { const resume = resumeHero?.resume; if (resume) onPlay(resume.release, resume.fileIndex, resume.positionMs); else void openTitle(hero) }}>{resumeHero?.resume ? resumeActionLabel(resumeHero.resume, hero.kind) : 'View versions'}</button></div></section>}
     {librarySections.filter(section => route !== 'home' || section.key === 'continue').map((section, index) => <HouseholdRail api={api} title={section.title} items={section.items} row={3 + index} empty={route === 'home' ? '' : HOUSEHOLD_EMPTY[section.key]} onOpen={openLibraryItem} />)}
-    <div class="tv-rows">{rows.filter(row => row.items.length > 0).map((row, rowIndex) => <section><div class="row-heading"><h2>{row.title}</h2></div><div class="poster-rail">{row.items.map((title, col) => <TitleCard api={api} title={title} row={rowIndex + 10} col={col} seeders={row.key === 'tracker-seeded'} focusRef={!hero && rowIndex === 0 && col === 0 ? first : undefined} onOpen={() => void openTitle(title)} />)}</div></section>)}</div>
-    {route === 'home' && librarySections.filter(section => section.key === 'favorites').map(section => <HouseholdRail api={api} title={section.title} items={section.items} row={20} empty="" onOpen={openLibraryItem} />)}
+    <div class="tv-rows">{rows.filter(row => row.items.length > 0).map((row, rowIndex) => <section><div class="row-heading"><h2>{row.title}</h2></div><div class="poster-rail">{row.items.map((title, col) => <TitleCard api={api} title={title} row={row.row ?? rowIndex + 10} focusKey={row.keyPrefix ? `${row.keyPrefix}-${title.id}` : undefined} col={col} seeders={row.key === 'tracker-seeded'} focusRef={!hero && rowIndex === 0 && col === 0 ? first : undefined} onOpen={() => void openTitle(title)} />)}</div></section>)}</div>
+    {route === 'home' && librarySections.filter(section => section.key === 'favorites').map(section => <HouseholdRail api={api} title={section.title} items={section.items} row={HOME_ROW.favorites} empty="" onOpen={openLibraryItem} />)}
     {['home', 'search', 'browse', 'tracker'].includes(route) && rows.every(row => row.items.length === 0) && (query ? <EmptyState title={`No titles match “${query}”`}>Try fewer or different words, or press Clear to see everything.</EmptyState> : route === 'search' ? <EmptyState title="Search the catalog">Press OK on the search field, type a title, then choose Search.</EmptyState> : <EmptyState title="No titles to show yet">The catalog may still be syncing. Wait a minute and press Refresh, or check that a tracker is enabled in Settings.</EmptyState>)}
    </>}
   </main>
@@ -1014,8 +1036,8 @@ export function TVPromotions({ api }: { api: API }) {
  return <button class="tv-promo" data-focus-region="content" data-focus-row="95" data-focus-col="0" data-focus-key="promo" onClick={() => { void openExternalURL(url) }}><small>Advertisement</small>{/^https?:\/\//.test(promotion.image) && <img src={promotion.image} alt="" />}{promotion.title && <strong>{promotion.title}</strong>}{promotion.text && <p>{promotion.text}</p>}{promotion.link ? <code>{promotion.link}</code> : null}</button>;
 }
 
-function TitleCard({ api, title, row, col, seeders, focusRef, onOpen }: { api: API; title: CatalogTitle; row: number; col: number; seeders?: boolean; focusRef?: { current: HTMLButtonElement | null }; onOpen: () => void }) {
- return <button ref={focusRef} class="poster-card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={`title-${title.id}`} data-art={artURL(api, title)} onClick={onOpen}>{title.posterUrl ? <img src={api.streamURL(title.posterUrl)} alt="" loading="lazy" /> : <div class="poster-fallback">{title.title.slice(0, 1)}</div>}<TVStateBadges state={title.libraryState} /><div class="poster-copy"><strong>{title.title}</strong><span>{cardMeta(title, { seeders })}</span></div></button>;
+function TitleCard({ api, title, row, col, focusKey, seeders, focusRef, onOpen }: { api: API; title: CatalogTitle; row: number; col: number; focusKey?: string; seeders?: boolean; focusRef?: { current: HTMLButtonElement | null }; onOpen: () => void }) {
+ return <button ref={focusRef} class="poster-card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey || `title-${title.id}`} data-art={artURL(api, title)} onClick={onOpen}>{title.posterUrl ? <img src={api.streamURL(title.posterUrl)} alt="" loading="lazy" /> : <div class="poster-fallback">{title.title.slice(0, 1)}</div>}<TVStateBadges state={title.libraryState} /><div class="poster-copy"><strong>{title.title}</strong><span>{cardMeta(title, { seeders })}</span></div></button>;
 }
 
 function sourceActionLabel(source: CatalogSource) { return source.libraryState?.downloadState && source.libraryState.downloadState !== 'none' ? 'Play' : 'Play and download' }
@@ -1083,7 +1105,7 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
    <p class="detail-overview">{detail.title.overview || 'No description yet. Pick a version to play.'}</p>
    <div class="detail-actions">
     {resume ? <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onResume(resume)} aria-label={`${resumeActionLabel(resume, detail.title.kind)} at saved position`}>{resumeActionLabel(resume, detail.title.kind)}</button> : firstSource && <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onPlay(firstSource.release, firstSource.fileIndex)}>{sourceActionLabel(firstSource)}</button>}
-    <button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="detail-favorite" aria-pressed={favorite} onClick={() => onFavorite(detail.title, !favorite)}>{favorite ? 'In favorites' : 'Add to favorites'}</button>
+    <button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="detail-favorite" aria-pressed={favorite} onClick={() => onFavorite(detail.title, !favorite)}>{favorite ? 'In My List' : 'Add to My List'}</button>
     <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="detail-refresh" aria-disabled={refreshing ? 'true' : undefined} aria-label="Refresh data: fetches fresh series information from the metadata providers and searches all trackers again, then rebuilds the episode list." onClick={() => void refresh()}>{refreshing ? 'Refreshing…' : 'Refresh data'}</button>
    </div>
    {resume && <small class="resume-file">{resumeLine(resume, detail.title.kind)}</small>}
