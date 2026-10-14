@@ -3,6 +3,28 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Version identity comes from the repository VERSION file (major.minor.patch).
+// versionCode = major * 10000 + minor * 100 + patch, so 0.9.8 -> 908. Every
+// later release must keep minor and patch below 100 to stay monotonic.
+fun deriveVersionCode(major: Int, minor: Int, patch: Int) =
+    major * 10000 + minor * 100 + patch
+
+val releaseVersion: String = file("../../../VERSION").readText().trim()
+val versionParts = Regex("""^(\d+)\.(\d+)\.(\d+)$""").matchEntire(releaseVersion)
+    ?.destructured?.toList()?.map { it.toInt() }
+    ?: throw GradleException("VERSION must match major.minor.patch, got '$releaseVersion'")
+val (verMajor, verMinor, verPatch) = versionParts
+require(verMinor < 100 && verPatch < 100) { "VERSION minor and patch must be below 100 for a monotonic versionCode, got '$releaseVersion'" }
+
+// Release keystore: one fixed key from the environment (CI secrets) so builds
+// from any machine upgrade each other. Never commit the keystore.
+val releaseKeystorePath: String? = System.getenv("TORRENTTV_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+val releaseKeystorePassword: String? = System.getenv("TORRENTTV_KEYSTORE_PASSWORD")
+val releaseKeyAlias: String? = System.getenv("TORRENTTV_KEY_ALIAS")
+val releaseKeyPassword: String? = System.getenv("TORRENTTV_KEY_PASSWORD")
+val haveReleaseKeystore = releaseKeystorePath != null && releaseKeystorePassword != null &&
+    releaseKeyAlias != null && releaseKeyPassword != null
+
 android {
     namespace = "com.torrenttv.app"
     compileSdk = 35
@@ -10,16 +32,31 @@ android {
         applicationId = "com.torrenttv.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = deriveVersionCode(verMajor, verMinor, verPatch)
+        versionName = releaseVersion
+    }
+    signingConfigs {
+        if (haveReleaseKeystore) {
+            create("torrenttvRelease") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         named("release") {
             isMinifyEnabled = false
-            // Sideloading artifact: the debug key keeps `adb install` and
-            // manual updates working without a distribution certificate,
-            // mirroring the deliberately unsigned Tizen WGT.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (haveReleaseKeystore) {
+                signingConfigs.getByName("torrenttvRelease")
+            } else {
+                logger.warn(
+                    "WARNING: TORRENTTV_KEYSTORE_PATH/_KEYSTORE_PASSWORD/_KEY_ALIAS/_KEY_PASSWORD not all set; " +
+                        "signing the release APK with the debug key. It will not upgrade a keystore-signed install."
+                )
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
@@ -54,3 +91,15 @@ val syncWebApp = tasks.register<Copy>("syncWebApp") {
     into("src/main/assets/www")
 }
 tasks.named("preBuild") { dependsOn(syncWebApp) }
+
+// Build check: fail if the Android identity ever stops matching VERSION.
+val verifyVersion = tasks.register("verifyVersion") {
+    doLast {
+        val dc = android.defaultConfig
+        check(dc.versionName == releaseVersion) { "versionName ${dc.versionName} != VERSION $releaseVersion" }
+        check(dc.versionCode == deriveVersionCode(verMajor, verMinor, verPatch)) {
+            "versionCode ${dc.versionCode} does not match VERSION $releaseVersion"
+        }
+    }
+}
+tasks.named("preBuild") { dependsOn(verifyVersion) }

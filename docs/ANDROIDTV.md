@@ -42,9 +42,33 @@ adb install clients/android-tv/.build/artifacts/torrent-tv-<VERSION>-android-tv.
 ```
 
 Updates are manual: install the newer APK over the old one (same
-application id, higher `versionCode`). CI checks that the packaged web
+application id, higher `versionCode`, same signing key). CI checks that the packaged web
 assets are byte-identical to the Tizen bundle and smoke-boots the real APK
 on an API 26 Android TV emulator.
+
+## Versioning and signing
+
+`versionName` is the `VERSION` file. `versionCode` is derived as
+`major * 10000 + minor * 100 + patch` (0.9.8 becomes 908), so it rises with
+every release as long as minor and patch stay below 100; the build fails on
+a `VERSION` that is not `major.minor.patch` or breaks that bound, and a
+`verifyVersion` Gradle task fails the build if the derived values drift.
+Moving from the old hardcoded `versionCode = 1` to 908 is one-way for
+installed builds; any future scheme must stay monotonic.
+
+Release builds are signed with one fixed keystore read from environment
+variables (CI supplies them from secrets); the keystore is never committed:
+
+```text
+TORRENTTV_KEYSTORE_PATH, TORRENTTV_KEYSTORE_PASSWORD,
+TORRENTTV_KEY_ALIAS, TORRENTTV_KEY_PASSWORD
+```
+
+If any is unset the build prints a warning and signs with the debug key.
+Such an APK installs fresh but cannot update a keystore-signed install (and
+vice versa); uninstall first. Keep the one keystore: losing it breaks the
+update path for every installed device. Upgrade installs over a previous
+build are unverified on hardware.
 
 ## Physical-TV verification log
 
