@@ -68,6 +68,21 @@ VENDORED_SDK_FILES: frozenset[str] = frozenset({
     "webOSTV-dev.js",
 })
 
+# Chromium 53 (webOS TV 4.0) rules for the built app.css. Four- and eight-digit
+# hex colors are Chromium 62+, gap is Chromium 66+/84+, and grid is
+# unsupported, so every grid layout listed here needs a flex fallback inside
+# the `@supports not (display: grid)` block.
+CSS_COMMENT = re.compile(rb"/\*.*?\*/", re.S)
+CSS_RULE = re.compile(rb"([^{}]+)\{([^{}]*)\}")
+CSS_SHORT_ALPHA_HEX = re.compile(rb"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4})(?![0-9a-zA-Z_-])")
+CSS_GAP_PROPERTY = re.compile(rb"(?<![\w-])(?:grid-)?(?:column-|row-)?gap\s*:")
+CSS_NO_GRID_BLOCK = re.compile(rb"@supports\s+not\s*\(\s*display\s*:\s*grid\s*\)\s*\{")
+CSS_OUTLINE_RING = re.compile(rb"(?<![\w-])outline\s*:\s*[1-9]\d*px\s+solid\b")
+REQUIRED_GRID_FALLBACKS: tuple[bytes, ...] = (
+    b".tv-list article",
+    b".job-log-expanded dl",
+)
+
 ICON_DIMENSIONS: dict[str, tuple[int, int] | tuple[tuple[int, int], ...]] = {
     "icon.png": (80, 80),
     "largeIcon.png": (130, 130),
@@ -267,6 +282,54 @@ def validate_appinfo(
     return appinfo
 
 
+def _no_grid_block(css: bytes) -> bytes:
+    """Return the body of the `@supports not (display: grid)` block(s)."""
+    bodies = []
+    for match in CSS_NO_GRID_BLOCK.finditer(css):
+        depth = 1
+        i = match.end()
+        while i < len(css) and depth:
+            if css[i] == ord("{"):
+                depth += 1
+            elif css[i] == ord("}"):
+                depth -= 1
+            i += 1
+        bodies.append(css[match.end():i - 1])
+    return b"\n".join(bodies)
+
+
+def validate_built_css(filename: str, content: bytes) -> None:
+    css = CSS_COMMENT.sub(b"", content)
+
+    hex_match = CSS_SHORT_ALPHA_HEX.search(css)
+    if hex_match:
+        raise WebosIpkError(
+            f"{filename} contains a 4- or 8-digit hex color {hex_match.group().decode()} "
+            "(Chromium 62+, unsupported on webOS TV 4.0)"
+        )
+    if CSS_GAP_PROPERTY.search(css):
+        raise WebosIpkError(f"{filename} uses a gap property (unsupported on Chromium 53)")
+
+    fallback = _no_grid_block(css)
+    for selector in REQUIRED_GRID_FALLBACKS:
+        pattern = re.compile(
+            rb"(?:^|[,{}])\s*" + re.escape(selector).replace(rb"\ ", rb"\s+")
+            + rb"\s*(?:,[^{}]*)?\{[^{}]*display\s*:\s*flex"
+        )
+        if not pattern.search(fallback):
+            raise WebosIpkError(
+                f"{filename} has no no-grid fallback for {selector.decode()!r} "
+                "inside @supports not (display: grid)"
+            )
+
+    for selectors, body in CSS_RULE.findall(css):
+        if b"button:focus" in selectors and b"box-shadow" in body and not CSS_OUTLINE_RING.search(body):
+            raise WebosIpkError(
+                f"{filename} focus ring relies on box-shadow alone; "
+                "add a solid outline fallback"
+            )
+
+
 def validate_archive(
     file: Path,
     target_version: str | None = None,
@@ -395,6 +458,8 @@ def validate_archive(
                 raise WebosIpkError(
                     f"{filename} references Samsung $WEBAPIS"
                 )
+
+    validate_built_css("app.css", app_files["app.css"])
 
     return (
         f"Compatible webOS package structure: id={pkg_id}, version={appinfo['version']}, "

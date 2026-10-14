@@ -98,7 +98,7 @@ class WebosIpkTests(unittest.TestCase):
             pkg_prefix + "appinfo.json": json.dumps(appinfo).encode("utf-8"),
             pkg_prefix + "index.html": b"<!doctype html><html><body></body></html>",
             pkg_prefix + "app.js": b"(function() { var x = 1; })();",
-            pkg_prefix + "app.css": b"body { margin: 0; }",
+            pkg_prefix + "app.css": self.GOOD_CSS,
             pkg_prefix + "startup.js": b"window.FileListBoot = {};",
             pkg_prefix + "fatal-error.js": b"window.FileListFatalError = {};",
             pkg_prefix + "webOSTV.js": b"window.webOS = {};",
@@ -545,6 +545,66 @@ echo "corrupt-archive" > "$out_dir/bad.ipk"
             with self.assertRaises(webos_ipk.WebosIpkError):
                 webos_ipk.pack(src, appinfo, icons, out_ipk, target_version="0.6.0", ares_bin=str(stub))
             self.assertFalse(out_ipk.exists())
+
+    GOOD_CSS = (
+        b"button:focus, input:focus { outline: 3px solid var(--teal); outline-offset: 2px; "
+        b"box-shadow: 0 0 0 5px var(--teal), 0 12px 34px rgba(0, 0, 0, .7); }\n"
+        b".tv-list article { display: grid; grid-template-columns: 1fr auto; }\n"
+        b".job-log-expanded dl { display: grid; grid-template-columns: 148px 1fr; }\n"
+        b"@supports not (display: grid) {\n"
+        b" .tv-list article { display: flex; }\n"
+        b" .job-log-expanded dl { display: flex; flex-wrap: wrap; }\n"
+        b"}\n"
+    )
+
+    def validate_css(self, css: bytes) -> str:
+        with tempfile.TemporaryDirectory() as td:
+            ipk = self.write_ipk_file(
+                self.make_ipk(extra_data={"usr/palm/applications/com.torrenttv.app/app.css": css}),
+                Path(td),
+            )
+            return webos_ipk.validate_archive(ipk)
+
+    def test_accepts_chromium53_safe_built_css(self):
+        self.assertIn("Compatible webOS package", self.validate_css(self.GOOD_CSS))
+
+    def test_rejects_four_and_eight_digit_hex_in_built_css(self):
+        for color in (b"#000b", b"#0c1216f5", b"#FFFA"):
+            with self.subTest(color=color):
+                css = self.GOOD_CSS + b".x { background: " + color + b"; }"
+                with self.assertRaisesRegex(webos_ipk.WebosIpkError, "4- or 8-digit hex color"):
+                    self.validate_css(css)
+
+    def test_accepts_three_and_six_digit_hex_in_built_css(self):
+        self.validate_css(self.GOOD_CSS + b".x { color: #fff; background: #0c1216; }")
+
+    def test_ignores_hex_lookalikes_in_css_comments(self):
+        self.validate_css(self.GOOD_CSS + b"/* was #000b */ .x { color: red; }")
+
+    def test_rejects_gap_property_in_built_css(self):
+        for decl in (b"gap: 8px", b"grid-gap: 8px", b"column-gap: 8px", b"row-gap: 8px"):
+            with self.subTest(decl=decl):
+                with self.assertRaisesRegex(webos_ipk.WebosIpkError, "gap"):
+                    self.validate_css(self.GOOD_CSS + b".x { display: flex; " + decl + b"; }")
+
+    def test_rejects_built_css_without_grid_fallbacks(self):
+        for selector in (b".tv-list article", b".job-log-expanded dl"):
+            with self.subTest(selector=selector):
+                css = self.GOOD_CSS.replace(b" " + selector + b" { display: flex", b" .other { display: flex")
+                with self.assertRaisesRegex(webos_ipk.WebosIpkError, "no-grid fallback"):
+                    self.validate_css(css)
+
+    def test_rejects_built_css_with_fallback_outside_supports_block(self):
+        css = self.GOOD_CSS.replace(b"@supports not (display: grid)", b"@supports (display: grid)")
+        with self.assertRaisesRegex(webos_ipk.WebosIpkError, "no-grid fallback"):
+            self.validate_css(css)
+
+    def test_rejects_focus_ring_that_depends_on_box_shadow_alone(self):
+        for outline in (b"outline: 0;", b"outline: none;", b""):
+            with self.subTest(outline=outline):
+                css = self.GOOD_CSS.replace(b"outline: 3px solid var(--teal); outline-offset: 2px;", outline)
+                with self.assertRaisesRegex(webos_ipk.WebosIpkError, "focus ring"):
+                    self.validate_css(css)
 
 if __name__ == "__main__":
     unittest.main()

@@ -375,7 +375,7 @@ export function createAVPlay(): WebOSAVPlay {
    }
 
    el.addEventListener('waiting', handleBufferingStart);
-   el.addEventListener('stall', handleBufferingStart);
+   el.addEventListener('stalled', handleBufferingStart);
 
    // Buffering progress: approximate from HTMLMediaElement buffered TimeRanges
    el.addEventListener('progress', function() {

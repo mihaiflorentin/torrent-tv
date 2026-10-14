@@ -213,8 +213,8 @@ describe('webOS avplay adapter', () => {
   // Additional progress events after completion never re-fire complete.
   fire(video, 'progress');
   expect(recorded.calls.onbufferingcomplete).toHaveLength(1);
-  // Re-entering buffering on a later stall restarts the sequence.
-  fire(video, 'stall');
+  // Re-entering buffering on a later stalled event restarts the sequence.
+  fire(video, 'stalled');
   expect(recorded.calls.onbufferingstart).toHaveLength(2);
   fire(video, 'playing');
   expect(recorded.calls.onbufferingcomplete).toHaveLength(2);
@@ -355,7 +355,7 @@ describe('webOS avplay adapter', () => {
   const video = openPrepared(av, recorded);
   bufferedRanges(video, 30, 60);
   // Progressive stream downloads ahead while playing: plain progress events
-  // with no waiting/stall since the last buffering start must stay silent.
+  // with no waiting/stalled since the last buffering start must stay silent.
   fire(video, 'progress');
   expect(recorded.calls.onbufferingprogress).toBeUndefined();
   expect(recorded.calls.onbufferingstart).toBeUndefined();

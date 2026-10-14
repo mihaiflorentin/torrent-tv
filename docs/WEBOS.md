@@ -120,6 +120,7 @@ clients/webos/.build/artifacts/torrent-tv-<VERSION>-webos.ipk.sha256
 7. Zero ES module syntax (`import`/`export`) in packaged JavaScript.
 8. Zero Samsung `$WEBAPIS` references.
 9. Zero development artifacts (`.build/`, `node_modules/`, `*.ts`, `*.map`, `tests/`) leaked into the package.
+10. Built `app.css` is Chromium 53 safe: no 4- or 8-digit hex colors, no `gap` properties, flex fallbacks inside `@supports not (display: grid)` for the title list and job-log detail layouts, and a focus ring that carries a solid `outline` besides the `box-shadow`.
 
 ## Headless old-engine boot smoke
 
