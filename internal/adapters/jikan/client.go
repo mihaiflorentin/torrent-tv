@@ -73,7 +73,6 @@ func (c *Client) getJSON(ctx context.Context, path string, out any) error {
 
 func (c *Client) Lookup(ctx context.Context, imdbID, title string, kind domain.MediaKind, language, fallback string) (domain.CatalogMetadata, error) {
 	_ = imdbID
-	_ = kind
 	_ = language
 	_ = fallback
 	trimmed := strings.TrimSpace(title)
@@ -83,6 +82,7 @@ func (c *Client) Lookup(ctx context.Context, imdbID, title string, kind domain.M
 	var search struct {
 		Data []struct {
 			MalID         int64   `json:"mal_id"`
+			Type          string  `json:"type"`
 			Title         string  `json:"title"`
 			TitleEnglish  string  `json:"title_english"`
 			TitleJapanese string  `json:"title_japanese"`
@@ -102,6 +102,12 @@ func (c *Client) Lookup(ctx context.Context, imdbID, title string, kind domain.M
 	}
 	wanted := normalizeTitle(trimmed)
 	for _, candidate := range search.Data {
+		// The MAL entry type must agree with what is being looked up, or a
+		// live-action film sharing an anime's title takes its synopsis.
+		if isMovie := strings.EqualFold(candidate.Type, "Movie"); candidate.Type != "" &&
+			((kind == domain.MediaMovie && !isMovie) || (kind == domain.MediaSeries && isMovie)) {
+			continue
+		}
 		for _, name := range []string{candidate.Title, candidate.TitleEnglish, candidate.TitleJapanese} {
 			if name == "" || normalizeTitle(name) != wanted {
 				continue
