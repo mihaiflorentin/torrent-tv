@@ -1,4 +1,4 @@
-import { canonicalLanguage, languageDisplayName, type Download } from '@torrent-tv/shared';
+import { canonicalLanguage, cueDisplayText, languageDisplayName, type Download } from '@torrent-tv/shared';
 
 export type PlayerAction = 'left' | 'right' | 'up' | 'down' | 'enter' | 'back' | 'play' | 'pause' | 'play-pause' | 'stop' | 'rewind' | 'fast-forward' | 'previous' | 'next' | 'previous-episode' | 'next-episode' | null;
 
@@ -95,7 +95,7 @@ function cueTime(value: string): number {
 
 export function parseVTT(input: string): SubtitleCue[] {
   const blocks = input.replace(/^\uFEFF/, '').replace(/\r/g, '').split(/\n{2,}/); const cues: SubtitleCue[] = [];
-  for (const block of blocks) { const lines = block.split('\n').filter(Boolean); if (!lines.length || /^WEBVTT/i.test(lines[0]) || /^NOTE(?:\s|$)/.test(lines[0])) continue; const timing = lines.findIndex(line => line.includes('-->')); if (timing < 0) continue; const [rawStart, rawEnd] = lines[timing].split('-->'); const start = cueTime(rawStart); const end = cueTime(rawEnd.trim().split(/\s+/)[0]); if (start < 0 || end <= start) continue; const text = lines.slice(timing + 1).join('\n').replace(/<[^>]+>/g, '').trim(); if (text) cues.push({ start, end, text }); }
+  for (const block of blocks) { const lines = block.split('\n').filter(Boolean); if (!lines.length || /^WEBVTT/i.test(lines[0]) || /^NOTE(?:\s|$)/.test(lines[0])) continue; const timing = lines.findIndex(line => line.includes('-->')); if (timing < 0) continue; const [rawStart, rawEnd] = lines[timing].split('-->'); const start = cueTime(rawStart); const end = cueTime(rawEnd.trim().split(/\s+/)[0]); if (start < 0 || end <= start) continue; const text = cueDisplayText(lines.slice(timing + 1).join('\n')); if (text) cues.push({ start, end, text }); }
   return cues.sort((a, b) => a.start - b.start);
 }
 

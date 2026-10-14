@@ -15,6 +15,10 @@ describe('player helpers', () => {
   });
   it('keeps an audio index only when its saved language still matches', () => { const english = { index: 1, type: 'AUDIO', language: 'eng', label: 'English' }; const romanian = { index: 3, type: 'AUDIO', language: 'ron', label: 'Romanian' }; expect(preferredAudio([english, romanian], 'ro', 3)?.index).toBe(3); expect(preferredAudio([english, romanian], 'ro', 1)?.index).toBe(3); expect(preferredAudio([english, romanian], 'de', -1)?.index).toBe(1) });
   it('parses and displays WebVTT cues at the requested playback time', () => { const cues = parseVTT('WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\nSalut!\n\n00:03.500 --> 00:00:05.000\nHello'); expect(cues).toHaveLength(2); expect(subtitleAt(cues, 2_000)).toBe('Salut!'); expect(subtitleAt(cues, 4_000)).toBe('Hello'); expect(subtitleAt(cues, 500)).toBe(''); });
+  it('renders break tags, ASS overrides and entities in cue text as real lines', () => {
+    const cues = parseVTT('WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nLine1</br>Line2\n\n00:00:03.000 --> 00:00:04.000\nA<br/>B &lt;br&gt;C\n\n00:00:05.000 --> 00:00:06.000\n{\\an8}Top\\NBottom\n\n00:00:07.000 --> 00:00:08.000\n<i>Tom &amp; Jerry</i> 1 < 2');
+    expect(cues.map(cue => cue.text)).toEqual(['Line1\nLine2', 'A\nB\nC', 'Top\nBottom', 'Tom & Jerry 1 < 2']);
+  });
 });
 
 describe('playerAction Android media keys', () => {

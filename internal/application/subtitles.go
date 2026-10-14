@@ -366,11 +366,11 @@ func toWebVTT(data []byte, format string) ([]byte, error) {
 		if !strings.HasPrefix(strings.TrimSpace(text), "WEBVTT") {
 			return nil, fmt.Errorf("invalid WebVTT subtitle")
 		}
-		return []byte(positionCueLines(text)), nil
+		return []byte(positionCueLines(sanitizeVTTCues(text))), nil
 	}
 	if format == ".srt" {
 		text = timeLine.ReplaceAllStringFunc(text, func(value string) string { return strings.ReplaceAll(value, ",", ".") })
-		return []byte(positionCueLines("WEBVTT\n\n" + text)), nil
+		return []byte(positionCueLines(sanitizeVTTCues("WEBVTT\n\n" + text))), nil
 	}
 	if format == ".ass" || format == ".ssa" {
 		var out strings.Builder
@@ -381,7 +381,7 @@ func toWebVTT(data []byte, format string) ([]byte, error) {
 			if m == nil {
 				continue
 			}
-			fmt.Fprintf(&out, "%d\n%s --> %s\n%s\n\n", index, vttTime(assMS(m[1:5])), vttTime(assMS(m[5:9])), cleanCue(m[9]))
+			fmt.Fprintf(&out, "%d\n%s --> %s\n%s\n\n", index, vttTime(assMS(m[1:5])), vttTime(assMS(m[5:9])), normalizeCueText(escapeCueMarkup(m[9]), true))
 			index++
 		}
 		if index == 1 {
@@ -424,7 +424,7 @@ func restampWebVTTCuePositioning(path string) bool {
 	if err != nil {
 		return false
 	}
-	stamped := positionCueLines(string(data))
+	stamped := positionCueLines(sanitizeVTTCues(string(data)))
 	if stamped == string(data) {
 		return false
 	}
@@ -587,11 +587,80 @@ func assMS(parts []string) int64 {
 	return ((values[0]*60+values[1])*60+values[2])*1000 + values[3]*10
 }
 
+// cleanCue prepares cue text for SAMI: line breaks of every spelling become
+// <br>, formatting is dropped and the rest is HTML-escaped.
 func cleanCue(value string) string {
-	value = regexp.MustCompile(`\{[^}]*\}`).ReplaceAllString(value, "")
-	value = strings.ReplaceAll(value, `\N`, "\n")
-	escaped := html.EscapeString(strings.TrimSpace(value))
+	escaped := html.EscapeString(normalizeCueText(value, false))
 	return strings.ReplaceAll(escaped, "\n", "<br>")
+}
+
+var (
+	cueBreakTag    = regexp.MustCompile(`(?i)(?:<|&lt;)\s*/?\s*br\s*/?\s*(?:>|&gt;)|\\[Nn]`)
+	cueOverride    = regexp.MustCompile(`\{[^}]*\}`)
+	cueFontTag     = regexp.MustCompile(`(?i)(?:<|&lt;)/?font(?:[\s](?:(?:&gt;)?[^>&]|&(?:[^g]|g(?:[^t]|t[^;])))*)?(?:>|&gt;)`)
+	cueEscapedTag  = regexp.MustCompile(`(?i)&lt;(/?[ibu])&gt;`)
+	cueFormatTag   = regexp.MustCompile(`(?i)</?[ibu]>`)
+	assFormatBlock = regexp.MustCompile(`(?i)\{\\([ibu])([01])\}`)
+)
+
+// escapeCueMarkup escapes the characters that are markup in WebVTT so plain
+// ASS dialogue text is not read as tags.
+func escapeCueMarkup(value string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(value)
+}
+
+// normalizeCueText resolves every <br> spelling (literal or entity-escaped,
+// "</br>" included) and the ASS \N / \n breaks into real newlines, maps ASS
+// {\i1} style overrides to <i>/<b>/<u> and drops every other override block
+// and <font> tag. Empty lines are removed, since a blank line would end the
+// cue. keepFormatting=false also drops <i>/<b>/<u>.
+func normalizeCueText(value string, keepFormatting bool) string {
+	value = strings.ReplaceAll(value, "\r", "")
+	value = cueBreakTag.ReplaceAllString(value, "\n")
+	value = assFormatBlock.ReplaceAllStringFunc(value, func(block string) string {
+		m := assFormatBlock.FindStringSubmatch(block)
+		if m[2] == "1" {
+			return "<" + strings.ToLower(m[1]) + ">"
+		}
+		return "</" + strings.ToLower(m[1]) + ">"
+	})
+	value = cueOverride.ReplaceAllString(value, "")
+	value = cueFontTag.ReplaceAllString(value, "")
+	value = cueEscapedTag.ReplaceAllString(value, "<$1>")
+	if !keepFormatting {
+		value = cueFormatTag.ReplaceAllString(value, "")
+	}
+	lines := strings.Split(value, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if line = strings.TrimSpace(line); line != "" {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
+}
+
+// sanitizeVTTCues rewrites every cue payload of a WebVTT document through
+// normalizeCueText so no break tag, ASS override or <font> tag reaches a
+// player as raw text. It is idempotent.
+func sanitizeVTTCues(text string) string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	for i := 0; i < len(lines); i++ {
+		out = append(out, lines[i])
+		if !vttCueTiming.MatchString(lines[i]) {
+			continue
+		}
+		payload := []string{}
+		for i+1 < len(lines) && strings.TrimSpace(lines[i+1]) != "" {
+			i++
+			payload = append(payload, lines[i])
+		}
+		if cleaned := normalizeCueText(strings.Join(payload, "\n"), true); cleaned != "" {
+			out = append(out, cleaned)
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 func sameStem(media, sub string) bool {
