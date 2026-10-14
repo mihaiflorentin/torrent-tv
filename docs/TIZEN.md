@@ -156,6 +156,14 @@ Arrow, Enter, and Back are mandatory Samsung remote keys and do not require regi
 
 AVPlay receives the server's Range-capable URL. The control overlay follows Samsung's five-second auto-hide guidance and gives D-pad and media keys playback-specific meanings rather than using catalog spatial navigation. The player closes AVPlay on exit and restores catalog focus. The package retains the Tizen Download privilege for compatibility with 0.1.5 artifacts, but current external subtitles are fetched as WebVTT over the trusted LAN and rendered in the application overlay.
 
+### Background and foreground (Home key)
+
+Tizen has no platform visibility hook, so the client falls back to `document.hidden` and the `visibilitychange` event. On hide the player saves position, pauses and closes AVPlay, and the live event stream closes; on show the stream reopens and the catalog refreshes. Unit-verified with a faked `document.hidden`.
+
+| Behavior | Status | Evidence |
+| --- | --- | --- |
+| Tizen 5.0 to 7.0 fire `visibilitychange` when Home is pressed and when the app is resumed | Unverified on hardware | Not yet observed on the 2019 premium set or the S90C; confirm each generation separately |
+
 ## Approval gate
 
 Connecting SDB, creating/registering certificates or DUIDs, installing a WGT, and altering TV settings are device mutations. Perform them only after explicit approval. Building and validating the local unsigned WGT does not touch the TV. Public Apps2Samsung publication is not in scope.
