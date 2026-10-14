@@ -187,14 +187,14 @@ type SeriesEpisode struct {
 }
 
 var (
-	episodeRE    = regexp.MustCompile(`(?i)(?:^|[ ._\-])S(\d{1,2})[ ._\-]?E(\d{1,3})(?:[ ._\-]|$)`)
+	episodeRE    = regexp.MustCompile(`(?i)(?:^|[ ._\-])S(\d{1,2})[ ._\-]?E(\d{1,3})(?:[ ._\-]?E(\d{1,3}))?(?:[ ._\-]|$)`)
 	episodeAltRE = regexp.MustCompile(`(?i)(?:^|[ ._\-])(\d{1,2})x(\d{1,3})(?:[ ._\-]|$)`)
 	seasonRE     = regexp.MustCompile(`(?i)(?:^|[ ._\-])S(\d{1,2})(?:\s*[-–]\s*S(\d{1,2}))?(?:[ ._\-]|$)`)
 	seasonWordRE = regexp.MustCompile(`(?i)(?:^|[ ._\-])(?:season|sezonul)\s*(\d{1,2})(?:\s*[-–]\s*(?:season|sezonul)?\s*(\d{1,2}))?(?:[ ._\-\[]|$)`)
 	leadingGroup = regexp.MustCompile(`^\[([^\]]{2,40})\]\s*`)
 	yearRE       = regexp.MustCompile(`(?:^|[ ._\-(])(19\d{2}|20\d{2})(?:[ ._\-)]|$)`)
 	resolutionRE = regexp.MustCompile(`(?i)(?:^|[ ._\-\[])(2160p|1080p|1080i|720p|576p|480p|4k|uhd)(?:[ ._\-\]]|$)`)
-	releaseEndRE = regexp.MustCompile(`-([A-Za-z0-9][A-Za-z0-9._-]{1,30})$`)
+	releaseExtRE = regexp.MustCompile(`(?i)\.(mkv|mp4|avi|m4v|mov|ts|wmv|srt)$`)
 )
 
 // ParseRelease converts tracker naming conventions into stable, display-ready
@@ -214,6 +214,11 @@ func ParseRelease(release TorrentRelease) ParsedRelease {
 		p.SeasonEnd = p.SeasonStart
 		p.EpisodeStart, _ = strconv.Atoi(name[m[4]:m[5]])
 		p.EpisodeEnd = p.EpisodeStart
+		if m[6] >= 0 {
+			if end, _ := strconv.Atoi(name[m[6]:m[7]]); end > p.EpisodeStart {
+				p.EpisodeEnd = end
+			}
+		}
 		boundary = m[0]
 		p.EpisodeTitle = cleanEpisodeTitle(name[m[1]:])
 	} else if m := episodeAltRE.FindStringSubmatchIndex(name); m != nil {
@@ -242,12 +247,13 @@ func ParseRelease(release TorrentRelease) ParsedRelease {
 		boundary = m[0]
 	}
 
-	if m := yearRE.FindStringSubmatchIndex(name); m != nil {
-		p.Year, _ = strconv.Atoi(name[m[2]:m[3]])
-		if m[0] < boundary {
-			boundary = m[0]
+	if start, year := releaseYear(name); year > 0 {
+		p.Year = year
+		if start < boundary {
+			boundary = start
 		}
 	}
+	titleEnd := boundary
 	if boundary == len(name) {
 		boundary = firstTechnicalToken(name)
 	}
@@ -265,16 +271,74 @@ func ParseRelease(release TorrentRelease) ParsedRelease {
 			p.Resolution = strings.ToLower(p.Resolution)
 		}
 	}
-	upper := strings.ToUpper(name)
+	// Technical tags are read from the part after the title only, as whole
+	// tokens: "HDRip" is not HDR and the title "Atmosphere" is not Atmos.
+	upper := strings.ToUpper(name[titleEnd:])
 	p.Quality = firstMatch(upper, []string{"REMUX", "BLU-RAY", "BLURAY", "WEB-DL", "WEBRIP", "HDTV", "DVDRIP"})
 	p.VideoCodec = firstMatch(upper, []string{"AV1", "H.265", "H265", "HEVC", "X265", "H.264", "H264", "X264", "XVID"})
 	p.Audio = firstMatch(upper, []string{"TRUEHD", "ATMOS", "DTS-HD", "DTS", "EAC3", "DDP", "AC3", "AAC", "FLAC"})
 	p.HDR = firstMatch(upper, []string{"DOLBY VISION", "DOVI", "HDR10+", "HDR10", "HDR"})
 	p.Edition = firstMatch(upper, []string{"DIRECTOR'S CUT", "EXTENDED", "REMASTERED", "REPACK", "PROPER"})
-	if m := releaseEndRE.FindStringSubmatch(name); len(m) > 1 && p.ReleaseGroup == "" {
-		p.ReleaseGroup = m[1]
+	if p.ReleaseGroup == "" {
+		p.ReleaseGroup = trailingReleaseGroup(name)
 	}
 	return p
+}
+
+// releaseYear picks the release year: the last year token before the first
+// technical token. Numeric title words ("Blade.Runner.2049.2017") lose to the
+// real year, and a year at the very start is the title ("1917.2019").
+func releaseYear(name string) (start, year int) {
+	limit := len(name)
+	if i := firstTechnicalToken(name); i < limit {
+		limit = i
+	}
+	if m := resolutionRE.FindStringIndex(name); m != nil && m[0] < limit {
+		limit = m[0]
+	}
+	for pos := 0; pos < len(name); {
+		m := yearRE.FindStringSubmatchIndex(name[pos:])
+		if m == nil {
+			break
+		}
+		yearStart, yearEnd := pos+m[2], pos+m[3]
+		if yearStart >= limit {
+			break
+		}
+		matchStart := pos + m[0]
+		// Scanning resumes on the separator so adjacent years both match.
+		pos = yearEnd
+		if yearStart == 0 {
+			continue
+		}
+		start = matchStart
+		year, _ = strconv.Atoi(name[yearStart:yearEnd])
+	}
+	return start, year
+}
+
+// trailingReleaseGroup reads the scene-style "-GROUP" suffix, ignoring file
+// extensions and hyphenated tags such as WEB-DL, Blu-ray and DTS-HD.
+func trailingReleaseGroup(name string) string {
+	name = releaseExtRE.ReplaceAllString(name, "")
+	i := strings.LastIndex(name, "-")
+	if i < 0 || i == len(name)-1 {
+		return ""
+	}
+	group := name[i+1:]
+	if len(group) < 2 || len(group) > 30 || strings.ContainsAny(group, " .") {
+		return ""
+	}
+	before := strings.ToUpper(name[:i])
+	switch strings.ToUpper(group) {
+	case "DL", "RAY", "HD", "MA", "HDMA", "X", "RIP":
+		for _, tag := range []string{"WEB", "BLU", "DTS", "DD", "HDTV", "DVD"} {
+			if strings.HasSuffix(before, tag) {
+				return ""
+			}
+		}
+	}
+	return group
 }
 
 func CatalogTitleID(release TorrentRelease, parsed ParsedRelease) string {
@@ -398,22 +462,43 @@ func cleanEpisodeTitle(v string) string {
 }
 
 func firstTechnicalToken(v string) int {
-	upper := strings.ToUpper(v)
-	tokens := []string{".2160P", ".1080P", ".1080I", ".720P", ".576P", ".480P", ".WEB-DL", ".WEBRIP", ".BLURAY", ".BLU-RAY", ".HDTV", ".DVDRIP", ".REMUX", " 2160P", " 1080P", " 720P"}
+	// Underscore-separated names tokenise like dotted ones; the swap keeps
+	// every byte offset intact.
+	upper := strings.ToUpper(strings.ReplaceAll(v, "_", "."))
+	tokens := []string{"2160P", "1080P", "1080I", "720P", "576P", "480P", "WEB-DL", "WEBRIP", "BLURAY", "BLU-RAY", "HDTV", "DVDRIP", "REMUX"}
 	best := len(v)
 	for _, token := range tokens {
-		if i := strings.Index(upper, token); i >= 0 && i < best {
-			best = i
+		for _, sep := range []string{".", " "} {
+			if i := strings.Index(upper, sep+token); i >= 0 && i < best {
+				best = i
+			}
 		}
 	}
 	return best
 }
 
+// firstMatch returns the first value present as a whole token: not glued to a
+// preceding letter or digit, nor to a following letter (digits may follow, as
+// in DDP5.1 and AAC2.0).
 func firstMatch(upper string, values []string) string {
 	for _, value := range values {
-		if strings.Contains(upper, value) {
-			return value
+		for from := 0; from < len(upper); {
+			i := strings.Index(upper[from:], value)
+			if i < 0 {
+				break
+			}
+			i += from
+			end := i + len(value)
+			beforeOK := i == 0 || !isAlnum(upper[i-1])
+			afterOK := end == len(upper) || !isLetter(upper[end])
+			if beforeOK && afterOK {
+				return value
+			}
+			from = i + 1
 		}
 	}
 	return ""
 }
+
+func isLetter(b byte) bool { return b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z' }
+func isAlnum(b byte) bool  { return isLetter(b) || b >= '0' && b <= '9' }
