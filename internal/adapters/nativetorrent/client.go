@@ -491,8 +491,11 @@ func (c *Client) Status(_ context.Context, hash string) (domain.DownloadStatus, 
 	// set, not the whole metainfo; mirror that so a completed selection inside
 	// a season pack ever reaches the completed path.
 	if len(sel) > 0 {
-		if p, ok := selectedProgress(t, sel); ok {
-			progress = p
+		if selDone, selTotal, ok := selectedBytes(t, sel); ok {
+			progress = float64(selDone) / float64(selTotal)
+			// Bytes and ETA describe the same set as progress, so a season
+			// pack with one episode selected does not report pack totals.
+			done, total = selDone, selTotal
 		}
 	}
 	st := t.Stats()
@@ -532,12 +535,11 @@ func (c *Client) Status(_ context.Context, hash string) (domain.DownloadStatus, 
 	}, nil
 }
 
-// selectedProgress computes progress over the selected files' bytes only,
-// mirroring qBittorrent whose progress and uploading state describe the
+// selectedBytes sums completed and total bytes over the selected files only,
+// mirroring qBittorrent whose progress, size and uploading state describe the
 // selected download set. ok is false when the selection covers no bytes.
-func selectedProgress(t *torrent.Torrent, indices []int) (progress float64, ok bool) {
+func selectedBytes(t *torrent.Torrent, indices []int) (done, total int64, ok bool) {
 	files := t.Files()
-	var total, done int64
 	for _, i := range indices {
 		if i < 0 || i >= len(files) {
 			continue
@@ -546,9 +548,9 @@ func selectedProgress(t *torrent.Torrent, indices []int) (progress float64, ok b
 		done += files[i].BytesCompleted()
 	}
 	if total <= 0 {
-		return 0, false
+		return 0, 0, false
 	}
-	return float64(done) / float64(total), true
+	return done, total, true
 }
 
 // Pieces maps piece state to the qbit-compatible integer convention the
