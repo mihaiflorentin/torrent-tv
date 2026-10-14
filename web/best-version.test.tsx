@@ -79,7 +79,7 @@ describe('Title detail best version Play', () => {
 
 describe('Title detail season', () => {
   it('opens the season of the saved progress', async () => {
-    const ep = (season: number, number: number) => ({ number, title: `Episode ${number}`, season, sourceCount: 1, sources: [source(`s${season}e${number}`, {})] });
+    const ep = (season: number, number: number) => ({ number, title: `Episode ${number}`, season, sourceCount: 1, sources: [source(`s${season}e${number}`, {}, 10)] });
     const show: CatalogTitle = { ...lanterns, id: 'sv', title: 'Vesper', kind: 'series', seasonCount: 2 };
     const data: CatalogDetail = { title: show, sources: [], seasons: [
       { number: 1, title: 'Season 1', episodeCount: 1, episodes: [ep(1, 1)] },

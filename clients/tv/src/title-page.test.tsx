@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { NavSnapshot } from './nav-snapshot';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, HouseholdItem, HouseholdState } from '@torrent-tv/shared';
 
 // Title page behavior on the TV: the primary action targets the best-ranked version, the page opens
@@ -28,7 +29,7 @@ const source = (id: string, parsed: Partial<CatalogSource['parsed']> = {}, rel =
 const empty: HouseholdState = { favorites: [], continueWatching: [], recent: [], watched: [] };
 const resumeItem = (over: Partial<HouseholdItem> = {}): HouseholdItem => ({ profileId: 'h', sourceId: 's1', releaseId: 'rel-1', fileIndex: 0, filePath: 'x.mkv', positionMs: 410, durationMs: 1000, watched: false, updatedAt: '2026-10-14T10:00:00Z', release: release('rel-1'), favorite: false, titleId: 'a', ...over });
 
-function mount(container: HTMLElement, api: Partial<API>, props: { titles: CatalogTitle[]; household?: HouseholdState; onPlay?: (...args: unknown[]) => void }) {
+function mount(container: HTMLElement, api: Partial<API>, props: { titles: CatalogTitle[]; household?: HouseholdState; onPlay?: (...args: unknown[]) => void; initialNav?: NavSnapshot; onNav?: (snapshot: NavSnapshot) => void; restoreFocus?: string | null }) {
   render(
     <Catalog
       api={{ titles: async () => ({ items: props.titles, nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }), ...api } as unknown as API}
@@ -38,7 +39,9 @@ function mount(container: HTMLElement, api: Partial<API>, props: { titles: Catal
       household={props.household || empty}
       downloads={[]}
       jobs={[]}
-      restoreFocus={null}
+      restoreFocus={props.restoreFocus ?? null}
+      initialNav={props.initialNav}
+      onNav={props.onNav}
       portal={null}
       updateStatus={null}
       onUpdateStatus={() => { }}
@@ -166,6 +169,77 @@ describe('TV title page', () => {
       expect(tile('2:2').textContent).toContain('41% watched');
       expect(tile('2:1').querySelector('.episode-progress')).toBeNull();
       expect(tile('2:3').querySelector('.episode-progress')).toBeNull();
+    });
+  });
+
+  describe('return to where you were (initialNav)', () => {
+    const nav = (over: Partial<NavSnapshot> = {}): NavSnapshot => ({ route: 'home', titleId: '', titleName: '', target: {}, query: '', category: '', sort: 'newest', focusKey: '', ...over });
+    const movie = (): CatalogDetail => ({ title: title(), seasons: [], sources: [source('only')] });
+
+    it('reopens the title page from a fresh fetch, focused on Play, with Resume reflecting the new position', async () => {
+      const fetchTitle = vi.fn(async () => movie());
+      mount(container, { title: fetchTitle } as unknown as Partial<API>, { titles: [title()], initialNav: nav({ titleId: 'a', titleName: 'Alpha' }), household: { ...empty, continueWatching: [resumeItem({ positionMs: 900 })] } });
+      await wait(80);
+      expect(fetchTitle).toHaveBeenCalledWith('a');
+      expect(key('detail-playback')!.textContent).toBe('Resume');
+      expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('detail-playback');
+    });
+
+    it('reopens the saved episode target of a series', async () => {
+      const ep = (n: number) => ({ number: n, title: `Episode ${n}`, season: 2, sourceCount: 1, sources: [source(`e${n}`)] });
+      const data: CatalogDetail = { title: title({ kind: 'series' }), sources: [], seasons: [{ number: 1, title: 'S1', episodeCount: 1, episodes: [{ ...ep(1), season: 1 }] }, { number: 2, title: 'S2', episodeCount: 2, episodes: [ep(1), ep(2)] }] };
+      mount(container, { title: async () => data } as unknown as Partial<API>, { titles: [title()], initialNav: nav({ titleId: 'a', titleName: 'Alpha', target: { season: 2, episode: 2 } }) });
+      await wait(80);
+      expect(key('season-2')!.className).toContain('active');
+      expect(key('episode-2:2')!.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('restores the list route and focuses the saved card when it is still there', async () => {
+      // happy-dom has no layout, so every element reports a zero size and focus restore sees nothing visible.
+      const size = { configurable: true, get: () => 100 };
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', size);
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', size);
+      try {
+        mount(container, {}, { titles: [title()], household: { ...empty, continueWatching: [resumeItem()] }, initialNav: nav({ route: 'continue', focusKey: 'library-a-0-0-0' }), restoreFocus: 'library-a-0-0-0' });
+        await wait(80);
+        expect(container.querySelector('.tv-top h1')!.textContent).toBe('Continue watching');
+        expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('library-a-0-0-0');
+      } finally {
+        delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetWidth;
+        delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetHeight;
+      }
+    });
+
+    it('restores the search query and its cache results', async () => {
+      const titles = vi.fn(async () => ({ items: [title()], nextCursor: null, total: 1 }));
+      mount(container, { titles } as unknown as Partial<API>, { titles: [title()], initialNav: nav({ route: 'search', query: 'alpha', sort: 'rating', category: 'Movies' }) });
+      await wait(80);
+      expect((container.querySelector('[data-focus-key="search-input"]') as HTMLInputElement).value).toBe('alpha');
+      expect(titles).toHaveBeenCalledWith(expect.objectContaining({ search: 'alpha', sort: 'rating', category: 'Movies' }));
+    });
+
+    it('falls back to the route list with the usual notice when the title cannot be reopened', async () => {
+      mount(container, { title: async () => { throw new Error('server returned 503'); } } as unknown as Partial<API>, { titles: [title()], initialNav: nav({ titleId: 'a', titleName: 'Alpha' }) });
+      await wait(80);
+      expect(container.querySelector('.tv-notice')!.textContent).toBe('Could not open Alpha: server returned 503. Check the server connection and press OK to try again.');
+      expect(key('hero-a')).not.toBeNull();
+    });
+
+    it('starts on Home as before when there is no initialNav', async () => {
+      mount(container, {}, { titles: [title()] });
+      await wait(80);
+      expect(container.querySelector('.tv-top h1')!.textContent).toBe('Home');
+      expect(key('detail-playback')).toBeNull();
+    });
+
+    it('reports where the viewer is as they navigate', async () => {
+      const onNav = vi.fn();
+      mount(container, { title: async () => movie() } as unknown as Partial<API>, { titles: [title()], onNav });
+      await wait();
+      key('hero-a')!.click();
+      await wait();
+      const last = onNav.mock.calls[onNav.mock.calls.length - 1][0] as NavSnapshot;
+      expect(last).toMatchObject({ route: 'home', titleId: 'a', titleName: 'Alpha', query: '' });
     });
   });
 });

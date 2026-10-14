@@ -8,6 +8,7 @@ import { PlayerKeyController, type PlayerFocus } from './player-keys';
 import { householdSections, nearEnd, trackerCategories } from './catalog-data';
 import { discoverServers, DiscoveredServer, normalizeServerURL } from './discovery';
 import { Backdrop } from './backdrop';
+import { captureNav, type NavSnapshot } from './nav-snapshot';
 import { cardMeta, downloadFacts, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
 import { appIdentity } from './app-name';
 import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL, registerMediaKeys } from './platform';
@@ -517,19 +518,20 @@ export type TVPreparingState = {
  hint?: string;
 };
 
-export function Catalog({ api, status, titles, facets, household, downloads, jobs, restoreFocus, portal, updateStatus, onUpdateStatus, onFocus, onRetry, onChangeServer, onForgetServer, onPlay, onPlayDownload, onManageDownload, onManageSeasonPack, onRefreshDownloads, onFavorite, preparing, onCancelPrepare, onRetryPrepare }: { api: API; status: string; titles: CatalogTitle[]; facets: CatalogFacets; household: HouseholdState; downloads: Download[]; jobs: Job[]; restoreFocus: string | null; portal: PortalState | null; updateStatus: UpdateStatus | null; onUpdateStatus: (status: UpdateStatus) => void; onFocus: (key: string) => void; onRetry: () => void; onChangeServer: () => void; onForgetServer: () => void; onPlay: (release: Release, fileIndex?: number, resumeMs?: number) => void; onPlayDownload: (download: Download) => void; onManageDownload: (download: Download, action: string) => Promise<void>; onManageSeasonPack: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onRefreshDownloads: () => Promise<void>; onFavorite: (title: CatalogTitle, value: boolean) => void; preparing?: TVPreparingState | null; onCancelPrepare?: () => void; onRetryPrepare?: () => void }) {
- const [route, setRoute] = useState<TVRoute>('home');
+export function Catalog({ api, status, titles, facets, household, downloads, jobs, restoreFocus, portal, updateStatus, onUpdateStatus, onFocus, onRetry, onChangeServer, onForgetServer, onPlay, onPlayDownload, onManageDownload, onManageSeasonPack, onRefreshDownloads, onFavorite, preparing, onCancelPrepare, onRetryPrepare, initialNav, onNav }: { api: API; status: string; titles: CatalogTitle[]; facets: CatalogFacets; household: HouseholdState; downloads: Download[]; jobs: Job[]; restoreFocus: string | null; portal: PortalState | null; updateStatus: UpdateStatus | null; onUpdateStatus: (status: UpdateStatus) => void; onFocus: (key: string) => void; onRetry: () => void; onChangeServer: () => void; onForgetServer: () => void; onPlay: (release: Release, fileIndex?: number, resumeMs?: number) => void; onPlayDownload: (download: Download) => void; onManageDownload: (download: Download, action: string) => Promise<void>; onManageSeasonPack: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onRefreshDownloads: () => Promise<void>; onFavorite: (title: CatalogTitle, value: boolean) => void; preparing?: TVPreparingState | null; onCancelPrepare?: () => void; onRetryPrepare?: () => void ; initialNav?: NavSnapshot; onNav?: (snapshot: NavSnapshot) => void }) {
+ // initialNav (absent: Home, nothing open) rehydrates where the viewer was before playback took the screen.
+ const [route, setRoute] = useState<TVRoute>(() => initialNav ? initialNav.route as TVRoute : 'home');
  const [menuOpen, setMenuOpen] = useState(false);
  const [projectsMessage, setProjectsMessage] = useState('');
  const [updateConfirm, setUpdateConfirm] = useState(false);
  const updateReturnKey = useRef<string | null>(null);
  const catalogMounted = useRef(true);
  useEffect(() => () => { catalogMounted.current = false; }, []);
- const [draftQuery, setDraftQuery] = useState('');
- const [query, setQuery] = useState('');
+ const [draftQuery, setDraftQuery] = useState(() => initialNav ? initialNav.query : '');
+ const [query, setQuery] = useState(() => initialNav ? initialNav.query : '');
  const [searching, setSearching] = useState(false);
- const [category, setCategory] = useState('');
- const [sort, setSort] = useState<'newest' | 'seeders' | 'title' | 'rating'>('newest');
+ const [category, setCategory] = useState(() => initialNav ? initialNav.category : '');
+ const [sort, setSort] = useState<'newest' | 'seeders' | 'title' | 'rating'>(() => initialNav ? initialNav.sort : 'newest');
  const [remoteTitles, setRemoteTitles] = useState(titles.slice(0, 12));
  const [nextCursor, setNextCursor] = useState<string | null>(null);
  const loadingMore = useRef(false);
@@ -576,6 +578,9 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
  useEffect(() => { if (route !== 'downloads') return; let stopped = false; let running = false; const refresh = async () => { if (stopped || running) return; running = true; try { await refreshDownloadsRef.current() } finally { running = false } }; void refresh(); const timer = window.setInterval(() => void refresh(), 3000); return () => { stopped = true; window.clearInterval(timer) } }, [route]);
  const openTitle = async (title: CatalogTitle, target: DetailTarget = {}) => { setDetailMessage('Loading versions…'); setNotice('Loading versions…'); setDetailTarget(target); try { const next = await api.title(title.id); setNotice(''); setDetail(next); if (needsEpisodeExpansion(next)) { setDetailMessage('Preparing the individual episode list…'); void api.refreshTitle(title.id, title.title).catch(error => setDetailMessage((error as Error).message)) } else setDetailMessage(''); } catch (error) { setDetailMessage((error as Error).message); setNotice(`Could not open ${title.title}: ${(error as Error).message}. Check the server connection and press OK to try again.`); } };
  const openLibraryItem = async (item: HouseholdItem) => { const id = item.titleId || item.catalog?.id; if (!id) { setDetailMessage('This library item is not linked to a catalog title yet. Refresh the catalog and try again.'); return } const title = item.catalog || { id, title: item.release.name, kind: 'movie', trackers: item.release.trackerId ? [{ id: item.release.trackerId, name: item.release.trackerName }] : [], categories: [], resolutions: [], sourceCount: 1, bestSeeders: item.release.seeders, largestSizeBytes: item.release.sizeBytes } as CatalogTitle; await openTitle(title, { season: item.seasonNumber, episode: item.episodeNumber }) };
+ // Rehydrate the open title through the same path as a normal open (fresh fetch, so Resume reflects the new position; failure falls back to the route list with the usual notice), and report the current spot so App can keep it while the Player owns the screen.
+ useEffect(() => { if (initialNav && initialNav.titleId) void openTitle({ id: initialNav.titleId, title: initialNav.titleName, kind: 'movie', trackers: [], categories: [], resolutions: [], sourceCount: 0, bestSeeders: 0, largestSizeBytes: 0 } as CatalogTitle, initialNav.target) }, []);
+ useEffect(() => { onNav?.(captureNav({ route, detail: detail ? { id: detail.title.id, title: detail.title.title } : null, target: detailTarget, query, category, sort })) }, [route, detail?.title.id, detailTarget, query, category, sort]);
  const manageSeasonPack = async (source: CatalogSource, season: number, action: SeasonPackAction) => {
   const isAcquire = action === 'download' || (action === 'retry' && !source.libraryState?.downloadId);
   if (!isAcquire) setDetailMessage(`Updating season ${season} download…`);
@@ -1128,9 +1133,13 @@ export function App() {
  const prepareController = useRef<AbortController | null>(null);
  const prepareOriginKey = useRef<string | null>(null);
  const catalogFocus = useRef<string | null>(null);
+ // Where the viewer is in Catalog (navLive, reported by Catalog) and where they were when playback took the screen (navSnapshot, handed back as Catalog's initialNav when the Player closes). Only a viewer-started play writes it; next-episode swaps inside the Player never do.
+ const navLive = useRef<NavSnapshot | null>(null);
+ const navSnapshot = useRef<NavSnapshot | null>(null);
+ const rememberNav = (focusKey: string | null) => { navSnapshot.current = navLive.current ? { ...navLive.current, focusKey: focusKey || '' } : null };
  const viewportInput = useRef(0);
  const loadState = async (client = api) => { if (client) try { setHousehold(await client.state()); } catch (error) { setStatus((error as Error).message); } };
- async function connect(url = draft) { setStatus('Connecting…'); try { const normalized = normalizeServerURL(url); const client = new API(normalized); const info = await client.info(); const [titlePage, catalogFacets, downloadPage, jobPage] = await Promise.all([client.titles({ pageSize: 12, sort: 'newest' }), client.facets(), client.downloads().catch(() => ({ items: [], nextCursor: null, total: 0 })), client.jobs({ pageSize: 24 }).catch(() => ({ items: [], nextCursor: null, total: 0 }))]); localStorage.setItem(STORAGE, normalized); setServer(normalized); setDraft(normalized); setAPI(client); setStatus(`${info.instanceName || info.name} ${info.version}`); setTitles(titlePage.items); setFacets(catalogFacets); void client.ensureMetadata(titlePage.items.map(item => item.id)).catch(error => setStatus((error as Error).message)); } catch (error) { setStatus((error as Error).message); } }
+ async function connect(url = draft) { setStatus('Connecting…'); try { const normalized = normalizeServerURL(url); if (normalized !== server) navSnapshot.current = null; const client = new API(normalized); const info = await client.info(); const [titlePage, catalogFacets, downloadPage, jobPage] = await Promise.all([client.titles({ pageSize: 12, sort: 'newest' }), client.facets(), client.downloads().catch(() => ({ items: [], nextCursor: null, total: 0 })), client.jobs({ pageSize: 24 }).catch(() => ({ items: [], nextCursor: null, total: 0 }))]); localStorage.setItem(STORAGE, normalized); setServer(normalized); setDraft(normalized); setAPI(client); setStatus(`${info.instanceName || info.name} ${info.version}`); setTitles(titlePage.items); setFacets(catalogFacets); void client.ensureMetadata(titlePage.items.map(item => item.id)).catch(error => setStatus((error as Error).message)); } catch (error) { setStatus((error as Error).message); } }
  async function runPrepare(attempt: PrepareAttempt): Promise<boolean> {
   if (!api) return false;
   prepareAttempt.current = attempt;
@@ -1149,6 +1158,7 @@ export function App() {
     if (token !== prepareToken.current) return false;
     prepareController.current = null;
     prepareAttempt.current = null;
+    rememberNav(prepareOriginKey.current);
     prepareOriginKey.current = null;
     setPreparing(null);
     let resumeMs = attempt.resumeMs;
@@ -1315,7 +1325,7 @@ export function App() {
  }, [api]);
  if (player && api) return <Player key={player.download.id} api={api} download={player.download} resumeMs={player.resumeMs} preferences={player.preferences} onStateChanged={() => loadState()} onComplete={advanceEpisode} onEpisode={switchEpisode} onClose={() => setPlayer(null)} />;
  if (!api) return <Setup draft={draft} server={server} status={status} onDraft={setDraft} onConnect={url => void connect(url)} onForget={() => { localStorage.removeItem(STORAGE); setServer(''); setDraft(''); setStatus('Saved server forgotten.') }} />;
- return <Catalog api={api} status={status} titles={titles} facets={facets} household={household} downloads={downloads} jobs={jobs} restoreFocus={catalogFocus.current} portal={portal} updateStatus={updateStatus} onUpdateStatus={setUpdateStatus} onFocus={key => { catalogFocus.current = key; }} onRetry={() => void connect(server)} onChangeServer={() => { cancelPrepare(); setAPI(null); }} onForgetServer={() => { cancelPrepare(); localStorage.removeItem(STORAGE); setAPI(null); setServer(''); setDraft(''); }} onPlay={play} onPlayDownload={download => void api.playback(download.id).then(value => setPlayer({ download, resumeMs: value.watched ? 0 : value.positionMs })).catch(() => setPlayer({ download, resumeMs: 0 }))} onManageDownload={manageDownload} onManageSeasonPack={manageSeasonPack} onRefreshDownloads={refreshDownloads} onFavorite={favorite} preparing={preparing} onCancelPrepare={cancelPrepare} onRetryPrepare={retryPrepare} />;
+ return <Catalog api={api} status={status} titles={titles} facets={facets} household={household} downloads={downloads} jobs={jobs} restoreFocus={navSnapshot.current ? navSnapshot.current.focusKey : catalogFocus.current} initialNav={navSnapshot.current || undefined} onNav={snapshot => { navLive.current = snapshot }} portal={portal} updateStatus={updateStatus} onUpdateStatus={setUpdateStatus} onFocus={key => { catalogFocus.current = key; }} onRetry={() => void connect(server)} onChangeServer={() => { cancelPrepare(); navSnapshot.current = null; setAPI(null); }} onForgetServer={() => { cancelPrepare(); navSnapshot.current = null; localStorage.removeItem(STORAGE); setAPI(null); setServer(''); setDraft(''); }} onPlay={play} onPlayDownload={download => { rememberNav(catalogFocus.current); void api.playback(download.id).then(value => setPlayer({ download, resumeMs: value.watched ? 0 : value.positionMs })).catch(() => setPlayer({ download, resumeMs: 0 })) }} onManageDownload={manageDownload} onManageSeasonPack={manageSeasonPack} onRefreshDownloads={refreshDownloads} onFavorite={favorite} preparing={preparing} onCancelPrepare={cancelPrepare} onRetryPrepare={retryPrepare} />;
 }
 
 try {
