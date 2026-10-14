@@ -37,7 +37,7 @@ func TestBrowserTranscodeRouteIsRegistered(t *testing.T) {
 		FilePath: "movie.mkv", State: "downloading", Progress: 0.05, SizeBytes: 200 << 20,
 	})
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/streams/unknown/browser", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/streams/unknown/browser", nil))
 	// An unknown source is refused by the media-info service (503, retryable),
 	// not by routing (404): the compatibility route exists.
 	if rec.Code != http.StatusServiceUnavailable {
@@ -220,7 +220,7 @@ func newStubHandler(t *testing.T, downloadErr error) http.Handler {
 func TestStreamAcquireMissingSourceIs404(t *testing.T) {
 	handler := newStubHandler(t, sql.ErrNoRows)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/streams/abc", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/streams/abc", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("GET /api/v1/streams/abc status = %d, want 404", rec.Code)
 	}
@@ -229,7 +229,7 @@ func TestStreamAcquireMissingSourceIs404(t *testing.T) {
 func TestStreamAcquireTransientErrorIs503(t *testing.T) {
 	handler := newStubHandler(t, fmt.Errorf("get download: %w", errors.New("database is locked")))
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/streams/abc", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/streams/abc", nil))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("GET /api/v1/streams/abc status = %d, want 503", rec.Code)
 	}
@@ -251,7 +251,7 @@ func TestStreamAcquireTransientErrorIs503(t *testing.T) {
 func TestPlaybackUpdateMissingSourceIs404(t *testing.T) {
 	handler := newStubHandler(t, sql.ErrNoRows)
 	rec := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/api/v1/playback/abc", strings.NewReader(`{"positionMs":1000,"durationMs":5000}`))
+	request := newRequest(http.MethodPut, "/api/v1/playback/abc", strings.NewReader(`{"positionMs":1000,"durationMs":5000}`))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(rec, request)
 	if rec.Code != http.StatusNotFound {
@@ -262,7 +262,7 @@ func TestPlaybackUpdateMissingSourceIs404(t *testing.T) {
 func TestPlaybackUpdateTransientErrorIs503(t *testing.T) {
 	handler := newStubHandler(t, fmt.Errorf("get download: %w", errors.New("database is locked")))
 	rec := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/api/v1/playback/abc", strings.NewReader(`{"positionMs":1000,"durationMs":5000}`))
+	request := newRequest(http.MethodPut, "/api/v1/playback/abc", strings.NewReader(`{"positionMs":1000,"durationMs":5000}`))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(rec, request)
 	if rec.Code != http.StatusServiceUnavailable {
@@ -273,7 +273,7 @@ func TestPlaybackUpdateTransientErrorIs503(t *testing.T) {
 func TestPlaybackUpdateNegativeInputIs400(t *testing.T) {
 	handler := newStubHandler(t, nil)
 	rec := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/api/v1/playback/abc", strings.NewReader(`{"positionMs":-1,"durationMs":5000}`))
+	request := newRequest(http.MethodPut, "/api/v1/playback/abc", strings.NewReader(`{"positionMs":-1,"durationMs":5000}`))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(rec, request)
 	if rec.Code != http.StatusBadRequest {
@@ -287,7 +287,7 @@ func TestPlaybackUpdateNegativeInputIs400(t *testing.T) {
 func getSettingsBody(t *testing.T, handler http.Handler) map[string]any {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/settings", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /api/v1/settings status = %d", rec.Code)
 	}
@@ -311,7 +311,7 @@ func putSettingsBody(t *testing.T, handler http.Handler, body map[string]any) *h
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := httptest.NewRequest(http.MethodPut, "/api/v1/settings", strings.NewReader(string(b)))
+	request := newRequest(http.MethodPut, "/api/v1/settings", strings.NewReader(string(b)))
 	request.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, request)
@@ -347,7 +347,7 @@ func TestSettingsRoundTripsAllocationAndReserve(t *testing.T) {
 		t.Fatalf("validation problem did not name the field: %s", problemBody.Detail)
 	}
 
-	request := httptest.NewRequest(http.MethodPut, "/api/v1/settings", strings.NewReader(`{"allocationGb":NaN}`))
+	request := newRequest(http.MethodPut, "/api/v1/settings", strings.NewReader(`{"allocationGb":NaN}`))
 	request.Header.Set("Content-Type", "application/json")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, request)
@@ -370,7 +370,7 @@ func TestSettingsRoundTripsAllocationAndReserve(t *testing.T) {
 func TestSettingsSchemaListsRetentionFields(t *testing.T) {
 	handler := newStubHandler(t, nil)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/settings/schema", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/settings/schema", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /api/v1/settings/schema status = %d", rec.Code)
 	}
@@ -460,7 +460,7 @@ func TestSettingsRoundTripEvictionRulesAndProtections(t *testing.T) {
 func TestSettingsSchemaMarksEngineFieldsRestartRequired(t *testing.T) {
 	handler := newStubHandler(t, nil)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/settings/schema", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/settings/schema", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /api/v1/settings/schema status = %d", rec.Code)
 	}
@@ -487,7 +487,7 @@ func TestSettingsSchemaMarksEngineFieldsRestartRequired(t *testing.T) {
 func TestSettingsSchemaDescribesEvictionFieldsForBrowserOnly(t *testing.T) {
 	handler := newStubHandler(t, nil)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/settings/schema", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/settings/schema", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /api/v1/settings/schema status = %d", rec.Code)
 	}
@@ -528,7 +528,7 @@ func TestSettingsSchemaDescribesEvictionFieldsForBrowserOnly(t *testing.T) {
 func TestSettingsSchemaTrackerFields(t *testing.T) {
 	handler := newStubHandler(t, nil)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/settings/schema", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/settings/schema", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /api/v1/settings/schema status = %d", rec.Code)
 	}
@@ -658,7 +658,7 @@ func newEngineFeedbackHandler(t *testing.T, savedEngine string) http.Handler {
 func TestSettingsExposeRunningEngineAlongsideSaved(t *testing.T) {
 	handler := newEngineFeedbackHandler(t, "qbittorrent")
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/settings", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /api/v1/settings status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -677,7 +677,7 @@ func TestSettingsExposeRunningEngineAlongsideSaved(t *testing.T) {
 func TestTorrentEngineDiagnosticNamesRunningEngine(t *testing.T) {
 	handler := newEngineFeedbackHandler(t, "qbittorrent")
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/dependencies/qbittorrent/test", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodPost, "/api/v1/dependencies/qbittorrent/test", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("POST /api/v1/dependencies/qbittorrent/test status = %d: %s", rec.Code, rec.Body.String())
 	}

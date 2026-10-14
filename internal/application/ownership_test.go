@@ -188,7 +188,7 @@ func TestSurveyUncertaintyBlocksAdmissionWithoutZeroCounting(t *testing.T) {
 		t.Fatalf("the absent qb owner must be reported uncertain, got %v", plan.uncertainOwners)
 	}
 
-	err = service.ensureAllocationRoom(ctx, domain.TorrentRelease{Name: "New.Release.2025"}, 1<<30)
+	err = service.ensureAllocationRoom(ctx, domain.TorrentRelease{Name: "New.Release.2025"}, 1<<30, &allocationReservation{})
 	if !errors.Is(err, domain.ErrEngineUnavailable) {
 		t.Fatalf("uncertainty must refuse new admission with ErrEngineUnavailable, got %v", err)
 	}
@@ -266,7 +266,7 @@ func TestAdmissionRefusesWhenEvictionReSurveyTurnsAnOwnerUncertain(t *testing.T)
 		t.Fatalf("initial survey must be clean, got %v", plan.uncertainOwners)
 	}
 
-	err = service.ensureAllocationRoom(ctx, domain.TorrentRelease{Name: "New.Release.2025"}, 1<<30)
+	err = service.ensureAllocationRoom(ctx, domain.TorrentRelease{Name: "New.Release.2025"}, 1<<30, &allocationReservation{})
 	if !errors.Is(err, domain.ErrEngineUnavailable) {
 		t.Fatalf("the re-survey uncertainty must refuse admission with ErrEngineUnavailable, got %v", err)
 	}

@@ -89,7 +89,7 @@ func TestStreamSnapEndpointFallsBackToTarget(t *testing.T) {
 		FilePath: "movie.mkv", State: "downloading", Progress: 0.05, SizeBytes: 200 << 20,
 	})
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/streams/source/snap?startMs=61000", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/streams/source/snap?startMs=61000", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("snap status = %d, want 200", rec.Code)
 	}

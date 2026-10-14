@@ -398,7 +398,9 @@ func TestBindingsSettingsSurfaceParityWithHTTP(t *testing.T) {
 	getJSON := func(target any, url string, payload any) {
 		t.Helper()
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+		req.Host = "127.0.0.1:8097"
+		handler.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("GET %s status = %d: %s", url, rec.Code, rec.Body.String())
 		}

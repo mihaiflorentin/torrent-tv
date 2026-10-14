@@ -102,6 +102,7 @@ type Repository interface {
 	FindDownload(context.Context, string, int) (domain.Download, error)
 	ListDownloads(context.Context) ([]domain.Download, error)
 	SetLease(context.Context, string, bool) error
+	ClearLeases(context.Context) (int64, error)
 	SaveJob(context.Context, domain.Job) error
 	ListJobs(context.Context, int) ([]domain.Job, error)
 	ListDueJobs(context.Context, time.Time, int) ([]domain.Job, error)
@@ -116,6 +117,7 @@ type Repository interface {
 	RemoveRelease(context.Context, string) error
 	AppendEvent(context.Context, string, string) (domain.Event, error)
 	ListEvents(context.Context, int64, int) ([]domain.Event, error)
+	PruneEvents(context.Context, time.Time, int) error
 	SavePlayback(context.Context, domain.PlaybackState) error
 	GetPlayback(context.Context, string, string) (domain.PlaybackState, error)
 	ListPlayback(context.Context, string) ([]domain.PlaybackState, error)

@@ -98,6 +98,7 @@ type Store struct {
 	base       Settings
 	value      Settings
 	envManaged map[string]bool
+	warnings   []string
 }
 
 func Load() (*Store, error) {
@@ -201,6 +202,7 @@ func LoadAt(path string) (*Store, error) {
 		return nil, err
 	}
 	anchorNativePaths(&effective, managed, settingsDir)
+	s.warnings = resetUnsafeMediaTools(&base, &effective, managed)
 	s.base, s.value, s.envManaged = base, effective, managed
 	if err := s.validate(effective); err != nil {
 		return nil, err
@@ -260,7 +262,11 @@ func (s *Store) EnvironmentManaged(key string) bool {
 	return s.envManaged[key]
 }
 
-func (s *Store) Save(next Settings) error {
+// Save validates and persists next. A changed ffmpegPath or ffprobePath must
+// also pass the executable probe, since the server runs it.
+func (s *Store) Save(next Settings) error { return s.save(next, true) }
+
+func (s *Store) save(next Settings, probeTools bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	mergeSecrets(&next, s.value)
@@ -274,6 +280,21 @@ func (s *Store) Save(next Settings) error {
 	}
 	if err := s.validate(effective); err != nil {
 		return err
+	}
+	if probeTools {
+		for _, t := range []struct {
+			key, binary, next, current string
+		}{
+			{"ffprobePath", "ffprobe", effective.FFprobePath, s.value.FFprobePath},
+			{"ffmpegPath", "ffmpeg", effective.FFmpegPath, s.value.FFmpegPath},
+		} {
+			if t.next == t.current || managed[t.key] {
+				continue
+			}
+			if err := ValidateMediaTool(t.next, t.binary); err != nil {
+				return err
+			}
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o750); err != nil {
 		return err
@@ -343,8 +364,11 @@ func (s *Store) validate(v Settings) error {
 	if v.SubtitleCachePath == "" || v.SubtitleCacheMaxBytes < 1<<20 || v.SubtitleCacheMaxBytes > 4<<30 {
 		return fmt.Errorf("subtitleCachePath is required and subtitleCacheMaxBytes must be between 1 MiB and 4 GiB")
 	}
-	if v.FFprobePath == "" || v.FFmpegPath == "" || !filepath.IsAbs(v.FFprobePath) || !filepath.IsAbs(v.FFmpegPath) {
-		return fmt.Errorf("ffprobePath and ffmpegPath must be absolute paths")
+	if err := mediaToolName("ffprobePath", v.FFprobePath, "ffprobe"); err != nil {
+		return err
+	}
+	if err := mediaToolName("ffmpegPath", v.FFmpegPath, "ffmpeg"); err != nil {
+		return err
 	}
 	if v.ArtworkCachePath == "" || v.ArtworkCacheMaxBytes < 16<<20 || v.ArtworkCacheMaxBytes > 8<<30 {
 		return fmt.Errorf("artworkCachePath is required and artworkCacheMaxBytes must be between 16 MiB and 8 GiB")

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -37,8 +38,22 @@ type cachedSearch struct {
 }
 
 func NewSubDL(settings *config.Store) *SubDL {
-	return &SubDL{settings: settings, client: &http.Client{Timeout: 45 * time.Second}, cache: map[string]cachedSearch{}}
+	return &SubDL{settings: settings, client: &http.Client{Timeout: 45 * time.Second, CheckRedirect: dropKeyOnCrossHostRedirect}, cache: map[string]cachedSearch{}}
 }
+
+// dropKeyOnCrossHostRedirect stops the API key following a redirect to another
+// host. net/http already drops Authorization there but not custom headers.
+func dropKeyOnCrossHostRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	if !strings.EqualFold(req.URL.Host, via[0].URL.Host) {
+		req.Header.Del("Authorization")
+		req.Header.Del("X-API-Key")
+	}
+	return nil
+}
+
 func (*SubDL) Name() string { return "subdl" }
 
 func (p *SubDL) Test(ctx context.Context) (string, error) {

@@ -87,11 +87,14 @@ func NewAt(settingsPath string, log *slog.Logger) (*App, error) {
 
 // assemble builds the application around an already-loaded settings store:
 // media-tool discovery and every adapter wiring step.
-func assemble(settings *config.Store, log *slog.Logger) (*App, error) {
+func assemble(settings *config.Store, log *slog.Logger) (_ *App, retErr error) {
 	// Media tools: discover ffprobe/ffmpeg on PATH when the configured
 	// paths do not exist, persisting what is found. A missing tool only
 	// degrades subtitle probing and audio fallback at runtime, so warn
 	// instead of failing startup.
+	for _, warning := range settings.StartupWarnings() {
+		log.Warn("settings value replaced at startup", "reason", warning)
+	}
 	unfound, err := settings.ResolveMediaTools()
 	if err != nil {
 		return nil, err
@@ -106,6 +109,20 @@ func assemble(settings *config.Store, log *slog.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	engines := map[string]application.TorrentEngine{}
+	// A startup failure must not leave the database or an engine's piece
+	// store open: nothing owns them until the Service takes over.
+	defer func() {
+		if retErr == nil {
+			return
+		}
+		for _, engine := range engines {
+			if closer, ok := engine.(io.Closer); ok {
+				_ = closer.Close()
+			}
+		}
+		_ = repo.Close()
+	}()
 	fl := filelist.New(func() (string, string, string) {
 		v := settings.Get()
 		return v.FileListURL, v.FileListUsername, v.FileListPasskey
@@ -157,7 +174,6 @@ func assemble(settings *config.Store, log *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("distinct engine prefixes: %w", err)
 	}
 	var legacyNativeErr error
-	engines := map[string]application.TorrentEngine{}
 	for _, prefix := range requiredEngines(defaultPrefix, persistedPrefixes) {
 		switch prefix {
 		case "native:":
@@ -208,6 +224,9 @@ func assemble(settings *config.Store, log *slog.Logger) (*App, error) {
 	service.SetMetadataProvider(application.NewMetadataChain(providerEntries, func() []string { return settings.Get().MetadataProviders }))
 	service.SetMediaProbe(mediaprobe.New(settings))
 	service.SetLogger(log)
+	if err := service.ResetLeases(context.Background()); err != nil {
+		log.Warn("clearing stale stream leases failed", "error", err)
+	}
 	service.StartScheduler()
 
 	// Integration wiring: the hub and the update coordinator are
@@ -668,6 +687,7 @@ func (b *completingAssetBody) Read(p []byte) (int, error) {
 	if rerr != nil {
 		return n, err
 	}
+	_ = b.body.Close()
 	b.body = resume
 	return n, nil
 }

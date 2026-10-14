@@ -61,7 +61,9 @@ Out: per-request prepare optimization beyond what the lease work touches, `Downl
 
 ### Admission
 
-Serialize survey, reservation, `engine.Add` and row save behind one admission mutex in `Prepare`, held for the shortest span that covers the survey-to-save window. If holding it across `engine.Add` is too long, reserve the requested bytes in memory under the mutex and release the reservation after the row is saved or the add fails. The reservation counts against the Allocation for concurrent callers. Which of the two is used is a ticket-level decision; both satisfy the requirement that no interleaving can exceed the cap.
+Serialize survey, reservation, `engine.Add` and row save behind one admission mutex in `Prepare`, held for the shortest span that covers the survey-to-save window. If holding it across `engine.Add` is too long, reserve the requested bytes in memory under the mutex and release the reservation after the row is saved or the add fails. The reservation counts against the Allocation for concurrent callers. Both satisfy the requirement that no interleaving can exceed the cap.
+
+**Chosen: in-memory reservation.** `ensureAllocationRoom` takes `admissionMu` only for the survey, eviction and reservation, and counts `reservedBytes` as stored. The caller holds an `allocationReservation` and releases it by `defer` once the row is saved or the request fails. `engine.Add` and the metadata wait run outside the lock, so a slow add never stalls another stream's admission.
 
 ### Native session restore
 
@@ -69,9 +71,9 @@ Serialize survey, reservation, `engine.Add` and row save behind one admission mu
 
 ### Trust boundary (see ADR-0012)
 
-- Origin policy: same-origin requests pass. Cross-origin requests pass only if the `Origin` is on an allowlist built from the known clients (the Android WebView asset origin `https://appassets.androidplatform.net`, the Tizen and webOS packaged-app origins, and `null` where those packaged apps send it). The exact origin strings are measured from the packaged clients during implementation, not guessed.
-- Endpoint tiers: administration endpoints (`/api/v1/settings` and any other write that TV clients do not use, per `PRODUCT.md`: provider credentials, dependency diagnostics, storage and network administration are browser-only) accept only same-origin requests. The client-facing endpoints keep the allowlist.
-- Host validation: a request is rejected unless its Host is an IP literal inside a trusted CIDR, `localhost`, or a hostname on the server's configured list (default includes the advertised LAN name if one exists). This blocks DNS rebinding.
+- Origin policy (revised 2026-10-15, see ADR-0012): the server runs on the LAN, so the default accepts a missing `Origin`, same-origin, `null` (Tizen and webOS), `https://appassets.androidplatform.net`, and any origin whose host is `localhost`, a loopback/private/link-local IP, or a single-label, `.local`, `.lan` or `.home.arpa` name. Public origins are rejected. `TORRENT_TV_ALLOWED_ORIGINS`, when set, replaces that default with a strict allowlist (plus absent and same-origin). The exact packaged-client origin strings are still to be measured on hardware.
+- Endpoint tiers: administration endpoints (`/api/v1/settings` and any other write that TV clients do not use, per `PRODUCT.md`: provider credentials, dependency diagnostics, storage and network administration are browser-only) accept no `Origin`, same-origin, or a LAN origin, but not `null` or public origins (only no `Origin` or same-origin when `TORRENT_TV_ALLOWED_ORIGINS` is set). The client-facing endpoints use the policy above.
+- Host validation (revised 2026-10-15): no restriction by default, since the server runs on the LAN under IP, mDNS or router names. `TORRENT_TV_ALLOWED_HOSTS`, when set, is a strict Host allowlist (the public-deployment mode, and the DNS-rebinding defence). Default DNS-rebinding exposure is accepted and recorded in ADR-0012.
 - `ffmpegPath` and `ffprobePath`: must be absolute, exist, be regular executable files, have a base name of `ffmpeg`/`ffprobe` (with `.exe` on Windows), and pass a `-version` probe whose first line starts with `ffmpeg version` or `ffprobe version`. Validation runs on save and at startup; a failure at startup falls back to the default resolution and logs.
 
 ### Secrets
@@ -93,7 +95,7 @@ Go tests next to the code:
 - Leases: two overlapping Acquires and one Release keep the lease; a general `SaveDownload` after `SetLease(true)` does not clear it; startup reset clears stale leases and logs the count; removal and retention honor the table.
 - Admission: two concurrent `Prepare` calls for different releases against a cap that fits one admit exactly one (run with `-race`).
 - Session restore: a session with one bad entry between two good ones restores both good entries and reports the skipped one.
-- Trust: table-driven handler tests for Origin and Host combinations (same-origin, allowlisted, `null`, foreign, rebinding Host, trusted CIDR IP Host), admin versus client endpoints, and preflight responses.
+- Trust: table-driven handler tests for Origin and Host combinations (same-origin, LAN origin, `null`, public origin, any Host by default, Host and Origin allowlists from the environment), admin versus client endpoints, and preflight responses.
 - Config validation: fake executables for the `-version` probe (accepted, wrong banner, missing, non-executable, relative path).
 - Errors: an adapter test with an `httptest` server that fails and an assertion that the returned error text contains neither the passkey nor the API key.
 - Journal: pruning keeps recent rows and removes old ones.
@@ -105,8 +107,8 @@ Automated: `go vet ./...`, `go test -race ./...`. On the Pi (unverified here): a
 
 ## Risks
 
-- The origin allowlist can lock out a client whose origin string was guessed wrong. Mitigation: measure each client's real Origin and keep `null` allowed on the client-facing tier. `null` is also what a sandboxed iframe sends, so the admin tier (same-origin only) is what protects settings and executable paths.
-- Host validation can block a household that reaches the server through a hostname nobody configured (for example a reverse proxy name). A settings field for extra allowed hostnames is part of the design.
+- The origin allowlist can lock out a client whose origin string was guessed wrong. Mitigation: measure each client's real Origin and keep `null` allowed on the client-facing tier. `null` is also what a sandboxed iframe sends, so the admin tier (no `null`, no public origins) is what protects settings and executable paths.
+- The default accepts any Host, so DNS rebinding is not blocked unless `TORRENT_TV_ALLOWED_HOSTS` is set; this is an accepted LAN-only trade-off.
 - Removing `leased` from the upsert changes the repository contract; any other writer that relied on it must call `SetLease`.
 - Holding an admission mutex across `engine.Add` can stall `Prepare` for slow adds.
 

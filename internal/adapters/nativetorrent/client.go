@@ -220,49 +220,57 @@ func (c *Client) Close() error {
 
 // loadSession re-adds every persisted torrent and re-applies its selection
 // and paused flag. Piece completion comes from the bolt db, so nothing is
-// re-verified from disk.
+// re-verified from disk. An entry that fails to restore is logged and
+// skipped so one bad saved torrent never disables the engine.
 func (c *Client) loadSession() error {
 	for hash, entry := range c.session.entries {
-		if len(entry.Metainfo) == 0 {
-			continue
+		if err := c.restoreEntry(hash, entry); err != nil {
+			slog.Warn("native engine: skipping torrent that failed to restore", "infohash", hash, "error", err)
 		}
-		mi, err := metainfo.Load(bytes.NewReader(entry.Metainfo))
-		if err != nil {
+	}
+	return nil
+}
+
+func (c *Client) restoreEntry(hash string, entry sessionEntry) error {
+	if len(entry.Metainfo) == 0 {
+		return nil
+	}
+	mi, err := metainfo.Load(bytes.NewReader(entry.Metainfo))
+	if err != nil {
+		return err
+	}
+	forceUDP4Trackers(mi)
+	info, err := mi.UnmarshalInfo()
+	if err != nil {
+		return err
+	}
+	if c.torrent(hash) != nil {
+		return nil
+	}
+	targetClient := c.publicClient
+	if info.Private != nil && *info.Private {
+		targetClient = c.privateClient
+	}
+	t, err := targetClient.AddTorrent(mi)
+	if err != nil {
+		return err
+	}
+	ih := mi.HashInfoBytes()
+	c.mu.Lock()
+	c.owners[ih] = targetClient
+	c.armWriteChunkErrorLocked(hash, t)
+	c.mu.Unlock()
+	if err := waitInfo(context.Background(), t); err != nil {
+		return err
+	}
+	if len(entry.MediaIndices) > 0 {
+		if err := c.PrepareFiles(context.Background(), hash, entry.MediaIndices, entry.SubtitleIndices); err != nil {
 			return err
 		}
-		forceUDP4Trackers(mi)
-		info, err := mi.UnmarshalInfo()
-		if err != nil {
+	}
+	if entry.Paused {
+		if err := c.Pause(context.Background(), hash); err != nil {
 			return err
-		}
-		if c.torrent(hash) != nil {
-			continue
-		}
-		targetClient := c.publicClient
-		if info.Private != nil && *info.Private {
-			targetClient = c.privateClient
-		}
-		t, err := targetClient.AddTorrent(mi)
-		if err != nil {
-			return err
-		}
-		ih := mi.HashInfoBytes()
-		c.mu.Lock()
-		c.owners[ih] = targetClient
-		c.armWriteChunkErrorLocked(hash, t)
-		c.mu.Unlock()
-		if err := waitInfo(context.Background(), t); err != nil {
-			return err
-		}
-		if len(entry.MediaIndices) > 0 {
-			if err := c.PrepareFiles(context.Background(), hash, entry.MediaIndices, entry.SubtitleIndices); err != nil {
-				return err
-			}
-		}
-		if entry.Paused {
-			if err := c.Pause(context.Background(), hash); err != nil {
-				return err
-			}
 		}
 	}
 	return nil

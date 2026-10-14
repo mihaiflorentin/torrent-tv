@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mihaiflorentin/torrent-tv/internal/adapters/sqlite"
@@ -126,7 +127,7 @@ func New(service *application.Service, settings *config.Store, log *slog.Logger,
 	mux.HandleFunc("GET /api/v1/streams/{id}/browser", a.browserStream)
 	mux.HandleFunc("GET /api/v1/streams/{id}/snap", a.streamSnap)
 	mux.Handle("/", appShell(webFS))
-	return recoverer(log, access(log, trusted(settings, corsAPI(mux))))
+	return recoverer(log, access(log, trusted(settings, guard(newTrustPolicy(os.Getenv), mux))))
 }
 
 // appShell serves the embedded web build. A GET outside /api/ that matches no
@@ -1199,7 +1200,9 @@ func (a *API) browserStream(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusInternalServerError, err)
 		return
 	}
-	cmd.Stderr = io.Discard
+	// Keep the tail of ffmpeg's diagnostics so a failed stream says why.
+	stderr := &tailBuffer{limit: 4 << 10}
+	cmd.Stderr = stderr
 	if err = cmd.Start(); err != nil {
 		problem(w, http.StatusServiceUnavailable, fmt.Errorf("start browser audio compatibility stream: %w", err))
 		return
@@ -1209,12 +1212,40 @@ func (a *API) browserStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	copyErr := copyFlush(w, stdout)
+	if copyErr != nil {
+		// Nobody reads ffmpeg's output any more: stop it instead of
+		// leaving it blocked on a full pipe until the request context ends.
+		_ = cmd.Process.Kill()
+	}
 	waitErr := cmd.Wait()
 	if copyErr != nil && !errors.Is(copyErr, context.Canceled) {
-		a.log.Warn("browser compatibility stream stopped", "sourceId", r.PathValue("id"), "error", copyErr)
+		a.log.Warn("browser compatibility stream stopped", "sourceId", r.PathValue("id"), "error", copyErr, "ffmpegStderr", stderr.String())
 	} else if waitErr != nil && r.Context().Err() == nil {
-		a.log.Warn("browser compatibility transcode stopped", "sourceId", r.PathValue("id"), "error", waitErr)
+		a.log.Warn("browser compatibility transcode stopped", "sourceId", r.PathValue("id"), "error", waitErr, "ffmpegStderr", stderr.String())
 	}
+}
+
+// tailBuffer keeps the last limit bytes written to it.
+type tailBuffer struct {
+	mu    sync.Mutex
+	limit int
+	buf   []byte
+}
+
+func (t *tailBuffer) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.buf = append(t.buf, p...)
+	if len(t.buf) > t.limit {
+		t.buf = t.buf[len(t.buf)-t.limit:]
+	}
+	return len(p), nil
+}
+
+func (t *tailBuffer) String() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return strings.TrimSpace(string(t.buf))
 }
 
 // browserStreamArgs selects the requested (default, then English) audio track
@@ -1404,26 +1435,6 @@ func write(w http.ResponseWriter, status int, v any) {
 
 func problem(w http.ResponseWriter, status int, err error) {
 	write(w, status, map[string]any{"type": "about:blank", "title": http.StatusText(status), "status": status, "detail": err.Error()})
-}
-
-// corsAPI lets locally-packaged TV clients (Tizen's widget runtime bypasses
-// CORS; a WebView does not) call the API the server advertises on the home
-// LAN. Preflights are answered here because the method-specific mux routes
-// would otherwise drop OPTIONS on the SPA handler.
-func corsAPI(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/v1") {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			if r.Method == http.MethodOptions {
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, HEAD, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-				w.Header().Set("Access-Control-Max-Age", "600")
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-		}
-		next.ServeHTTP(w, r)
-	})
 }
 
 func trusted(s *config.Store, next http.Handler) http.Handler {

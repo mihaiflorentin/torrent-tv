@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mihaiflorentin/torrent-tv/internal/domain"
@@ -44,6 +45,10 @@ type Service struct {
 	providerSlots    map[string]chan struct{}
 	pendingMu        sync.Mutex
 	pendingMetadata  map[string]bool
+	admissionMu      sync.Mutex
+	reservedBytes    atomic.Int64
+	leaseMu          sync.Mutex
+	leases           map[string]int
 	mediaInfoMu      sync.Mutex
 	mediaInfoCache   map[string]cachedMediaInfo
 	providerMu       sync.Mutex
@@ -98,6 +103,7 @@ func NewService(trackers *TrackerRegistry, engines *EngineSet, r Repository, s *
 		providerSlots:    make(map[string]chan struct{}),
 		pendingMetadata:  map[string]bool{},
 		mediaInfoCache:   map[string]cachedMediaInfo{},
+		leases:           map[string]int{},
 		freeSpace:        freeDiskBytes,
 		providerCtx:      provCtx,
 		providerCancel:   provCancel,
@@ -650,6 +656,19 @@ func isTransient(err error) bool {
 	return strings.Contains(text, "timeout") || strings.Contains(text, "temporar") || strings.Contains(text, "connection reset") || strings.Contains(text, "http 5") || strings.Contains(text, "returned 5")
 }
 
+// Job logs and the event journal keep 30 days of history; the journal also
+// keeps its newest 1000 rows so a quiet server can still replay recent events.
+const (
+	historyRetention      = 30 * 24 * time.Hour
+	eventJournalMinRetain = 1000
+)
+
+func (s *Service) pruneHistory() {
+	cutoff := time.Now().Add(-historyRetention)
+	_ = s.repo.PruneJobLogs(context.Background(), cutoff, 500)
+	_ = s.repo.PruneEvents(context.Background(), cutoff, eventJournalMinRetain)
+}
+
 func (s *Service) StartScheduler() {
 	s.wg.Add(1)
 	go func() {
@@ -657,7 +676,7 @@ func (s *Service) StartScheduler() {
 		s.recoverInterruptedJobs()
 		s.retryDueJobs(true)
 		s.retryDueJobs(false)
-		_ = s.repo.PruneJobLogs(context.Background(), time.Now().Add(-30*24*time.Hour), 500)
+		s.pruneHistory()
 		_, _ = s.SyncCatalog("latest")
 		_, _ = s.RunRetention()
 		latest := time.NewTicker(time.Hour)
@@ -673,7 +692,7 @@ func (s *Service) StartScheduler() {
 				_, _ = s.SyncCatalog("latest")
 				_, _ = s.RunRetention()
 			case <-rebuild.C:
-				_ = s.repo.PruneJobLogs(context.Background(), time.Now().Add(-30*24*time.Hour), 500)
+				s.pruneHistory()
 				_, _ = s.SyncCatalog("rebuild")
 			case <-due.C:
 				s.retryDueJobs(true)
@@ -1464,7 +1483,11 @@ func (s *Service) TestEngine(ctx context.Context) (string, error) {
 // the retention job uses) and the survey re-run; only when nothing evictable
 // remains does the download fail with a visible Allocation problem. A zero
 // Allocation disables the whole check.
-func (s *Service) ensureAllocationRoom(ctx context.Context, release domain.TorrentRelease, incoming int64) error {
+func (s *Service) ensureAllocationRoom(ctx context.Context, release domain.TorrentRelease, incoming int64, held *allocationReservation) error {
+	s.admissionMu.Lock()
+	defer s.admissionMu.Unlock()
+	// Drop this request's earlier estimate so it never counts against itself.
+	held.release()
 	settings := s.settings.Get()
 	if settings.AllocationGB <= 0 {
 		return nil
@@ -1479,7 +1502,7 @@ func (s *Service) ensureAllocationRoom(ctx context.Context, release domain.Torre
 	if err := refuseUncertainOwners(plan); err != nil {
 		return err
 	}
-	plan.storedBytes += incoming
+	plan.storedBytes += incoming + s.reservedBytes.Load()
 	reason, tripped := retentionDeficit(plan, settings)
 	rules := config.NormalizeEvictionRules(settings.EvictionRules)
 	for tripped {
@@ -1507,10 +1530,33 @@ func (s *Service) ensureAllocationRoom(ctx context.Context, release domain.Torre
 		if err := refuseUncertainOwners(plan); err != nil {
 			return err
 		}
-		plan.storedBytes += incoming
+		plan.storedBytes += incoming + s.reservedBytes.Load()
 		reason, tripped = retentionDeficit(plan, settings)
 	}
+	held.reserve(s, incoming)
 	return nil
+}
+
+// allocationReservation is the in-memory claim one admitted request holds on
+// the Allocation between the capacity decision and its saved download row,
+// the window in which the row-based survey cannot yet see the torrent. Later
+// admissions count claimed bytes as stored. The zero value holds nothing.
+type allocationReservation struct {
+	s     *Service
+	bytes int64
+}
+
+func (r *allocationReservation) reserve(s *Service, bytes int64) {
+	r.s, r.bytes = s, bytes
+	s.reservedBytes.Add(bytes)
+}
+
+// release is idempotent and never blocks, so failure paths can defer it.
+func (r *allocationReservation) release() {
+	if r.s != nil && r.bytes != 0 {
+		r.s.reservedBytes.Add(-r.bytes)
+	}
+	r.bytes = 0
 }
 
 // refuseUncertainOwners is the admission gate for survey uncertainty: a
@@ -1570,7 +1616,10 @@ func (s *Service) Prepare(ctx context.Context, releaseID string, fileIndex int) 
 	if err != nil {
 		return domain.Download{}, err
 	}
-	if err := s.ensureAllocationRoom(ctx, release, 0); err != nil {
+	// The reservation lives until the row is saved or the request fails.
+	reservation := &allocationReservation{}
+	defer reservation.release()
+	if err := s.ensureAllocationRoom(ctx, release, 0, reservation); err != nil {
 		return domain.Download{}, err
 	}
 	metainfo, err := s.releaseMetainfo(ctx, release)
@@ -1596,7 +1645,7 @@ func (s *Service) Prepare(ctx context.Context, releaseID string, fileIndex int) 
 		incoming = totalFiles
 	}
 	if incoming > release.SizeBytes {
-		if err := s.ensureAllocationRoom(ctx, release, incoming); err != nil {
+		if err := s.ensureAllocationRoom(ctx, release, incoming, reservation); err != nil {
 			return domain.Download{}, err
 		}
 	}
@@ -1849,6 +1898,8 @@ func (s *Service) PrepareSeason(ctx context.Context, releaseID string, season in
 		season = 1
 	}
 
+	reservation := &allocationReservation{}
+	defer reservation.release()
 	var engine TorrentEngine
 	engineID, hash, enginePrefix := "", "", ""
 	unavailableOwner := ""
@@ -1874,7 +1925,7 @@ func (s *Service) PrepareSeason(ctx context.Context, releaseID string, season in
 		if err != nil {
 			return nil, err
 		}
-		if err := s.ensureAllocationRoom(ctx, release, 0); err != nil {
+		if err := s.ensureAllocationRoom(ctx, release, 0, reservation); err != nil {
 			return nil, err
 		}
 		metainfo, err := s.releaseMetainfo(ctx, release)
@@ -1900,7 +1951,7 @@ func (s *Service) PrepareSeason(ctx context.Context, releaseID string, season in
 			incoming = totalFiles
 		}
 		if incoming > release.SizeBytes {
-			if fitErr := s.ensureAllocationRoom(ctx, release, incoming); fitErr != nil {
+			if fitErr := s.ensureAllocationRoom(ctx, release, incoming, reservation); fitErr != nil {
 				return nil, fitErr
 			}
 		}
@@ -2284,13 +2335,13 @@ func (s *Service) Manage(ctx context.Context, id, action string, _ bool) error {
 			return listErr
 		}
 		for _, item := range managed {
-			if item.EngineID == d.EngineID && item.Leased {
+			if item.EngineID == d.EngineID && s.rowLeased(item) {
 				return fmt.Errorf("cannot remove an actively streamed download")
 			}
 		}
 		return s.removeTorrent(ctx, d.EngineID)
 	case "remove-file":
-		if d.Leased {
+		if s.rowLeased(d) {
 			return fmt.Errorf("cannot remove a file that is being streamed")
 		}
 		if err := s.repo.DeleteDownload(ctx, d.ID); err != nil {
@@ -2711,6 +2762,9 @@ func (s *Service) householdItem(ctx context.Context, p domain.PlaybackState, fav
 	return item, true
 }
 
+// Acquire takes a stream lease on the download (GLOSSARY: Stream lease).
+// Leases are counted in memory so overlapping streams each hold one; the
+// persisted flag is set on the first and cleared when the last is released.
 func (s *Service) Acquire(ctx context.Context, id string) (domain.Download, error) {
 	d, err := s.repo.GetDownload(ctx, id)
 	if err != nil {
@@ -2720,17 +2774,67 @@ func (s *Service) Acquire(ctx context.Context, id string) (domain.Download, erro
 	if err != nil {
 		return d, err
 	}
+	s.leaseMu.Lock()
+	s.leases[id]++
+	s.leaseMu.Unlock()
 	if err = s.repo.SetLease(ctx, id, true); err != nil {
+		s.dropLease(id)
 		return d, err
 	}
 	d.Leased = true
 	return d, nil
 }
 
+// dropLease decrements the in-memory count and reports whether it reached
+// zero.
+func (s *Service) dropLease(id string) bool {
+	s.leaseMu.Lock()
+	defer s.leaseMu.Unlock()
+	if s.leases[id] > 1 {
+		s.leases[id]--
+		return false
+	}
+	delete(s.leases, id)
+	return true
+}
+
+// leaseHeld reports whether any stream is active on the download according
+// to the in-memory table.
+func (s *Service) leaseHeld(id string) bool {
+	s.leaseMu.Lock()
+	defer s.leaseMu.Unlock()
+	return s.leases[id] > 0
+}
+
+// rowLeased consults the in-memory table first and the persisted flag second.
+func (s *Service) rowLeased(d domain.Download) bool {
+	return s.leaseHeld(d.ID) || d.Leased
+}
+
 func (s *Service) Release(id string) {
+	if !s.dropLease(id) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_ = s.repo.SetLease(ctx, id, false)
+	if err := s.repo.SetLease(ctx, id, false); err != nil {
+		if log := s.log; log != nil {
+			log.Warn("clear stream lease failed", "download", id, "error", err)
+		}
+	}
+}
+
+// ResetLeases clears every persisted lease. Leases never survive a restart,
+// so the server calls it before accepting requests.
+func (s *Service) ResetLeases(ctx context.Context) error {
+	cleared, err := s.repo.ClearLeases(ctx)
+	if err != nil {
+		return err
+	}
+	if log := s.log; log != nil {
+		log.Info("cleared stale stream leases", "count", cleared)
+	}
+	return nil
 }
 
 func (s *Service) WaitRange(ctx context.Context, d domain.Download, start, count int64) error {

@@ -776,7 +776,7 @@ func (r *Repository) RecordSync(ctx context.Context, name string, count int, syn
 }
 
 func (r *Repository) SaveDownload(ctx context.Context, d domain.Download) error {
-	_, err := r.db.ExecContext(ctx, `INSERT INTO downloads(id,release_id,engine_id,file_index,file_path,absolute_path,size_bytes,file_offset,piece_size,state,progress,downloaded_bytes,speed_bytes_per_second,eta_seconds,peers,seeds,buffered_bytes,leased,error,tracker_id,tracker_name,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET engine_id=excluded.engine_id,absolute_path=excluded.absolute_path,piece_size=excluded.piece_size,state=excluded.state,progress=excluded.progress,downloaded_bytes=excluded.downloaded_bytes,speed_bytes_per_second=excluded.speed_bytes_per_second,eta_seconds=excluded.eta_seconds,peers=excluded.peers,seeds=excluded.seeds,buffered_bytes=excluded.buffered_bytes,leased=excluded.leased,error=excluded.error,tracker_id=excluded.tracker_id,tracker_name=excluded.tracker_name,updated_at=excluded.updated_at`,
+	_, err := r.db.ExecContext(ctx, `INSERT INTO downloads(id,release_id,engine_id,file_index,file_path,absolute_path,size_bytes,file_offset,piece_size,state,progress,downloaded_bytes,speed_bytes_per_second,eta_seconds,peers,seeds,buffered_bytes,leased,error,tracker_id,tracker_name,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET engine_id=excluded.engine_id,absolute_path=excluded.absolute_path,piece_size=excluded.piece_size,state=excluded.state,progress=excluded.progress,downloaded_bytes=excluded.downloaded_bytes,speed_bytes_per_second=excluded.speed_bytes_per_second,eta_seconds=excluded.eta_seconds,peers=excluded.peers,seeds=excluded.seeds,buffered_bytes=excluded.buffered_bytes,error=excluded.error,tracker_id=excluded.tracker_id,tracker_name=excluded.tracker_name,updated_at=excluded.updated_at`,
 		d.ID, d.ReleaseID, d.EngineID, d.FileIndex, d.FilePath, d.AbsolutePath, d.SizeBytes, d.FileOffset, d.PieceSize, d.State, d.Progress, d.DownloadedBytes, d.SpeedBytesPerSecond, d.ETASeconds, d.Peers, d.Seeds, d.BufferedBytes, d.Leased, d.Error, d.TrackerID, d.TrackerName, d.CreatedAt.Unix(), d.UpdatedAt.Unix())
 	return err
 }
@@ -859,6 +859,16 @@ func (r *Repository) SetLease(ctx context.Context, id string, v bool) error {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+// ClearLeases resets every persisted stream lease and returns the number of
+// rows that were leased.
+func (r *Repository) ClearLeases(ctx context.Context) (int64, error) {
+	res, err := r.db.ExecContext(ctx, "UPDATE downloads SET leased=0 WHERE leased<>0")
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func (r *Repository) SaveJob(ctx context.Context, job domain.Job) error {
@@ -1134,6 +1144,16 @@ func (r *Repository) AppendEvent(ctx context.Context, kind, payload string) (dom
 	}
 	id, err := result.LastInsertId()
 	return domain.Event{ID: id, Kind: kind, Payload: payload, CreatedAt: now}, err
+}
+
+// PruneEvents deletes journal rows older than before, always keeping the
+// newest minKeep rows so a quiet server still has history to replay.
+func (r *Repository) PruneEvents(ctx context.Context, before time.Time, minKeep int) error {
+	if minKeep < 0 {
+		minKeep = 0
+	}
+	_, err := r.db.ExecContext(ctx, `DELETE FROM event_journal WHERE created_at<? AND id NOT IN (SELECT id FROM event_journal ORDER BY id DESC LIMIT ?)`, before.Unix(), minKeep)
+	return err
 }
 
 func (r *Repository) ListEvents(ctx context.Context, after int64, limit int) ([]domain.Event, error) {

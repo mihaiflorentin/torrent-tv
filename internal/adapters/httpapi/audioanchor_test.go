@@ -76,7 +76,7 @@ func TestAudioAnchorRoute(t *testing.T) {
 
 	t.Run("measures the requested window", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		handler.ServeHTTP(rec, newRequest(http.MethodGet,
 			"/api/v1/downloads/source/audio-anchor?startByte=2097152&lengthBytes=16777216&streamIndex=1", nil))
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d body = %s", rec.Code, rec.Body.String())
@@ -92,7 +92,7 @@ func TestAudioAnchorRoute(t *testing.T) {
 
 	t.Run("unknown source is gone", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		handler.ServeHTTP(rec, newRequest(http.MethodGet,
 			"/api/v1/downloads/missing/audio-anchor?startByte=2097152&lengthBytes=16777216&streamIndex=1", nil))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want 404", rec.Code)
@@ -105,7 +105,7 @@ func TestAudioAnchorRoute(t *testing.T) {
 		partial.Progress = 0
 		partialHandler := newAnchorHTTPTest(t, &anchorHTTPProbe{span: span}, partial)
 		rec := httptest.NewRecorder()
-		partialHandler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		partialHandler.ServeHTTP(rec, newRequest(http.MethodGet,
 			"/api/v1/downloads/partial/audio-anchor?startByte=2097152&lengthBytes=16777216&streamIndex=1", nil))
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d, want 503", rec.Code)
@@ -117,7 +117,7 @@ func TestAudioAnchorRoute(t *testing.T) {
 
 	t.Run("invalid window is unprocessable", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		handler.ServeHTTP(rec, newRequest(http.MethodGet,
 			"/api/v1/downloads/source/audio-anchor?startByte=-1&lengthBytes=16777216&streamIndex=1", nil))
 		if rec.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", rec.Code)
@@ -126,7 +126,7 @@ func TestAudioAnchorRoute(t *testing.T) {
 
 	t.Run("non-numeric query is bad request", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		handler.ServeHTTP(rec, newRequest(http.MethodGet,
 			"/api/v1/downloads/source/audio-anchor?startByte=abc&lengthBytes=16777216&streamIndex=1", nil))
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", rec.Code)

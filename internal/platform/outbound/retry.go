@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -43,11 +44,11 @@ func Do(ctx context.Context, client *http.Client, makeRequest func() (*http.Requ
 	for attempt := 1; attempt <= policy.Attempts; attempt++ {
 		req, err := makeRequest()
 		if err != nil {
-			return nil, err
+			return nil, redact(policy.Provider, err)
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, err
+			return nil, redact(policy.Provider, err)
 		}
 		if resp.StatusCode != http.StatusTooManyRequests {
 			return resp, nil
@@ -67,6 +68,20 @@ func Do(ctx context.Context, client *http.Client, makeRequest func() (*http.Requ
 		}
 	}
 	return nil, last
+}
+
+// redact drops the request URL that net/http embeds in transport errors, since
+// provider URLs carry credentials (passkey, api_key). The provider, operation
+// and cause stay; the cause is wrapped so errors.Is/As still work.
+func redact(provider string, err error) error {
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) {
+		return err
+	}
+	if provider == "" {
+		provider = "outbound"
+	}
+	return fmt.Errorf("%s %s request failed: %w", provider, strings.ToLower(urlErr.Op), urlErr.Err)
 }
 
 func retryDelay(header http.Header, attempt int) time.Duration {

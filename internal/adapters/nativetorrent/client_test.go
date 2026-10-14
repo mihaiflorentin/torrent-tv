@@ -3,6 +3,7 @@ package nativetorrent
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -941,5 +942,38 @@ func TestProgressiveServeMidFileOnPartialPublicDownload(t *testing.T) {
 	}
 	if !bytes.Equal(rec.Body.Bytes(), wantBytes) {
 		t.Fatalf("HTTP served bytes mismatch")
+	}
+}
+
+func TestRestoreSkipsBadEntriesAndLoadsTheRest(t *testing.T) {
+	dir := t.TempDir()
+	goodMI, goodRaw := buildPublicTestMetainfo(t, seedContentFill(t, 'g', 'h'))
+	staleMI, staleRaw := buildPublicTestMetainfo(t, seedContentFill(t, 's', 't'))
+	goodHash := goodMI.HashInfoBytes().HexString()
+	staleHash := staleMI.HashInfoBytes().HexString()
+	entries := map[string]sessionEntry{
+		goodHash:                 {Metainfo: goodRaw},
+		staleHash:                {Metainfo: staleRaw, MediaIndices: []int{99}},
+		strings.Repeat("ab", 20): {Metainfo: []byte("not a torrent")},
+	}
+	raw, err := json.Marshal(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionDir := filepath.Join(dir, "session")
+	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sessionDir, "session.json"), raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	c := newTestClientAt(t, dir)
+
+	if c.torrent(goodHash) == nil {
+		t.Fatal("healthy torrent was not restored")
+	}
+	if c.torrent(staleHash) == nil {
+		t.Fatal("torrent with a stale selection should stay loaded")
 	}
 }

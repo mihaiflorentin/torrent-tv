@@ -123,7 +123,7 @@ func TestPrepareRouteReturnsAllocationProblem(t *testing.T) {
 	}}
 	handler := newPrepareGateHandler(t, engine)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/releases/filelist:incoming-release/prepare", nil))
+	handler.ServeHTTP(rec, newRequest(http.MethodPost, "/api/v1/releases/filelist:incoming-release/prepare", nil))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("POST prepare status = %d, want 409: %s", rec.Code, rec.Body.String())
 	}
@@ -145,7 +145,7 @@ func TestPrepareSeasonRouteReturnsAllocationProblem(t *testing.T) {
 	}}
 	handler := newPrepareGateHandler(t, engine)
 	rec := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/releases/filelist:incoming-release/prepare-season", strings.NewReader(`{"season":1}`))
+	request := newRequest(http.MethodPost, "/api/v1/releases/filelist:incoming-release/prepare-season", strings.NewReader(`{"season":1}`))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(rec, request)
 	if rec.Code != http.StatusConflict {

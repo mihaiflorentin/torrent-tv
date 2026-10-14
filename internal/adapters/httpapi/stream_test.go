@@ -136,7 +136,7 @@ func TestStreamRespondsBeforeFullStartupBuffer(t *testing.T) {
 	}
 	handler := newStreamHTTPTest(t, engine, download)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/streams/source", nil)
+	req := newRequest(http.MethodGet, "/api/v1/streams/source", nil)
 	req.Header.Set("Range", "bytes=0-")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -176,7 +176,7 @@ func TestStreamServesSmallRangesImmediately(t *testing.T) {
 	}
 	handler := newStreamHTTPTest(t, engine, download)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/streams/source", nil)
+	req := newRequest(http.MethodGet, "/api/v1/streams/source", nil)
 	req.Header.Set("Range", "bytes=0-1048575")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)

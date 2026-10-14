@@ -193,7 +193,7 @@ func TestDisabledTrackerDownloadsKeepTrackerLabels(t *testing.T) {
 	seedProvenanceDownload(t, f, domain.Download{ID: "dl-pb", ReleaseID: "piratebay:20", EngineID: "qb:pb", FilePath: "Beta.2024.1080p.mkv", State: "downloading", TrackerID: "piratebay", TrackerName: "The Pirate Bay"})
 
 	rec := httptest.NewRecorder()
-	f.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/downloads", nil))
+	f.handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/downloads", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET downloads status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -231,7 +231,7 @@ func TestTrackerDisabledPrepareReturnsActionableConflict(t *testing.T) {
 	seedProvenanceRelease(t, f, domain.TorrentRelease{ID: "piratebay:20", TrackerID: "piratebay", TrackerName: "The Pirate Bay", ProviderID: "20", Name: "Beta.2024.1080p", Category: "Video", CategoryID: "201", BrowseClass: "video", SizeBytes: 1 << 20})
 
 	rec := httptest.NewRecorder()
-	f.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/releases/piratebay:20/prepare", nil))
+	f.handler.ServeHTTP(rec, newRequest(http.MethodPost, "/api/v1/releases/piratebay:20/prepare", nil))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("prepare status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -249,7 +249,7 @@ func TestTrackerUnconfiguredPrepareReturnsConfigurationGuidance(t *testing.T) {
 	seedProvenanceRelease(t, f, domain.TorrentRelease{ID: "piratebay:20", TrackerID: "piratebay", TrackerName: "The Pirate Bay", ProviderID: "20", Name: "Beta.2024.1080p", Category: "Video", CategoryID: "201", BrowseClass: "video", SizeBytes: 1 << 20})
 
 	rec := httptest.NewRecorder()
-	f.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/releases/piratebay:20/prepare", nil))
+	f.handler.ServeHTTP(rec, newRequest(http.MethodPost, "/api/v1/releases/piratebay:20/prepare", nil))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("prepare status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -276,7 +276,7 @@ func TestMagnetUnsupportedPrepareReturnsUpgradeGuidance(t *testing.T) {
 	seedProvenanceRelease(t, f, domain.TorrentRelease{ID: "piratebay:20", TrackerID: "piratebay", TrackerName: "The Pirate Bay", ProviderID: "20", Name: "Beta.2024.1080p", Category: "Video", CategoryID: "201", BrowseClass: "video", SizeBytes: 1 << 20})
 
 	rec := httptest.NewRecorder()
-	f.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/releases/piratebay:20/prepare", nil))
+	f.handler.ServeHTTP(rec, newRequest(http.MethodPost, "/api/v1/releases/piratebay:20/prepare", nil))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("prepare status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -303,7 +303,7 @@ func TestDownloadMetadataDeadlineReturnsGatewayTimeout(t *testing.T) {
 	seedProvenanceRelease(t, f, domain.TorrentRelease{ID: "piratebay:20", TrackerID: "piratebay", TrackerName: "The Pirate Bay", ProviderID: "20", Name: "Beta.2024.1080p", Category: "Video", CategoryID: "201", BrowseClass: "video", SizeBytes: 1 << 20})
 
 	rec := httptest.NewRecorder()
-	f.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/releases/piratebay:20/prepare", nil))
+	f.handler.ServeHTTP(rec, newRequest(http.MethodPost, "/api/v1/releases/piratebay:20/prepare", nil))
 	if rec.Code != http.StatusGatewayTimeout {
 		t.Fatalf("prepare status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -330,7 +330,7 @@ func TestDownloadCancelledPrepareDoesNotPersistFailedRelease(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rec := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/releases/filelist:10/prepare", nil).WithContext(ctx)
+	request := newRequest(http.MethodPost, "/api/v1/releases/filelist:10/prepare", nil).WithContext(ctx)
 	done := make(chan struct{})
 	go func() {
 		f.handler.ServeHTTP(rec, request)
@@ -376,7 +376,7 @@ func TestTrackersEndpointReturnsStatuses(t *testing.T) {
 	f := newTrackerFixture(t, unusedEngine{}, filelistRegistration(filelist), filelistRegistration(piratebay))
 
 	rec := httptest.NewRecorder()
-	f.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/trackers", nil))
+	f.handler.ServeHTTP(rec, newRequest(http.MethodGet, "/api/v1/trackers", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET trackers status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -434,7 +434,7 @@ func TestTrackerDependencyTestRoutesRegisteredIDs(t *testing.T) {
 
 	post := func(name string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
-		f.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/dependencies/"+name+"/test", nil))
+		f.handler.ServeHTTP(rec, newRequest(http.MethodPost, "/api/v1/dependencies/"+name+"/test", nil))
 		return rec
 	}
 

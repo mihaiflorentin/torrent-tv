@@ -555,3 +555,48 @@ func TestSeriesSeasonsRoundTripAndDelete(t *testing.T) {
 		t.Fatalf("deleting an absent row must be a no-op, got %v", err)
 	}
 }
+
+func TestPruneEventsRemovesOldRowsAndKeepsRecentInOrder(t *testing.T) {
+	r, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	ctx := context.Background()
+	for i := 1; i <= 6; i++ {
+		if _, err := r.AppendEvent(ctx, "kind", fmt.Sprintf(`{"n":%d}`, i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cutoff := time.Now().Add(-30 * 24 * time.Hour)
+	old := cutoff.Add(-time.Hour).Unix()
+	if _, err := r.db.ExecContext(ctx, `UPDATE event_journal SET created_at=? WHERE id<=4`, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.PruneEvents(ctx, cutoff, 1); err != nil {
+		t.Fatal(err)
+	}
+	events, err := r.ListEvents(ctx, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 2 || events[0].ID != 5 || events[1].ID != 6 {
+		t.Fatalf("expected recent events 5,6 in order, got %+v", events)
+	}
+
+	// Everything is old now, but the newest rows are kept as a floor.
+	if _, err := r.db.ExecContext(ctx, `UPDATE event_journal SET created_at=?`, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.PruneEvents(ctx, cutoff, 1); err != nil {
+		t.Fatal(err)
+	}
+	events, err = r.ListEvents(ctx, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].ID != 6 {
+		t.Fatalf("expected newest event 6 kept as floor, got %+v", events)
+	}
+}
