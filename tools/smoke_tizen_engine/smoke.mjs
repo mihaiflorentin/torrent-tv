@@ -11,7 +11,7 @@
  * The pin defines the guarantee's ceiling: engines older than Chrome 63 are
  * outside this smoke's claim.
  *
- * Three cases, one Make target (`make smoke-tizen-engine`):
+ * Four cases, one Make target (`make smoke-tizen-engine`):
  *   1. clean boot      — the real clients/tv/dist boots with zero uncaught
  *                        page errors and zero console errors (warnings are
  *                        tolerated), and the startup handoff completes:
@@ -28,6 +28,12 @@
  *                        app.js makes THIS script exit non-zero (code 3) with a
  *                        clear message; the Make target fails unless the
  *                        fixture is rejected.
+ *
+ *   4. promotions      — with a fake server saved as the TV's server and
+ *                        adsEnabled set, Home renders the promotion tile and
+ *                        no #fatal-error panel appears (Chrome 63 has no
+ *                        AbortController; ticket #10, parent #4). Runs in its
+ *                        own invocation: --cases promotions.
  *
  * Exit codes: 0 all requested cases passed; 1 infrastructure failure; 2 the
  * broken fixture booted or stayed inconclusive (harness failed to detect);
@@ -112,13 +118,16 @@ function parseArgs(argv) {
    throw new SmokeFailure(`unknown or incomplete argument: ${name}`);
   }
  }
- const known = new Set(['clean', 'fatal', 'broken']);
+ const known = new Set(['clean', 'fatal', 'broken', 'promotions']);
  for (const item of state.cases) {
-  if (!known.has(item)) throw new SmokeFailure(`unknown case "${item}" (known: clean, fatal, broken)`);
+  if (!known.has(item)) throw new SmokeFailure(`unknown case "${item}" (known: clean, fatal, broken, promotions)`);
  }
  if (state.cases.length === 0) throw new SmokeFailure('no cases requested');
  if (state.cases.includes('broken') && state.cases.length !== 1) {
   throw new SmokeFailure('the broken fixture must run in its own invocation: --cases broken');
+ }
+ if (state.cases.includes('promotions') && state.cases.length !== 1) {
+  throw new SmokeFailure('the promotions case must run in its own invocation: --cases promotions');
  }
  return state;
 }
@@ -132,6 +141,30 @@ function freePort() {
    probe.close(() => resolve(port));
   });
  });
+}
+
+// Minimal server for the promotions case: just enough for connect() to reach
+// Home with ads enabled. Unknown paths answer an empty page so no request 404s
+// (a failed resource would count as a console error).
+function fakeAPIResponse(state, pathname, res) {
+ const route = pathname.slice('/api/v1'.length);
+ if (route === '/events') {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+  res.write(': open\n\n');
+  return; // held open
+ }
+ const empty = { items: [], nextCursor: null, total: 0 };
+ const bodies = {
+  '/system/info': { name: 'smoke', instanceName: 'smoke', version: '0.0.0', configured: true },
+  '/catalog/facets': { categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] },
+  '/state': { favorites: [], continueWatching: [], recent: [], watched: [] },
+  '/portal/state': { accountsEnabled: false, adsEnabled: true, donor: false, links: [] },
+  '/updates/current': { currentVersion: '0.0.0', available: false, releasesUrl: 'http://127.0.0.1/', selfUpdate: false, applying: false },
+  '/portal/promotions': [{ id: 'smoke-promo', provider: 'smoke', title: 'Smoke promotion', text: '', image: '', link: '', screenTime: 60 }],
+ };
+ if (route === '/portal/promotions') state.promotionRequests = (state.promotionRequests || 0) + 1;
+ res.writeHead(200, { 'Content-Type': MIME['.json'] });
+ res.end(JSON.stringify(bodies[route] ?? empty));
 }
 
 function createServer(state, root) {
@@ -156,6 +189,10 @@ function createServer(state, root) {
     res.writeHead(200, { 'Content-Type': MIME['.json'] });
     res.end('{}');
    });
+   return;
+  }
+  if (state.fakeAPI && pathname.startsWith('/api/v1/')) {
+   fakeAPIResponse(state, pathname, res);
    return;
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -292,7 +329,7 @@ async function waitForEvent(session, method, timeoutMs) {
  });
 }
 
-async function openPage(cdpPort, url) {
+async function openPage(cdpPort, url, preloadScript) {
  const response = await fetch(`http://127.0.0.1:${cdpPort}/json/new?url=${encodeURIComponent('about:blank')}`);
  if (!response.ok) throw new SmokeFailure(`/json/new returned HTTP ${response.status}`);
  const tab = await response.json();
@@ -316,6 +353,7 @@ async function openPage(cdpPort, url) {
   if (params.entry.level !== 'error') return;
   errors.push({ kind: 'console-error', text: `${params.entry.source}: ${params.entry.text}` });
  });
+ if (preloadScript) await session.send('Page.addScriptToEvaluateOnNewDocument', { source: preloadScript });
  await session.send('Page.navigate', { url });
  await waitForEvent(session, 'Page.loadEventFired', MILESTONE_TIMEOUT_MS);
  return { session, errors };
@@ -430,6 +468,32 @@ async function runFatal(session, state) {
  console.log(`case 2 injected error: PASS — #fatal-error panel is present, visible (role=alert), and reported via POST /api/v1/diagnostics/client (recorded: level=${report.level}, message=${JSON.stringify(String(report.message).slice(0, 80))}).`);
 }
 
+async function runPromotions(state, cdpPort, servePort, browser) {
+ state.fakeAPI = true;
+ const origin = `http://127.0.0.1:${servePort}`;
+ const { session, errors } = await openPage(cdpPort, `${origin}/index.html`, `try { localStorage.setItem('filelist.serverUrl', ${JSON.stringify(origin)}) } catch (e) {}`);
+ try {
+  const home = await poll(async () => {
+   try {
+    const { result } = await session.send('Runtime.evaluate', {
+     expression: `(function () { return { promo: Boolean(document.querySelector('.tv-promo')), fatal: Boolean(document.getElementById('fatal-error')) } })()`,
+     returnByValue: true,
+    });
+    return { done: result.value.promo || result.value.fatal, view: result.value };
+   } catch {
+    return { done: false };
+   }
+  }, MILESTONE_TIMEOUT_MS);
+  reportErrors('promotions', errors);
+  if (!home.done) throw new SmokeFailure(`case 4 promotions FAILED — Home never rendered the promotion tile within ${MILESTONE_TIMEOUT_MS / 1000}s (promotion requests served: ${state.promotionRequests || 0})`);
+  if (home.view.fatal) throw new SmokeFailure('case 4 promotions FAILED — the #fatal-error panel covered Home with promotions enabled');
+  if (errors.length > 0) throw new SmokeFailure(`case 4 promotions FAILED — Home rendered but produced ${errors.length} page/console error(s)`);
+  console.log(`case 4 promotions: PASS — engine ${browser}; Home rendered the promotion tile with adsEnabled, no fatal panel, 0 page errors, 0 console errors.`);
+ } finally {
+  session.close();
+ }
+}
+
 async function runBroken(state, cdpPort, servePort, browser) {
  const { session, errors } = await openPage(cdpPort, `http://127.0.0.1:${servePort}/index.html`);
  try {
@@ -487,7 +551,10 @@ async function main() {
  console.log(`smoke-tizen-engine: serving ${root} on http://127.0.0.1:${servePort} with $WEBAPIS stub + diagnostics recorder; engine ${browser}; image ${state.image}; cases: ${state.cases.join(',')}`);
 
  try {
-  if (state.cases.includes('broken')) {
+  if (state.cases.includes('promotions')) {
+   await runPromotions(state, cdpPort, servePort, browser);
+   console.log('smoke-tizen-engine: promotions case passed on the pinned old engine.');
+  } else if (state.cases.includes('broken')) {
    await runBroken(state, cdpPort, servePort, browser);
   } else {
    await runCleanAndFatal(state, cdpPort, servePort, browser);

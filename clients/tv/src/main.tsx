@@ -858,7 +858,7 @@ export function TVSettings({ api, onChangeServer, onForgetServer, updateStatus, 
 // fallback for boxes without a browser. A hidden, failed, or empty
 // delivery still leaves nothing in the DOM; delivery advances after each
 // creative's screen time and stops on unmount or a hidden document.
-function TVPromotions({ api }: { api: API }) {
+export function TVPromotions({ api }: { api: API }) {
  const [promotion, setPromotion] = useState<PortalPromotion | null>(null);
  useEffect(() => {
   let stopped = false;
@@ -868,9 +868,11 @@ function TVPromotions({ api }: { api: API }) {
   const deliver = async () => {
    if (stopped || document.hidden) return;
    cancelDelivery();
-   controller = new AbortController();
+   // Tizen 5 (Chromium 63) has no AbortController: skip cancellation there.
+   // A late response is dropped through the stopped flag instead.
+   controller = detectCapabilities().supportsAbortController ? new AbortController() : null;
    try {
-    const [creative] = await api.call<PortalPromotion[]>('/portal/promotions?count=1', { signal: controller.signal });
+    const [creative] = await api.call<PortalPromotion[]>('/portal/promotions?count=1', controller ? { signal: controller.signal } : {});
     if (stopped || document.hidden) return;
     setPromotion(creative || null);
     if (creative) timer = window.setTimeout(() => { timer = 0; void deliver() }, promotionScreenTimeMs(creative.screenTime));

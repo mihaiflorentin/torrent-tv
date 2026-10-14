@@ -43,6 +43,36 @@ ENGINE_FLOOR_APIS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     ("Promise.any", re.compile(rb"\bPromise\s*\.\s*any\s*\(")),
     (".at", re.compile(rb"\.\s*at\s*\(")),
     ("ResizeObserver", re.compile(rb"\bnew\s+ResizeObserver\b|\bResizeObserver\s*\(")),
+    # Chromium 64-119 additions above the Chromium 63 floor.
+    ("trimStart", re.compile(rb"\.\s*trimStart\s*\(")),
+    ("trimEnd", re.compile(rb"\.\s*trimEnd\s*\(")),
+    ("replaceChildren", re.compile(rb"\.\s*replaceChildren\s*\(")),
+    ("Object.hasOwn", re.compile(rb"\bObject\s*\.\s*hasOwn\s*\(")),
+    ("findLast", re.compile(rb"\.\s*findLast(?:Index)?\s*\(")),
+    ("toSorted", re.compile(rb"\.\s*toSorted\s*\(")),
+    ("toReversed", re.compile(rb"\.\s*toReversed\s*\(")),
+    ("Promise.withResolvers", re.compile(rb"\bPromise\s*\.\s*withResolvers\s*\(")),
+    # '(?<name>' only: lookbehind '(?<=' and '(?<!' are not named groups.
+    ("regex named groups", re.compile(rb"\(\?<[A-Za-z_$]")),
+    ("Unicode property escapes", re.compile(rb"\\[pP]\{")),
+)
+# A bare 'new AbortController' throws on Chromium 63. It is allowed only when a
+# capability guard sits just before it; the window approximates "same function"
+# because the rule runs on minified output where function bounds are not parseable.
+ABORT_CONTROLLER_NEW = re.compile(rb"\bnew\s+AbortController\b")
+ABORT_CONTROLLER_GUARD = re.compile(rb"typeof\s+AbortController\b|\bsupportsAbortController\b")
+ABORT_CONTROLLER_GUARD_WINDOW = 400
+CSS_UNSUPPORTED_FEATURES: tuple[tuple[str, re.Pattern[bytes]], ...] = (
+    # Features above the Chromium 63 floor. Property rules anchor to a declaration
+    # start so 'inset' in 'box-shadow:inset ...' and 'inset-box' selectors pass.
+    ("inset", re.compile(rb"(?:\A\s*|[{;]\s*)inset\s*:", re.I)),
+    ("aspect-ratio", re.compile(rb"(?:\A\s*|[{;]\s*)aspect-ratio\s*:", re.I)),
+    (":is()", re.compile(rb":is\(", re.I)),
+    (":where()", re.compile(rb":where\(", re.I)),
+    (":focus-visible", re.compile(rb":focus-visible\b", re.I)),
+    ("min()", re.compile(rb"(?<![\w-])min\(", re.I)),
+    ("max()", re.compile(rb"(?<![\w-])max\(", re.I)),
+    ("clamp()", re.compile(rb"(?<![\w-])clamp\(", re.I)),
 )
 
 
@@ -240,6 +270,11 @@ def validate_app_engine_floor(files: dict[str, bytes]) -> None:
         if data is None:
             continue
         missing = [name for name, pattern in ENGINE_FLOOR_APIS if pattern.search(data)]
+        for match in ABORT_CONTROLLER_NEW.finditer(data):
+            window = data[max(0, match.start() - ABORT_CONTROLLER_GUARD_WINDOW):match.start()]
+            if not ABORT_CONTROLLER_GUARD.search(window):
+                missing.append("new AbortController")
+                break
         if missing:
             raise WGTError(
                 f"{script!r} uses {len(missing)} floor-missing API(s): "
@@ -265,6 +300,12 @@ def validate_css_layout_gaps(files: dict[str, bytes]) -> None:
                     f"{name!r} uses flex/grid gap property {match.group(1).decode()!r}; "
                     "ADR-0006 requires margin-based spacing"
                 )
+            for feature, pattern in CSS_UNSUPPORTED_FEATURES:
+                if pattern.search(chunk):
+                    raise WGTError(
+                        f"{name!r} uses unsupported CSS {feature}; "
+                        "the Tizen 5.0 floor engine (Chromium 63) lacks it"
+                    )
 
 
 def validate_tv_icon(name: str, data: bytes) -> None:
