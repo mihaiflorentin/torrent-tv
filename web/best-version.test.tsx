@@ -76,3 +76,22 @@ describe('Title detail best version Play', () => {
     expect(Array.from(picker.querySelectorAll('.source-headline')).map(item => item.textContent)).toHaveLength(3);
   });
 });
+
+describe('Title detail season', () => {
+  it('opens the season of the saved progress', async () => {
+    const ep = (season: number, number: number) => ({ number, title: `Episode ${number}`, season, sourceCount: 1, sources: [source(`s${season}e${number}`, {})] });
+    const show: CatalogTitle = { ...lanterns, id: 'sv', title: 'Vesper', kind: 'series', seasonCount: 2 };
+    const data: CatalogDetail = { title: show, sources: [], seasons: [
+      { number: 1, title: 'Season 1', episodeCount: 1, episodes: [ep(1, 1)] },
+      { number: 2, title: 'Season 2', episodeCount: 1, episodes: [ep(2, 4)] },
+    ] };
+    vi.spyOn(API.prototype, 'titles').mockResolvedValue({ items: [show], nextCursor: null, total: 1 });
+    vi.spyOn(API.prototype, 'title').mockResolvedValue(data);
+    vi.spyOn(API.prototype, 'state').mockResolvedValue({ ...empty, continueWatching: [{
+      profileId: 'p', sourceId: 's', releaseId: 'r', fileIndex: 0, filePath: 'x.mkv', positionMs: 5, durationMs: 10, watched: false, updatedAt: '2026-10-14T20:00:00Z', favorite: false, titleId: 'sv', seasonNumber: 2, episodeNumber: 4,
+      release: data.seasons[1].episodes[0].sources[0].release,
+    }] });
+    await openDetail();
+    expect(document.querySelector('.detail .season-tabs [aria-pressed="true"]')!.textContent).toContain('Season 2');
+  });
+});

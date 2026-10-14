@@ -159,7 +159,7 @@ Observed before the redesign: poster cards on both clients show seeders, tracker
 | Poster card, Home and Browse rows (web and TV) | Poster, title, year, library state (Downloaded, Downloading with percent, Watched) | Best resolution; rating when it has votes (once) | Seeders, tracker names, source count. Exception: a row defined by seeders ("Strong swarms") shows seeders |
 | Continue watching and Library cards | Poster or backdrop, title, episode code (S01E02), progress bar with "41% watched" or "Watched" | Year (TV: movies only, an episode shows its code instead) | Tracker, release name, file path, resolution |
 | Title detail header | Title, year, kind and season count, genres, overview, play or resume action, Favorite | Library state; one-line resume summary; Refresh data (TV: the explanation sits in the button's label for assistive tech, not on screen) | Summed seeders, tracker badges (they move to each version) |
-| Season and episode list | Episode number and title, library state, version count | None: the API carries no per-episode artwork, and the old web list repeated the title's backdrop on every row, so rows are text only on the web as on the TV | Pack release names (shown inside the expanded pack) |
+| Season and episode list | Episode number and title, library state, version count; on TV a progress bar with "41% watched" for an episode in progress (none when unwatched or watched) | None: the API carries no per-episode artwork, and the old web list repeated the title's backdrop on every row, so rows are text only on the web as on the TV | Pack release names (shown inside the expanded pack) |
 | Version (source) row, the decision point | Resolution with HDR, quality and codec chips, size, seeders, the action label (Play, Play and download) | Tracker badge (TV: tracker name as muted text); audio summary where known (the parsed audio string beside the chips) | Release and file name (one line, shown for the focused row only on TV), release id, category, file index (on the web all of them sit behind the row's Details toggle) |
 | Browse, Search and Categories | Search field, media-type filter (web); result cards as above | Category, resolution and sort controls (TV: the four sort buttons and a category chip; it has no media-type or resolution filter) | Tracker-sync prose (move to the empty state), tracker strip unless a tracker needs setup or is disabled (the TV never had either) |
 | Downloads | Display title with episode, state (percent, speed and ETA while active, Paused, Error), actions | Size, resolution and codec, tracker, "Playable while downloading" | Release name, file path, file index, peers and seeders (inside a Details control), engine route |
@@ -183,6 +183,8 @@ The primary Play on a title page prepares one Source chosen by `rankSources()` (
 6. More seeders, then the smaller file. Ties keep the server order.
 
 For a series the target is the resume episode, else the target episode of the opened link, else the first episode of the selected season; sources that name another season or episode rank after those that match. A season that only has packs shows no Play (the pack controls stay).
+
+The TV title page opens with focus on Play or Resume (Favorite when there is nothing to play); Back stays one press Up and the Back key still closes the page. The season tab that opens first is the link's target, else the season of the saved progress, else the first.
 
 ## Support floor for shipped CSS
 

@@ -1002,7 +1002,8 @@ function TVSeasonPackCard({ source, season, index, baseRow, open, onToggle, onAc
  </article>;
 }
 function TitleDetail({ api, detail, target, message, resume, favorite, onClose, onFavorite, onResume, onPlay, onPackAction }: { api: API; detail: CatalogDetail; target: DetailTarget; message: string; resume?: HouseholdItem; favorite: boolean; onClose: () => void; onFavorite: (title: CatalogTitle, value: boolean) => void; onResume: (item: HouseholdItem) => void; onPlay: (release: Release, fileIndex?: number) => void; onPackAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean> }) {
- const [season, setSeason] = useState(target.season || detail.seasons[0]?.number || 0);
+ // Season to open: the link's target, else the season of the saved progress, else the first.
+ const [season, setSeason] = useState(() => target.season || (resume?.seasonNumber && detail.seasons.some(item => item.number === resume.seasonNumber) ? resume.seasonNumber : 0) || detail.seasons[0]?.number || 0);
  const [expanded, setExpanded] = useState(target.episode ? `${target.season}:${target.episode}` : '');
  const [expandedPack, setExpandedPack] = useState('');
  const [pendingPack, setPendingPack] = useState<CatalogSource | null>(null);
@@ -1037,7 +1038,7 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
  };
  return <main class="detail-screen">
   <Backdrop initial={artURL(api, detail.title)} follow={false} />
-  <button data-detail-initial data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}>Back</button>
+  <button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}>Back</button>
   <div class="detail-copy">
    <span class="eyebrow">{heroFacts(detail.title).join(' · ')}</span>
    <h1>{detail.title.title}</h1>
@@ -1045,9 +1046,9 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
    <TVStateBadges state={detail.title.libraryState} />
    <p class="detail-overview">{detail.title.overview || 'No description yet. Pick a version to play.'}</p>
    <div class="detail-actions">
-    {resume ? <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onResume(resume)} aria-label={`${resumeActionLabel(resume, detail.title.kind)} at saved position`}>{resumeActionLabel(resume, detail.title.kind)}</button> : firstSource && <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onPlay(firstSource.release, firstSource.fileIndex)}>{playActionLabel(firstSource)}</button>}
+    {resume ? <button class="primary" data-detail-initial data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onResume(resume)} aria-label={`${resumeActionLabel(resume, detail.title.kind)} at saved position`}>{resumeActionLabel(resume, detail.title.kind)}</button> : firstSource && <button class="primary" data-detail-initial data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onPlay(firstSource.release, firstSource.fileIndex)}>{playActionLabel(firstSource)}</button>}
     {firstSource && <button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="detail-versions" onClick={chooseVersion}>Choose version</button>}
-    <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="detail-favorite" aria-pressed={favorite} onClick={() => onFavorite(detail.title, !favorite)}>{favorite ? 'In favorites' : 'Add to favorites'}</button>
+    <button data-detail-initial={resume || firstSource ? undefined : true} data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="detail-favorite" aria-pressed={favorite} onClick={() => onFavorite(detail.title, !favorite)}>{favorite ? 'In favorites' : 'Add to favorites'}</button>
     <button data-focus-region="content" data-focus-row="1" data-focus-col="3" data-focus-key="detail-refresh" aria-disabled={refreshing ? 'true' : undefined} aria-label="Refresh data: fetches fresh series information from the metadata providers and searches all trackers again, then rebuilds the episode list." onClick={() => void refresh()}>{refreshing ? 'Refreshing…' : 'Refresh data'}</button>
    </div>
    {resume && <small class="resume-file">{resumeLine(resume, detail.title.kind)}</small>}
@@ -1068,9 +1069,11 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
     const key = `${episode.season}:${episode.number}`;
     const open = expanded === key;
     const row = episodeRowBase + index * 20;
+    const episodeState = episode.libraryState;
+    const progress = episodeState && episodeState.watchState !== 'watched' && episodeState.positionMs ? watchProgress({ positionMs: episodeState.positionMs, durationMs: episodeState.durationMs || 0 }) : 0;
     return <article key={key} class={`episode-row ${open ? 'expanded' : ''}`}>
      <button class="episode-tile" aria-expanded={open} data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={`episode-${key}`} onClick={() => setExpanded(current => current === key ? '' : key)}>
-      <span><b>{episode.number ? `${episode.number}. ` : ''}{episode.title}</b><small>{episode.sourceCount} version{episode.sourceCount === 1 ? '' : 's'}</small></span>
+      <span><b>{episode.number ? `${episode.number}. ` : ''}{episode.title}</b><small>{episode.sourceCount} version{episode.sourceCount === 1 ? '' : 's'}{progress > 0 ? ` · ${progress}% watched` : ''}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
       <TVStateBadges state={episode.libraryState} />
      </button>
      {open && episode.sources.map((source, sourceIndex) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={row + 1 + sourceIndex} onPlay={onPlay} />)}

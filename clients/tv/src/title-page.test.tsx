@@ -118,4 +118,54 @@ describe('TV title page', () => {
       expect(key('detail-playback')!.getAttribute('aria-label')).toBe('Resume at saved position');
     });
   });
+
+  describe('opening focus, resume season and episode progress', () => {
+    const episode = (season: number, number: number, state?: CatalogSource['libraryState']) => ({ number, title: `Episode ${number}`, season, sourceCount: 1, sources: [source(`s${season}e${number}`)], libraryState: state });
+    const series = (): CatalogDetail => ({ title: title({ kind: 'series' }), sources: [], seasons: [
+      { number: 1, title: 'Season 1', episodeCount: 1, episodes: [episode(1, 1)] },
+      { number: 2, title: 'Season 2', episodeCount: 3, episodes: [
+        episode(2, 1, { downloadState: 'downloaded', watchState: 'watched', positionMs: 900, durationMs: 1000 }),
+        episode(2, 2, { downloadState: 'downloaded', watchState: 'inProgress', positionMs: 410, durationMs: 1000 }),
+        episode(2, 3),
+      ] },
+    ] });
+
+    it('opens focused on Play, with Back reachable above it and the row order unchanged', async () => {
+      await open({ title: title(), seasons: [], sources: [source('only')] });
+      expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('detail-playback');
+      const rows = ['detail-back', 'detail-playback', 'detail-versions', 'detail-favorite', 'detail-refresh'].map(name => [name, key(name)!.dataset.focusRow, key(name)!.dataset.focusCol]);
+      expect(rows).toEqual([['detail-back', '0', '0'], ['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-refresh', '1', '3']]);
+    });
+
+    it('opens focused on Resume when there is saved progress', async () => {
+      await open({ title: title(), seasons: [], sources: [source('only')] }, { ...empty, continueWatching: [resumeItem()] });
+      expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('detail-playback');
+    });
+
+    it('falls to Favorite when there is nothing to play, never to Back', async () => {
+      await open({ title: title(), seasons: [], sources: [] });
+      expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('detail-favorite');
+      expect(key('detail-back')).not.toBeNull();
+    });
+
+    it('opens the season of the saved progress', async () => {
+      await open(series(), { ...empty, continueWatching: [resumeItem({ seasonNumber: 2, episodeNumber: 2 })] });
+      expect(key('season-2')!.className).toContain('active');
+      expect(key('episode-2:2')).not.toBeNull();
+    });
+
+    it('opens the first season without saved progress', async () => {
+      await open(series());
+      expect(key('season-1')!.className).toContain('active');
+    });
+
+    it('shows a progress bar and percent only on an episode that is in progress', async () => {
+      await open(series(), { ...empty, continueWatching: [resumeItem({ seasonNumber: 2, episodeNumber: 2 })] });
+      const tile = (name: string) => key(`episode-${name}`)!;
+      expect(tile('2:2').querySelector('.episode-progress b')!.getAttribute('style')).toContain('width: 41%');
+      expect(tile('2:2').textContent).toContain('41% watched');
+      expect(tile('2:1').querySelector('.episode-progress')).toBeNull();
+      expect(tile('2:3').querySelector('.episode-progress')).toBeNull();
+    });
+  });
 });
