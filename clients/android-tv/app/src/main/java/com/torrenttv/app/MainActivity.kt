@@ -57,6 +57,11 @@ class MainActivity : Activity(), ShellHost {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 loader.shouldInterceptRequest(request.url)
 
+            // The JS bridge is exposed to whatever document loads, so the
+            // WebView never leaves the app's asset origin.
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+                !UrlPolicy.isAppOrigin(request.url.toString())
+
             override fun onPageFinished(view: WebView, url: String) {
                 Log.i("TorrentTV", "ready")
             }
@@ -84,7 +89,7 @@ class MainActivity : Activity(), ShellHost {
         layout.addView(view, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         setContentView(layout)
-        view.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
+        view.loadUrl(UrlPolicy.APP_URL)
     }
 
     // The WebView is gone for good, so the panel is native; Back exits.
