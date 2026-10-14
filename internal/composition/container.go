@@ -221,6 +221,9 @@ func assemble(settings *config.Store, log *slog.Logger) (_ *App, retErr error) {
 	service.SetMetadataProvider(application.NewMetadataChain(providerEntries, func() []string { return settings.Get().MetadataProviders }))
 	service.SetMediaProbe(mediaprobe.New(settings))
 	service.SetLogger(log)
+	if err := service.ResetLeases(context.Background()); err != nil {
+		log.Warn("clearing stale stream leases failed", "error", err)
+	}
 	service.StartScheduler()
 
 	// Integration wiring: the hub and the update coordinator are

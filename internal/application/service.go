@@ -44,6 +44,8 @@ type Service struct {
 	providerSlots    map[string]chan struct{}
 	pendingMu        sync.Mutex
 	pendingMetadata  map[string]bool
+	leaseMu          sync.Mutex
+	leases           map[string]int
 	mediaInfoMu      sync.Mutex
 	mediaInfoCache   map[string]cachedMediaInfo
 	providerMu       sync.Mutex
@@ -98,6 +100,7 @@ func NewService(trackers *TrackerRegistry, engines *EngineSet, r Repository, s *
 		providerSlots:    make(map[string]chan struct{}),
 		pendingMetadata:  map[string]bool{},
 		mediaInfoCache:   map[string]cachedMediaInfo{},
+		leases:           map[string]int{},
 		freeSpace:        freeDiskBytes,
 		providerCtx:      provCtx,
 		providerCancel:   provCancel,
@@ -2284,13 +2287,13 @@ func (s *Service) Manage(ctx context.Context, id, action string, _ bool) error {
 			return listErr
 		}
 		for _, item := range managed {
-			if item.EngineID == d.EngineID && item.Leased {
+			if item.EngineID == d.EngineID && s.rowLeased(item) {
 				return fmt.Errorf("cannot remove an actively streamed download")
 			}
 		}
 		return s.removeTorrent(ctx, d.EngineID)
 	case "remove-file":
-		if d.Leased {
+		if s.rowLeased(d) {
 			return fmt.Errorf("cannot remove a file that is being streamed")
 		}
 		if err := s.repo.DeleteDownload(ctx, d.ID); err != nil {
@@ -2711,6 +2714,9 @@ func (s *Service) householdItem(ctx context.Context, p domain.PlaybackState, fav
 	return item, true
 }
 
+// Acquire takes a stream lease on the download (GLOSSARY: Stream lease).
+// Leases are counted in memory so overlapping streams each hold one; the
+// persisted flag is set on the first and cleared when the last is released.
 func (s *Service) Acquire(ctx context.Context, id string) (domain.Download, error) {
 	d, err := s.repo.GetDownload(ctx, id)
 	if err != nil {
@@ -2720,17 +2726,67 @@ func (s *Service) Acquire(ctx context.Context, id string) (domain.Download, erro
 	if err != nil {
 		return d, err
 	}
+	s.leaseMu.Lock()
+	s.leases[id]++
+	s.leaseMu.Unlock()
 	if err = s.repo.SetLease(ctx, id, true); err != nil {
+		s.dropLease(id)
 		return d, err
 	}
 	d.Leased = true
 	return d, nil
 }
 
+// dropLease decrements the in-memory count and reports whether it reached
+// zero.
+func (s *Service) dropLease(id string) bool {
+	s.leaseMu.Lock()
+	defer s.leaseMu.Unlock()
+	if s.leases[id] > 1 {
+		s.leases[id]--
+		return false
+	}
+	delete(s.leases, id)
+	return true
+}
+
+// leaseHeld reports whether any stream is active on the download according
+// to the in-memory table.
+func (s *Service) leaseHeld(id string) bool {
+	s.leaseMu.Lock()
+	defer s.leaseMu.Unlock()
+	return s.leases[id] > 0
+}
+
+// rowLeased consults the in-memory table first and the persisted flag second.
+func (s *Service) rowLeased(d domain.Download) bool {
+	return s.leaseHeld(d.ID) || d.Leased
+}
+
 func (s *Service) Release(id string) {
+	if !s.dropLease(id) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_ = s.repo.SetLease(ctx, id, false)
+	if err := s.repo.SetLease(ctx, id, false); err != nil {
+		if log := s.log; log != nil {
+			log.Warn("clear stream lease failed", "download", id, "error", err)
+		}
+	}
+}
+
+// ResetLeases clears every persisted lease. Leases never survive a restart,
+// so the server calls it before accepting requests.
+func (s *Service) ResetLeases(ctx context.Context) error {
+	cleared, err := s.repo.ClearLeases(ctx)
+	if err != nil {
+		return err
+	}
+	if log := s.log; log != nil {
+		log.Info("cleared stale stream leases", "count", cleared)
+	}
+	return nil
 }
 
 func (s *Service) WaitRange(ctx context.Context, d domain.Download, start, count int64) error {
