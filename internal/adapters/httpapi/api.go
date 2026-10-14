@@ -202,13 +202,16 @@ func (a *API) getSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) putSettings(w http.ResponseWriter, r *http.Request) {
-	var v config.Settings
+	// Decode over the current settings so a field the client omits (for
+	// example a flag added after the client was built) keeps its value
+	// instead of silently turning false.
+	old := a.settings.Get()
+	v := old
 	if err := decode(r, &v); err != nil {
 		problem(w, 400, err)
 		return
 	}
-	old := a.settings.Get()
-	if err := config.EnsureNativePathsWritable(v.DownloadEngine, v.DownloadRoot, v.TorrentSessionDir); err != nil {
+	if err := a.settings.EnsureNativePathsWritableFor(v); err != nil {
 		problem(w, 400, err)
 		return
 	}

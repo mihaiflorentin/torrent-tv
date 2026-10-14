@@ -254,6 +254,19 @@ func anchorNativePaths(v *Settings, managed map[string]bool, dir string) {
 		v.SubtitleCachePath = anchor(v.SubtitleCachePath)
 	}
 }
+// EnsureNativePathsWritableFor probes v's native paths where the store will
+// anchor them: relative values resolve next to the settings file, never in
+// the (arbitrary) process working directory.
+func (s *Store) EnsureNativePathsWritableFor(v Settings) error {
+	s.mu.RLock()
+	managed := s.envManaged
+	s.mu.RUnlock()
+	if dir, err := filepath.Abs(filepath.Dir(s.path)); err == nil {
+		anchorNativePaths(&v, managed, dir)
+	}
+	return EnsureNativePathsWritable(v.DownloadEngine, v.DownloadRoot, v.TorrentSessionDir)
+}
+
 func (s *Store) Get() Settings { s.mu.RLock(); defer s.mu.RUnlock(); return s.value }
 func (s *Store) Path() string  { return s.path }
 func (s *Store) EnvironmentManaged(key string) bool {
@@ -571,7 +584,10 @@ func mergeSecrets(next *Settings, old Settings) {
 	if next.FileListPasskey == "" {
 		next.FileListPasskey = old.FileListPasskey
 	}
-	if next.QBittorrentPassword == "" {
+	// A password without a username is meaningless: clearing the username
+	// is how a client switches to the credential-free sidecar, and it must
+	// not resurrect the old password (which would read as half-configured).
+	if next.QBittorrentPassword == "" && next.QBittorrentUsername != "" {
 		next.QBittorrentPassword = old.QBittorrentPassword
 	}
 	if next.TMDBAPIKey == "" {
