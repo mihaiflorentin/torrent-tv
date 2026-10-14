@@ -455,10 +455,15 @@ func catalogFilter(q domain.CatalogQuery) (string, []any) {
 		like := "%" + escapeLike(search) + "%"
 		args = append(args, like, like, like)
 	}
-	for value, column := range map[string]string{q.Category: "r.category", string(q.Kind): "c.media_kind", q.Resolution: "c.resolution", q.HDR: "c.hdr", q.Quality: "c.source", q.Codec: "c.video_codec"} {
-		if value != "" {
-			where = append(where, column+"=?")
-			args = append(args, value)
+	// A slice, not a map keyed by value: two filters sharing one value must
+	// both apply. Matching ignores case, like the in-memory filter.
+	for _, f := range []struct{ value, column string }{
+		{q.Category, "r.category"}, {string(q.Kind), "c.media_kind"}, {q.Resolution, "c.resolution"},
+		{q.HDR, "c.hdr"}, {q.Quality, "c.source"}, {q.Codec, "c.video_codec"},
+	} {
+		if f.value != "" {
+			where = append(where, f.column+"=? COLLATE NOCASE")
+			args = append(args, f.value)
 		}
 	}
 	if q.MinSeeders > 0 {
@@ -967,8 +972,8 @@ func (r *Repository) QueryJobs(ctx context.Context, search, state, kind, retryab
 	}
 	where, args := []string{"1=1"}, []any{}
 	if q := strings.TrimSpace(search); q != "" {
-		where = append(where, "(id LIKE ? OR kind LIKE ? OR payload LIKE ? OR error LIKE ?)")
-		like := "%" + q + "%"
+		where = append(where, "(id LIKE ? ESCAPE '\\' OR kind LIKE ? ESCAPE '\\' OR payload LIKE ? ESCAPE '\\' OR error LIKE ? ESCAPE '\\')")
+		like := "%" + escapeLike(q) + "%"
 		args = append(args, like, like, like, like)
 	}
 	if state != "" {
