@@ -61,9 +61,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  const session = useRef(0);
  const completedRetryUsed = useRef(false);
  const pollTimer = useRef(0);
- const scrubTimer = useRef(0);
  const messageTimer = useRef(0);
- const scrubTarget = useRef<number | null>(null);
  const audioTimer = useRef(0);
  const autoplayIntent = useRef(true);
  const suspendedState = useRef<{ position: number; playing: boolean } | null>(null);
@@ -137,18 +135,6 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
   controls.setPanelOpen(true);
   revealControls(true);
   window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="${openerKey}"]`)), 0);
- }
-
- function seek(target: number) {
-  const av = window.webapis?.avplay;
-  const next = clampSeek(target, duration.current);
-  try { av?.seekTo(next); current.current = next; setPosition(next); } catch { }
- }
-
- function scrub(delta: number, hidden = false) {
-  const next = clampSeek((scrubTarget.current ?? current.current) + delta, duration.current); scrubTarget.current = next; setPosition(next);
-  if (hidden) showTransientMessage(`${formatTime(next)} / ${formatTime(duration.current)}`, 1500);
-  window.clearTimeout(scrubTimer.current); scrubTimer.current = window.setTimeout(() => { const target = scrubTarget.current; scrubTarget.current = null; if (target !== null) seek(target); }, 550);
  }
 
  function refreshTracks() { const av = window.webapis?.avplay; try { const all = (av?.getTotalTrackInfo?.() || []).map(normalizeTrack); if (all.length) setTracks(all); } catch { } }
@@ -234,7 +220,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
      }
     },
     onstreamcompleted: () => { if (token === session.current) { current.current = duration.current; void save().then(() => onComplete(preferenceRef.current)); } },
-    oncurrentplaytime: (value: number) => { if (token === session.current) { current.current = value; if (scrubTarget.current === null) setPosition(value); if (subtitleCues.current.length) setExternalSubtitle(subtitleAt(subtitleCues.current, value, subtitleDelayRef.current)); if (Date.now() - lastSaved.current >= 10_000) { lastSaved.current = Date.now(); save(); } } },
+    oncurrentplaytime: (value: number) => { if (token === session.current) { if (keysRef.current && !keysRef.current.playtime(value)) return; current.current = value; setPosition(value); if (subtitleCues.current.length) setExternalSubtitle(subtitleAt(subtitleCues.current, value, subtitleDelayRef.current)); if (Date.now() - lastSaved.current >= 10_000) { lastSaved.current = Date.now(); save(); } } },
     onsubtitlechange: (_duration: number, text: string) => { if (token === session.current) setExternalSubtitle(String(text || '')); },
     ontrackschanged: () => { if (token === session.current) refreshTracks(); },
     onerror: (error: string) => void recover(error, token),
@@ -260,7 +246,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
     suspendedState.current = { position: current.current, playing: playing.current };
     session.current++;
     window.clearTimeout(pollTimer.current);
-    window.clearTimeout(scrubTimer.current);
+    keysRef.current?.dispose();
     window.clearTimeout(messageTimer.current);
     window.clearTimeout(audioTimer.current);
     controls.dispose();
@@ -273,7 +259,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
     openPlayer(position, wasPlaying);
    }
   });
-  return () => { cancelled = true; disposeVisibility(); session.current++; window.clearTimeout(focusTimer); window.clearTimeout(pollTimer.current); controls.dispose(); window.clearTimeout(scrubTimer.current); window.clearTimeout(messageTimer.current); window.clearTimeout(audioTimer.current); void save(); stopAVPlay(); };
+  return () => { cancelled = true; disposeVisibility(); session.current++; window.clearTimeout(focusTimer); window.clearTimeout(pollTimer.current); controls.dispose(); keysRef.current?.dispose(); window.clearTimeout(messageTimer.current); window.clearTimeout(audioTimer.current); void save(); stopAVPlay(); };
  }, [download.id]);
  useEffect(() => {
   const remember = (event: FocusEvent) => {
@@ -297,7 +283,16 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    remembered: () => lastControlFocus.current,
    remember: key => { lastControlFocus.current = key; },
    reveal: hold => revealControls(hold),
-   seek: (delta, hidden) => scrub(delta, hidden),
+   duration: () => duration.current,
+   position: () => current.current,
+   setPosition: ms => { current.current = ms; setPosition(ms); },
+   announce: ms => showTransientMessage(`${formatTime(ms)} / ${formatTime(duration.current)}`, 1500),
+   avSeekTo: (ms, onSuccess, onError) => {
+    const av = window.webapis?.avplay;
+    if (!av) throw new Error('AVPlay is unavailable on this device.');
+    av.seekTo(ms, onSuccess, (error: any) => onError(String(error?.message || error?.name || error || 'AVPlay could not seek.')));
+   },
+   seekFailed: error => { setMessage(`Seek failed: ${error}`); void recover(`Seek failed: ${error}`, session.current); },
    focusControl: key => focusControl(key),
    activateControl: key => document.querySelector<HTMLElement>(`[data-player-control="${key}"]`)?.click(),
    activateFocused: () => (document.activeElement as HTMLElement | null)?.click(),
@@ -311,11 +306,11 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    const action = playerAction(event.key, event.keyCode);
    if (!action) return;
    event.preventDefault();
-   keys.handle(action);
+   keys.handle(action, event.repeat);
   };
   addEventListener('focusin', remember);
   addEventListener('keydown', key);
-  return () => { keysRef.current = null; removeEventListener('focusin', remember); removeEventListener('keydown', key); };
+  return () => { keys.dispose(); keysRef.current = null; removeEventListener('focusin', remember); removeEventListener('keydown', key); };
  }, [download.id]);
 
  function chooseTrack(type: 'AUDIO' | 'TEXT', index: number | null) {
@@ -338,7 +333,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
      window.clearTimeout(audioTimer.current);
      audioTimer.current = window.setTimeout(() => {
       try {
-       av.seekTo(clampSeek(current.current, duration.current));
+       av.seekTo(clampSeek(keysRef.current?.resumeTarget() ?? current.current, duration.current));
        if (!wasPlaying) av.pause();
        refreshTracks();
       } catch { }
@@ -391,8 +386,8 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    <button class="player-timeline" data-player-control="timeline" data-focus-region="player-controls" data-focus-row="0" data-focus-col="0" data-focus-key="player-timeline" onClick={() => { revealControls(); focusControl('timeline') }} aria-label="Playback timeline; use left and right to seek"><span style={{ width: `${percent}%` }}></span></button>
    <div class="player-time"><span>{formatTime(position)}</span><span>{formatTime(total)}</span></div>
    <div class="player-toolbar">
-    <button data-player-control="restart" data-focus-region="player-controls" data-focus-row="1" data-focus-col="0" data-focus-key="player-restart" onClick={() => keepControl('restart', () => seek(0))}>Restart</button><button data-player-control="back-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="1" data-focus-key="player-back-10" onClick={() => keepControl('back-10', () => seek(current.current - 10_000))}>−10s</button>
-    <button data-player-control="play" data-focus-region="player-controls" data-focus-row="1" data-focus-col="2" data-focus-key="player-play" class="primary" onClick={() => keepControl('play', () => togglePlayback())}>{playing.current ? 'Pause' : 'Play'}</button><button data-player-control="forward-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="3" data-focus-key="player-forward-10" onClick={() => keepControl('forward-10', () => seek(current.current + 10_000))}>+10s</button>
+    <button data-player-control="restart" data-focus-region="player-controls" data-focus-row="1" data-focus-col="0" data-focus-key="player-restart" onClick={() => keepControl('restart', () => keysRef.current?.seekTo(0))}>Restart</button><button data-player-control="back-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="1" data-focus-key="player-back-10" onClick={() => keepControl('back-10', () => keysRef.current?.seekBy(-10_000))}>−10s</button>
+    <button data-player-control="play" data-focus-region="player-controls" data-focus-row="1" data-focus-col="2" data-focus-key="player-play" class="primary" onClick={() => keepControl('play', () => togglePlayback())}>{playing.current ? 'Pause' : 'Play'}</button><button data-player-control="forward-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="3" data-focus-key="player-forward-10" onClick={() => keepControl('forward-10', () => keysRef.current?.seekBy(10_000))}>+10s</button>
     <button data-player-control="audio" data-focus-region="player-controls" data-focus-row="1" data-focus-col="4" data-focus-key="player-audio" onClick={() => openMenu('audio', 'audio')}>Audio ({audioTracks.length})</button><button data-player-control="subtitles" data-focus-region="player-controls" data-focus-row="1" data-focus-col="5" data-focus-key="player-subtitles" onClick={() => { openMenu('subtitles', 'subtitles'); void findSubtitles(false, 'local') }}>Subtitles ({subtitleTracks.length + subtitleCandidates.length})</button>
     <button data-player-control="options" data-focus-region="player-controls" data-focus-row="1" data-focus-col="6" data-focus-key="player-options" onClick={() => openMenu('options', 'options')}>Options</button><button data-player-control="back" data-focus-region="player-controls" data-focus-row="1" data-focus-col="7" data-focus-key="player-back" onClick={() => { save(); onClose(); }}>Back</button><button data-player-control="hide" data-focus-region="player-controls" data-focus-row="1" data-focus-col="8" data-focus-key="player-hide" onClick={hideControls}>Hide</button>
    </div>
@@ -491,18 +486,23 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
  detailRef.current = detail;
  refreshDownloadsRef.current = onRefreshDownloads;
  const favoriteIDs = new Set(household.favorites.map(item => item.titleId || item.catalog?.id).filter(Boolean));
- // App-level titles only change identity on a full snapshot refresh
- // (connect, visible-return): replace the held pages so fresh snapshot
- // titles surface immediately and accumulated pages release with it.
- useEffect(() => setRemoteTitles(titles.slice()), [titles]);
- const fetchPage = (cursor = '') => api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor }).then(page => { setRemoteTitles(page.items); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)); return page; });
+ const fetchPage = (cursor = '') => api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor }).then(page => { setRemoteTitles(page.items); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); return page; });
  useEffect(() => { void fetchPage('').catch(() => { }) }, [query, category, sort]);
+ // App-level titles only change identity on an explicit snapshot refresh
+ // (visible-return). The newest-first snapshot only matches the unfiltered
+ // view; under a query, category or other sort, reload the first page with
+ // the current ones. Accumulated pages release with it either way.
+ const seenTitles = useRef(titles);
+ useEffect(() => { if (seenTitles.current === titles) return; seenTitles.current = titles; if (query.trim().length < 3 && !category && sort === 'newest') setRemoteTitles(titles.slice()); else void fetchPage('').catch(() => { }) }, [titles]);
+ // A metadata update patches the matching card in place so loaded pages,
+ // query, category and sort survive it.
+ useEffect(() => { const patch = (event: Event) => { const updated = (event as CustomEvent).detail?.title as CatalogTitle | undefined; if (!updated?.id) return; setRemoteTitles(current => current.some(item => item.id === updated.id) ? current.map(item => item.id === updated.id ? updated : item) : current) }; window.addEventListener('catalog-metadata-updated', patch); return () => window.removeEventListener('catalog-metadata-updated', patch) }, []);
  // Entering a catalog view with nothing held loads its first page; leaving
  // one drops the accumulated pages so memory resets between sections.
  useEffect(() => { if (['home', 'browse', 'search', 'tracker'].includes(route) && remoteTitles.length === 0) void fetchPage('').catch(() => { }) }, [route]);
  useEffect(() => { const refresh = (event: Event) => { const searched = String((event as CustomEvent).detail?.query || '').toLowerCase(); if (query && searched === query.toLowerCase()) { setDetailMessage('Catalog search completed.'); void fetchPage('').catch(error => setDetailMessage((error as Error).message)); } }; window.addEventListener('catalog-search-completed', refresh); return () => window.removeEventListener('catalog-search-completed', refresh) }, [query, category, sort]);
- const submitSearch = async () => { if (searching) return; const value = draftQuery.trim(); setSearching(true); try { if (value) { const page = await api.searchTitles(value); setRemoteTitles(page.items); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(() => { }); } setQuery(value); } catch (error) { setDetailMessage((error as Error).message); } finally { setSearching(false) } };
- const loadMore = () => { if (loadingMore.current || !nextCursor) return; loadingMore.current = true; api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor: nextCursor }).then(page => { setRemoteTitles(current => [...current, ...page.items]); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)); }).catch(() => { }).finally(() => { loadingMore.current = false; }); };
+ const submitSearch = async () => { if (searching) return; const value = draftQuery.trim(); setSearching(true); try { if (value) { const page = await api.searchTitles(value); setRemoteTitles(page.items); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); } setQuery(value); } catch (error) { setDetailMessage((error as Error).message); } finally { setSearching(false) } };
+ const loadMore = () => { if (loadingMore.current || !nextCursor) return; loadingMore.current = true; api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor: nextCursor }).then(page => { setRemoteTitles(current => [...current, ...page.items]); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); }).catch(() => { }).finally(() => { loadingMore.current = false; }); };
  useEffect(() => { const updated = (event: Event) => { const titleId = String((event as CustomEvent).detail?.titleId || ''); if (!titleId || detailRef.current?.title.id !== titleId) return; void api.title(titleId).then(next => { setDetail(next); setDetailMessage(needsEpisodeExpansion(next) ? 'Preparing the individual episode list…' : '') }).catch(error => setDetailMessage((error as Error).message)) }; window.addEventListener('catalog-title-updated', updated); return () => window.removeEventListener('catalog-title-updated', updated) }, [api]);
  useEffect(() => {
   const titleId = detail?.title.kind === 'series' ? detail.title.id : ''; if (!titleId) return; let stopped = false; let running = false; const refresh = async () => {
@@ -669,6 +669,8 @@ function TVDownloads({ items, onPlay, onManage }: { items: Download[]; onPlay: (
  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
  const [removing, setRemoving] = useState(false);
  const [busyAction, setBusyAction] = useState('');
+ // A failed action shows its message here and leaves the list where it was; the fatal panel is for startup failures only.
+ const [actionMessage, setActionMessage] = useState('');
  const [query, setQuery] = useState('');
  const [filter, setFilter] = useState<'all' | 'streaming' | 'complete' | 'paused' | 'errors'>('all');
  const [sort, setSort] = useState<DownloadSort>('recent');
@@ -703,12 +705,12 @@ function TVDownloads({ items, onPlay, onManage }: { items: Download[]; onPlay: (
  const toggleFiles = (engineId: string) => setExpandedGroups(current => { const next = new Set(current); if (next.has(engineId)) next.delete(engineId); else next.add(engineId); return next });
  const cycle = <T extends string,>(value: T, values: T[], set: (value: T) => void) => set(values[(values.indexOf(value) + 1) % values.length]);
  const cycleSort = () => { const values: DownloadSort[] = ['recent', 'title', 'progress', 'size', 'speed']; const next = values[(values.indexOf(sort) + 1) % values.length]; setSort(next); setOrder(orderDownloadIDs(items, next)) };
- const runAction = async (download: Download, action: DownloadTransferAction) => { if (busyAction) return; setBusyAction(`${download.id}:${action}`); try { await onManage(download, action) } finally { setBusyAction('') } };
- const confirmRemoval = async () => { if (!pending || removing) return; setRemoving(true); try { await onManage(pending.download, pending.scope === 'file' ? 'remove-file' : 'remove'); setPending(null); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="downloads-search"]')), 0) } finally { setRemoving(false) } };
- if (pending) return <section role="dialog" aria-modal="true" aria-labelledby="download-delete-heading" aria-describedby="download-delete-description" class="tv-settings tv-removal-confirm">{pending.scope === 'file' ? <><h2 id="download-delete-heading">Remove episode from downloads?</h2><strong>{pending.download.displayTitle || pending.download.filePath}</strong><p id="download-delete-description">The episode leaves the download list. Its file stays on disk until the whole torrent is deleted.</p></> : <><h2 id="download-delete-heading">Delete download?</h2><strong>{pending.download.releaseName || pending.download.filePath}</strong><p>Selected file: {pending.download.filePath}</p><p>{formatBytes(pending.download.sizeBytes)} · {pending.download.trackerName} release {pending.download.releaseId}</p><p id="download-delete-description">This removes the torrent from qBittorrent and permanently deletes its incomplete and downloaded files.</p></>}<button ref={cancelButton} aria-disabled={removing ? 'true' : undefined} data-focus-region="download-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="download-cancel" onClick={closeConfirmation}>Cancel</button><button ref={confirmButton} aria-disabled={removing ? 'true' : undefined} class="danger-button" data-focus-region="download-dialog" data-focus-row="2" data-focus-col="0" data-focus-key="download-confirm" onClick={() => void confirmRemoval()}>{removing ? (pending.scope === 'file' ? 'Removing…' : 'Deleting…') : pending.scope === 'file' ? 'Remove episode' : 'Delete download'}</button></section>;
+ const runAction = async (download: Download, action: DownloadTransferAction) => { if (busyAction) return; setActionMessage(''); setBusyAction(`${download.id}:${action}`); try { await onManage(download, action) } catch (error) { setActionMessage((error as Error).message) } finally { setBusyAction('') } };
+ const confirmRemoval = async () => { if (!pending || removing) return; setActionMessage(''); setRemoving(true); try { await onManage(pending.download, pending.scope === 'file' ? 'remove-file' : 'remove'); setPending(null); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="downloads-search"]')), 0) } catch (error) { setActionMessage((error as Error).message) } finally { setRemoving(false) } };
+ if (pending) return <section role="dialog" aria-modal="true" aria-labelledby="download-delete-heading" aria-describedby="download-delete-description" class="tv-settings tv-removal-confirm">{pending.scope === 'file' ? <><h2 id="download-delete-heading">Remove episode from downloads?</h2><strong>{pending.download.displayTitle || pending.download.filePath}</strong><p id="download-delete-description">The episode leaves the download list. Its file stays on disk until the whole torrent is deleted.</p></> : <><h2 id="download-delete-heading">Delete download?</h2><strong>{pending.download.releaseName || pending.download.filePath}</strong><p>Selected file: {pending.download.filePath}</p><p>{formatBytes(pending.download.sizeBytes)} · {pending.download.trackerName} release {pending.download.releaseId}</p><p id="download-delete-description">This removes the torrent from qBittorrent and permanently deletes its incomplete and downloaded files.</p></>}{actionMessage && <p role="alert" class="focus-hint">{actionMessage}</p>}<button ref={cancelButton} aria-disabled={removing ? 'true' : undefined} data-focus-region="download-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="download-cancel" onClick={closeConfirmation}>Cancel</button><button ref={confirmButton} aria-disabled={removing ? 'true' : undefined} class="danger-button" data-focus-region="download-dialog" data-focus-row="2" data-focus-col="0" data-focus-key="download-confirm" onClick={() => void confirmRemoval()}>{removing ? (pending.scope === 'file' ? 'Removing…' : 'Deleting…') : pending.scope === 'file' ? 'Remove episode' : 'Delete download'}</button></section>;
  const filterLabel = { all: 'All', streaming: 'Still downloading', complete: 'Downloaded', paused: 'Paused', errors: 'Needs attention' }[filter];
  const sortLabel = { recent: 'Recent', title: 'Title A–Z', progress: 'Progress', size: 'File size', speed: 'Speed' }[sort];
- return <section class="tv-list tv-download-list"><h2>Application downloads</h2><div class="tv-filters tv-download-tools"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="downloads-search" value={query} onInput={event => setQuery(event.currentTarget.value)} placeholder="Search downloads; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="downloads-filter" onClick={() => cycle(filter, ['all', 'streaming', 'complete', 'paused', 'errors'], setFilter)}>Filter: {filterLabel}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="downloads-sort" onClick={cycleSort}>Sort: {sortLabel}</button></div><p class="tv-download-count" aria-live="polite">{groups.length} of {items.length} downloads shown</p>{groups.length === 0 ? <p>{items.length === 0 ? 'No managed downloads yet.' : 'No downloads match this search and filter.'}</p> : groups.map((group, groupIndex) => {
+ return <section class="tv-list tv-download-list"><h2>Application downloads</h2>{actionMessage && <p role="status" class="focus-hint">{actionMessage}</p>}<div class="tv-filters tv-download-tools"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="downloads-search" value={query} onInput={event => setQuery(event.currentTarget.value)} placeholder="Search downloads; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="downloads-filter" onClick={() => cycle(filter, ['all', 'streaming', 'complete', 'paused', 'errors'], setFilter)}>Filter: {filterLabel}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="downloads-sort" onClick={cycleSort}>Sort: {sortLabel}</button></div><p class="tv-download-count" aria-live="polite">{groups.length} of {items.length} downloads shown</p>{groups.length === 0 ? <p>{items.length === 0 ? 'No managed downloads yet.' : 'No downloads match this search and filter.'}</p> : groups.map((group, groupIndex) => {
   const download = group.representative;
   const band = 2 + groupIndex * 20;
   const expanded = expandedGroups.has(download.engineId);
@@ -894,7 +896,7 @@ function SourceButton({ source, row, onPlay, focusKey }: { source: CatalogSource
 type SeasonPackAction = 'download' | 'pause' | 'resume' | 'retry' | 'delete';
 function TVSeasonPackCard({ source, season, index, baseRow, open, onToggle, onAction, onDelete }: { source: CatalogSource; season: number; index: number; baseRow: number; open: boolean; onToggle: () => void; onAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onDelete: () => void }) {
  const state = source.libraryState; const [busy, setBusy] = useState(''); const managed = Boolean(state?.downloadId); const paused = state?.transferState === 'paused'; const complete = state?.downloadState === 'downloaded'; const error = state?.downloadState === 'error';
- const run = async (action: SeasonPackAction) => { if (busy) return; setBusy(action); try { await onAction(source, season, action) } finally { setBusy('') } };
+ const run = async (action: SeasonPackAction) => { if (busy) return; setBusy(action); try { await onAction(source, season, action) } catch { /* the detail area already shows the message */ } finally { setBusy('') } };
  // Unique structured row band per pack card: shared rows collided across
  // cards, so D-pad movement crossed into sibling headers and controls.
  const row = baseRow + index * 4;
@@ -926,7 +928,7 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
  useEffect(() => { const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(timer); }, []);
  useEffect(() => { if (!pendingPack) return; const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(timer) }, [pendingPack]);
  useEffect(() => { if (!expanded && !expandedPack && !pendingPack) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (pendingPack && !deleting) setPendingPack(null); else if (expandedPack) setExpandedPack(''); else setExpanded('') }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [expanded, expandedPack, pendingPack, deleting]);
- const confirmDelete = async () => { if (!pendingPack || !selected || deleting) return; setDeleting(true); try { await onPackAction(pendingPack, selected.number, 'delete'); setPendingPack(null) } finally { setDeleting(false) } };
+ const confirmDelete = async () => { if (!pendingPack || !selected || deleting) return; setDeleting(true); try { await onPackAction(pendingPack, selected.number, 'delete'); setPendingPack(null) } catch { /* the detail area already shows the message; the dialog stays open */ } finally { setDeleting(false) } };
  const refresh = async () => {
   if (refreshing) return;
   setRefreshing(true);
@@ -1024,7 +1026,7 @@ export function App() {
  const catalogFocus = useRef<string | null>(null);
  const viewportInput = useRef(0);
  const loadState = async (client = api) => { if (client) try { setHousehold(await client.state()); } catch (error) { setStatus((error as Error).message); } };
- async function connect(url = draft) { setStatus('Connecting…'); try { const normalized = normalizeServerURL(url); const client = new API(normalized); const info = await client.info(); const [titlePage, catalogFacets, downloadPage, jobPage] = await Promise.all([client.titles({ pageSize: 12, sort: 'newest' }), client.facets(), client.downloads().catch(() => ({ items: [], nextCursor: null, total: 0 })), client.jobs({ pageSize: 24 }).catch(() => ({ items: [], nextCursor: null, total: 0 }))]); localStorage.setItem(STORAGE, normalized); setServer(normalized); setDraft(normalized); setAPI(client); setStatus(`${info.instanceName || info.name} ${info.version}`); setTitles(titlePage.items); setFacets(catalogFacets); void client.ensureMetadata(titlePage.items.map(item => item.id)); } catch (error) { setStatus((error as Error).message); } }
+ async function connect(url = draft) { setStatus('Connecting…'); try { const normalized = normalizeServerURL(url); const client = new API(normalized); const info = await client.info(); const [titlePage, catalogFacets, downloadPage, jobPage] = await Promise.all([client.titles({ pageSize: 12, sort: 'newest' }), client.facets(), client.downloads().catch(() => ({ items: [], nextCursor: null, total: 0 })), client.jobs({ pageSize: 24 }).catch(() => ({ items: [], nextCursor: null, total: 0 }))]); localStorage.setItem(STORAGE, normalized); setServer(normalized); setDraft(normalized); setAPI(client); setStatus(`${info.instanceName || info.name} ${info.version}`); setTitles(titlePage.items); setFacets(catalogFacets); void client.ensureMetadata(titlePage.items.map(item => item.id)).catch(error => setStatus((error as Error).message)); } catch (error) { setStatus((error as Error).message); } }
  async function runPrepare(attempt: PrepareAttempt): Promise<boolean> {
   if (!api) return false;
   prepareAttempt.current = attempt;
@@ -1149,7 +1151,7 @@ export function App() {
   const eventPayload = (event: MessageEvent) => { const envelope = JSON.parse(event.data); return typeof envelope.payload === 'string' ? JSON.parse(envelope.payload) : envelope.payload };
   const loadPortal = () => api.call<PortalState>('/portal/state').then(value => setPortal(value)).catch(() => setPortal(null));
   const loadUpdate = () => api.call<UpdateStatus>('/updates/current').then(value => setUpdateStatus(value)).catch(() => setUpdateStatus(null));
-  const metadata = (event: MessageEvent) => { try { const payload = eventPayload(event); const title = payload.title as CatalogTitle | undefined; if (!title?.id) return; setTitles(current => current.some(item => item.id === title.id) ? current.map(item => item.id === title.id ? title : item) : current) } catch (error) { void api.diagnostic('warn', 'Could not process metadata event', { error: String(error) }).catch(() => { }) } };
+  const metadata = (event: MessageEvent) => { try { const payload = eventPayload(event); const title = payload.title as CatalogTitle | undefined; if (!title?.id) return; window.dispatchEvent(new CustomEvent('catalog-metadata-updated', { detail: { title } })) } catch (error) { void api.diagnostic('warn', 'Could not process metadata event', { error: String(error) }).catch(() => { }) } };
   const catalogUpdated = (event: MessageEvent) => { try { const payload = eventPayload(event); const titleId = String(payload.titleId || payload.title?.id || ''); if (titleId) window.dispatchEvent(new CustomEvent('catalog-title-updated', { detail: { titleId } })); setStatus(titleId ? 'Episode list updated.' : 'Catalog updated.') } catch (error) { void api.diagnostic('warn', 'Could not process catalog event', { error: String(error) }).catch(() => { }) } };
   const searchCompleted = (event: MessageEvent) => { try { const payload = eventPayload(event); window.dispatchEvent(new CustomEvent('catalog-search-completed', { detail: payload })); setStatus(`Search for ${payload.query || 'title'} completed.`) } catch (error) { void api.diagnostic('warn', 'Could not process search event', { error: String(error) }).catch(() => { }) } };
   const portalStateEvent = (event: MessageEvent) => { if (!snapshotEventAllowed(recovering, 'portal.state')) return; try { setPortal(eventPayload(event) as PortalState) } catch (error) { void api.diagnostic('warn', 'Could not process portal event', { error: String(error) }).catch(() => { }) } };

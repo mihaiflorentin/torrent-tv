@@ -143,6 +143,7 @@ The 2019 premium set is where the 0.3.0 Support-floor failure was first observed
 | 0.3.0 | Discovery scan and catalog render after replacing both `flatMap` call sites (discovery target construction and the catalog heading lookup) with ES5-safe equivalents | Pending TV test | Fix implemented and unit-verified; requires reinstall and observation on this 2019 set |
 | 0.3.0 | Error panel on unhandled errors: plain-language guidance instead of silence, with the failure reported to the server's client-diagnostics channel | Pending TV test | Implemented; requires observation on this 2019 set |
 | Unreleased | Player Wake model: Left/Right/Up/Down on hidden controls wake without seeking, OK opens Audio/Subtitles on the first press, toolbar Left/Right never seek, focus stays on the pressed control after every action, FF/RW seek one Seek step in every state, the hide timer re-arms per key press | Pending TV test | Key router and hide-timer vitest pass on synthetic keys and fake timers; the full player walkthrough, focus fallback after `visibility:hidden` and seek landing need observation on this TV |
+| Unreleased | Reliable seeking: a pending seek target owns the shown position and current time until AVPlay's `seekTo` success callback fires, `oncurrentplaytime` reports within 1 s of the target, or a 2 s timeout releases it; seek errors show a status message and take the recovery path; an audio-track switch resumes at the pending target; `event.repeat` is ignored for Enter, Back and Play/Pause while timeline repeats accumulate Seek steps and commit after 550 ms idle | Pending TV test | Three release paths, error pass-through, audio resume and held keys pass in vitest on a fake AVPlay port with fake timers. Unverified on hardware, per generation: that Tizen 5.0 and the S90C fire the `seekTo` callbacks, that stale `oncurrentplaytime` really arrives after a seek, that `keydown` carries `repeat` on the remote and its repeat rate, and that a held timeline key lands without a visible jump back |
 | Unreleased | Visible focus and stable controls: the teal focus ring shows on every focused button and input, busy controls (Rescan, Search, season pack controls, Refresh data, delete dialogs) keep focus and ignore OK while busy, and the Settings release link is a focus stop that opens through the platform external-open path | Pending TV test | Stylesheet-order test and happy-dom component tests pass, the Tizen validator passes; the ring's visibility on this TV, focus staying put through a busy state and the release link opening the browser need observation |
 
 ## Optional manual Tizen CLI signing
@@ -156,6 +157,14 @@ When no server is saved, first launch uses Samsung's network API to scan at most
 Arrow, Enter, and Back are mandatory Samsung remote keys and do not require registration. The client handles their DOM key events with spatial focus navigation. Only the optional media keys are registered through `tvinputdevice`. Samsung IME owns key input while the address field is focused; its Done and Cancel events blur the field and restore Connect focus without suppressing text-editing defaults.
 
 AVPlay receives the server's Range-capable URL. The control overlay follows Samsung's five-second auto-hide guidance and gives D-pad and media keys playback-specific meanings rather than using catalog spatial navigation. The player closes AVPlay on exit and restores catalog focus. The package retains the Tizen Download privilege for compatibility with 0.1.5 artifacts, but current external subtitles are fetched as WebVTT over the trusted LAN and rendered in the application overlay.
+
+### Background and foreground (Home key)
+
+Tizen has no platform visibility hook, so the client falls back to `document.hidden` and the `visibilitychange` event. On hide the player saves position, pauses and closes AVPlay, and the live event stream closes; on show the stream reopens and the catalog refreshes. Unit-verified with a faked `document.hidden`.
+
+| Behavior | Status | Evidence |
+| --- | --- | --- |
+| Tizen 5.0 to 7.0 fire `visibilitychange` when Home is pressed and when the app is resumed | Unverified on hardware | Not yet observed on the 2019 premium set or the S90C; confirm each generation separately |
 
 ## Approval gate
 
