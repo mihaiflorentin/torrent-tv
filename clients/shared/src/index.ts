@@ -251,5 +251,7 @@ export { ControlsVisibility } from './controls-visibility';
 export type { ControlsVisibilityOptions, ControlsVisibilityPolicy } from './controls-visibility';
 export { DEFAULT_PLAYER_SETTINGS, PLAYER_MUTED_KEY, PLAYER_VOLUME_KEY, clampVolume, loadPlayerSettings, savePlayerSettings } from './player-settings';
 export type { PlayerSettings, PlayerSettingsStorage } from './player-settings';
+export { RECENT_SEARCHES_KEY, RECENT_SEARCH_LIMIT, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch } from './recent-searches';
+export type { RecentSearchStorage } from './recent-searches';
 export { buildPath, parsePath } from './routes';
 export type { Route, View } from './routes';

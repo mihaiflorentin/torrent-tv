@@ -1027,6 +1027,23 @@ dl .tracker-badge,
  outline: none;
 }
 
+.recent-searches {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ gap: var(--tt-space-2);
+ margin-top: var(--tt-space-3);
+}
+
+.recent-searches span {
+ color: var(--tt-text-muted);
+ font-size: var(--tt-text-sm);
+}
+
+.recent-searches .recent-clear {
+ color: var(--tt-text-muted);
+}
+
 .tools-secondary select {
  color: var(--tt-text-muted);
 }

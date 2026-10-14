@@ -401,6 +401,16 @@ button.primary.active {
  width: 860px
 }
 
+.tv-recent {
+ display: flex;
+ flex-wrap: wrap;
+ margin: 0 0 var(--tt-space-3)
+}
+
+.tv-recent>* {
+ margin: 0 var(--tt-space-4) var(--tt-space-3) 0
+}
+
 .tv-filters {
  display: flex;
  flex-wrap: wrap;
