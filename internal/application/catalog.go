@@ -812,11 +812,14 @@ func (s *Service) Artwork(ctx context.Context, titleID, kind string) (string, st
 		return "", "", err
 	}
 	path := filepath.Join(root, base+ext)
-	tmp := path + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o640)
+	// A unique temp file per request: concurrent fetches of the same poster
+	// must not interleave writes into one file.
+	f, err := os.CreateTemp(root, base+".*.tmp")
 	if err != nil {
 		return "", "", err
 	}
+	tmp := f.Name()
+	_ = f.Chmod(0o640)
 	written, copyErr := io.Copy(f, io.LimitReader(body, (16<<20)+1))
 	closeErr := f.Close()
 	if copyErr != nil || closeErr != nil || written > 16<<20 {
