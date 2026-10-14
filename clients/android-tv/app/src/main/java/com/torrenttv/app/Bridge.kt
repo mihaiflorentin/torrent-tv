@@ -29,11 +29,14 @@ class Bridge(
     // activity accepted the intent (several ATV boxes ship no browser): the
     // web app keeps the URL visible so the address can be used elsewhere.
     @JavascriptInterface
-    fun openExternal(url: String): Boolean = try {
-        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-        true
-    } catch (error: ActivityNotFoundException) {
-        false
+    fun openExternal(url: String): Boolean {
+        if (!UrlPolicy.isExternalOpenable(url)) return false
+        return try {
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url.trim())))
+            true
+        } catch (error: ActivityNotFoundException) {
+            false
+        }
     }
 
     // Direct logcat writes for the CI boot smoke: WebView console messages

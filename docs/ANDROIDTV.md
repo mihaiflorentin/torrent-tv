@@ -55,3 +55,8 @@ every API 26+ result so far comes from the CI emulator.
 | Device | Platform | Verified versions | Notes |
 | ------ | -------- | ----------------- | ----- |
 | (none named yet) | — | — | CI emulator `android-tv; API 26` is the only exercised floor |
+
+Unverified on hardware: the WebView navigation lock (only the app-assets
+origin loads) and the `openExternal` http(s)-only check. The URL decisions
+are covered by JVM unit tests (`UrlPolicyTest`); the WebView and intent
+behavior has not been observed on a device.
