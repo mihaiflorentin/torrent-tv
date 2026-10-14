@@ -1105,6 +1105,21 @@ button.primary.active {
  font-size: var(--tt-tv-text-meta)
 }
 
+/* Episode progress: a static bar whose width is set by state, never animated. */
+.episode-tile .episode-progress {
+ display: block;
+ width: 360px;
+ height: 10px;
+ background: var(--tt-scrim-text);
+ overflow: hidden
+}
+
+.episode-tile .episode-progress b {
+ display: block;
+ height: 100%;
+ background: var(--tt-accent)
+}
+
 .episode-tile .tv-state-badges {
  flex: 0 0 auto;
  flex-wrap: nowrap;

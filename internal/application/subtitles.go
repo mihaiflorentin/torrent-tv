@@ -88,24 +88,29 @@ func (s *Service) SearchSubtitles(ctx context.Context, downloadID, language stri
 			items = append(items, domain.SubtitleCandidate{ID: strconv.Itoa(file.Index), Provider: "contained", ProviderLabel: "Included", Language: lang, Title: name, FileName: name, ReleaseName: release.Name, Format: strings.TrimPrefix(strings.ToLower(filepath.Ext(name)), "."), Description: "Included in the torrent", Score: score})
 		}
 	}
-	// Embedded streams are probed only after the selected media file exists. A
-	// probe failure must not hide included or provider subtitles.
+	// Embedded streams are read in full to be listed reliably and extracted, so
+	// they are offered only once the media file is complete. A probe failure
+	// must not hide included or provider subtitles.
 	if scope != SubtitleScopeRemote && s.mediaProbe != nil && d.AbsolutePath != "" {
-		if info, statErr := os.Stat(d.AbsolutePath); statErr == nil && !info.IsDir() {
+		if !completedLocalFile(d) {
+			warnings = append(warnings, domain.SubtitleProviderWarning{Provider: "embedded", Message: "Embedded subtitles are available after the download completes"})
+		} else {
 			tracks, probeErr := s.mediaProbe.ProbeSubtitles(ctx, d.AbsolutePath)
 			if probeErr != nil {
 				warnings = append(warnings, domain.SubtitleProviderWarning{Provider: "embedded", Message: probeErr.Error()})
 			} else {
+				bitmap := 0
 				for _, track := range tracks {
+					if track.Bitmap {
+						bitmap++
+						continue
+					}
+					lang := embeddedTrackLanguage(track)
 					label := embeddedTrackLabel(track)
-					score := 260.0
-					if sameLanguage(language, track.Language) {
-						score += 25
-					}
-					if track.Forced {
-						score += 5
-					}
-					items = append(items, domain.SubtitleCandidate{ID: strconv.Itoa(track.Index), Provider: "embedded", ProviderLabel: "Embedded", Language: domain.NormalizeLanguage(track.Language), Title: label, FileName: label, ReleaseName: release.Name, Format: track.Codec, HearingImpaired: track.HearingImpaired, Description: "Embedded in the media file", Score: score})
+					items = append(items, domain.SubtitleCandidate{ID: strconv.Itoa(track.Index), Provider: "embedded", ProviderLabel: "Embedded", Language: lang, Title: embeddedTrackTitle(track, label), FileName: label, ReleaseName: release.Name, Format: track.Codec, HearingImpaired: track.HearingImpaired, Forced: track.Forced, Default: track.Default, Description: "Embedded in the media file", Score: embeddedScore(track, lang, language, fallbackLanguage)})
+				}
+				if bitmap > 0 {
+					warnings = append(warnings, domain.SubtitleProviderWarning{Provider: "embedded", Message: fmt.Sprintf("%d picture-based subtitle track(s) (PGS, VobSub) cannot be shown and were skipped", bitmap)})
 				}
 			}
 		}
@@ -157,7 +162,19 @@ func (s *Service) PrepareSubtitle(ctx context.Context, downloadID, providerName,
 	if target != "vtt" {
 		target = "sami"
 	}
-	if cached, cacheErr := s.repo.GetSubtitleAsset(ctx, downloadID, providerName, candidateID, target); cacheErr == nil {
+	embeddedStale := time.Time{}
+	if providerName == "embedded" {
+		// A track can only be demuxed from the whole file: a partial file yields
+		// a truncated track, and an asset extracted before the media last
+		// changed may be one, so both are refused or regenerated.
+		if !completedLocalFile(d) {
+			return domain.SubtitleAsset{}, fmt.Errorf("embedded subtitles are available after the download completes")
+		}
+		if info, statErr := os.Stat(d.AbsolutePath); statErr == nil {
+			embeddedStale = info.ModTime()
+		}
+	}
+	if cached, cacheErr := s.repo.GetSubtitleAsset(ctx, downloadID, providerName, candidateID, target); cacheErr == nil && !cached.CreatedAt.Add(time.Second).Before(embeddedStale) {
 		if _, statErr := os.Stat(cached.Path); statErr == nil {
 			if target == "vtt" {
 				restampWebVTTCuePositioning(cached.Path)
@@ -223,20 +240,27 @@ func (s *Service) PrepareSubtitle(ctx context.Context, downloadID, providerName,
 		if parseErr != nil || index < 0 {
 			return domain.SubtitleAsset{}, fmt.Errorf("invalid embedded subtitle id")
 		}
-		if _, statErr := os.Stat(d.AbsolutePath); statErr != nil {
-			return domain.SubtitleAsset{}, fmt.Errorf("media file is not ready for embedded subtitles: %w", statErr)
+		tracks, probeErr := s.mediaProbe.ProbeSubtitles(ctx, d.AbsolutePath)
+		if probeErr != nil {
+			return domain.SubtitleAsset{}, fmt.Errorf("probe embedded subtitles: %w", probeErr)
+		}
+		var selected *domain.MediaSubtitleTrack
+		for i := range tracks {
+			if tracks[i].Index == index {
+				selected = &tracks[i]
+				break
+			}
+		}
+		if selected == nil {
+			return domain.SubtitleAsset{}, fmt.Errorf("embedded subtitle track not found")
+		}
+		if selected.Bitmap {
+			return domain.SubtitleAsset{}, fmt.Errorf("embedded subtitle track %d is picture-based (%s) and cannot be shown", index, selected.Codec)
 		}
 		// The prepared asset persists the candidate's language so an
 		// embedded track keeps it across restarts instead of losing it to
 		// filename re-derivation.
-		if tracks, probeErr := s.mediaProbe.ProbeSubtitles(ctx, d.AbsolutePath); probeErr == nil {
-			for _, track := range tracks {
-				if track.Index == index {
-					language = domain.NormalizeLanguage(track.Language)
-					break
-				}
-			}
-		}
+		language = embeddedTrackLanguage(*selected)
 		if err = os.MkdirAll(s.settings.Get().SubtitleCachePath, 0o750); err != nil {
 			return domain.SubtitleAsset{}, err
 		}
@@ -247,7 +271,7 @@ func (s *Service) PrepareSubtitle(ctx context.Context, downloadID, providerName,
 		tmpPath := tmp.Name()
 		_ = tmp.Close()
 		defer os.Remove(tmpPath)
-		if err = s.mediaProbe.ExtractSubtitle(ctx, d.AbsolutePath, index, tmpPath); err != nil {
+		if err = s.mediaProbe.ExtractSubtitle(ctx, d.AbsolutePath, selected.Ordinal, tmpPath); err != nil {
 			return domain.SubtitleAsset{}, err
 		}
 		data, readErr := os.ReadFile(tmpPath)
@@ -275,6 +299,11 @@ func (s *Service) PrepareSubtitle(ctx context.Context, downloadID, providerName,
 	data, format, err := unpackSubtitle(source.Data, source.Format, source.Name, d.FilePath)
 	if err != nil {
 		return domain.SubtitleAsset{}, err
+	}
+	if providerName != "embedded" {
+		// ffmpeg already emits UTF-8 for embedded tracks; every other source
+		// may be UTF-16 or a legacy code page.
+		data = []byte(decodeSubtitleText(data, language))
 	}
 	var converted []byte
 	if target == "vtt" {
@@ -310,6 +339,56 @@ func (s *Service) PrepareSubtitle(ctx context.Context, downloadID, providerName,
 		return domain.SubtitleAsset{}, err
 	}
 	return asset, nil
+}
+
+// embeddedTrackLanguage is the canonical language of an embedded track: the
+// tag (ISO codes, legacy "mol", language names), else a language word in the
+// track title ("Romanian SDH"). Undetermined tracks answer "".
+func embeddedTrackLanguage(track domain.MediaSubtitleTrack) string {
+	if lang := domain.LanguageFromName(track.Language); lang != "" {
+		return lang
+	}
+	for _, token := range subtitleNameTokens.Split(strings.ToLower(track.Title), -1) {
+		if lang := domain.LanguageFromName(token); lang != "" {
+			return lang
+		}
+	}
+	return ""
+}
+
+// embeddedScore keeps the track inside its language bracket: a full track
+// outranks a forced-only one, and tracks in neither the requested nor the
+// fallback language sink far below so they are never auto-selected ahead of
+// a usable one. Undetermined languages rank just below the fallback language.
+func embeddedScore(track domain.MediaSubtitleTrack, lang, requested, fallback string) float64 {
+	score := 260.0
+	switch {
+	case lang == "":
+		score -= 10
+	case sameLanguage(requested, lang):
+		score += 25
+	case requested != "" && !sameLanguage(fallback, lang):
+		score -= 200
+	}
+	if track.Forced {
+		score -= 15
+	}
+	if track.HearingImpaired {
+		score -= 5
+	}
+	if track.Default {
+		score += 3
+	}
+	return score
+}
+
+// embeddedTrackTitle is the title shown for a track: the container's own
+// title when it has one, otherwise the composed label.
+func embeddedTrackTitle(track domain.MediaSubtitleTrack, label string) string {
+	if title := strings.TrimSpace(track.Title); title != "" {
+		return title
+	}
+	return label
 }
 
 func embeddedTrackLabel(track domain.MediaSubtitleTrack) string {
@@ -366,11 +445,11 @@ func toWebVTT(data []byte, format string) ([]byte, error) {
 		if !strings.HasPrefix(strings.TrimSpace(text), "WEBVTT") {
 			return nil, fmt.Errorf("invalid WebVTT subtitle")
 		}
-		return []byte(positionCueLines(text)), nil
+		return []byte(positionCueLines(sanitizeVTTCues(text))), nil
 	}
 	if format == ".srt" {
 		text = timeLine.ReplaceAllStringFunc(text, func(value string) string { return strings.ReplaceAll(value, ",", ".") })
-		return []byte(positionCueLines("WEBVTT\n\n" + text)), nil
+		return []byte(positionCueLines(sanitizeVTTCues("WEBVTT\n\n" + text))), nil
 	}
 	if format == ".ass" || format == ".ssa" {
 		var out strings.Builder
@@ -381,7 +460,7 @@ func toWebVTT(data []byte, format string) ([]byte, error) {
 			if m == nil {
 				continue
 			}
-			fmt.Fprintf(&out, "%d\n%s --> %s\n%s\n\n", index, vttTime(assMS(m[1:5])), vttTime(assMS(m[5:9])), cleanCue(m[9]))
+			fmt.Fprintf(&out, "%d\n%s --> %s\n%s\n\n", index, vttTime(assMS(m[1:5])), vttTime(assMS(m[5:9])), normalizeCueText(escapeCueMarkup(m[9]), true))
 			index++
 		}
 		if index == 1 {
@@ -424,7 +503,7 @@ func restampWebVTTCuePositioning(path string) bool {
 	if err != nil {
 		return false
 	}
-	stamped := positionCueLines(string(data))
+	stamped := positionCueLines(sanitizeVTTCues(string(data)))
 	if stamped == string(data) {
 		return false
 	}
@@ -587,11 +666,80 @@ func assMS(parts []string) int64 {
 	return ((values[0]*60+values[1])*60+values[2])*1000 + values[3]*10
 }
 
+// cleanCue prepares cue text for SAMI: line breaks of every spelling become
+// <br>, formatting is dropped and the rest is HTML-escaped.
 func cleanCue(value string) string {
-	value = regexp.MustCompile(`\{[^}]*\}`).ReplaceAllString(value, "")
-	value = strings.ReplaceAll(value, `\N`, "\n")
-	escaped := html.EscapeString(strings.TrimSpace(value))
+	escaped := html.EscapeString(normalizeCueText(value, false))
 	return strings.ReplaceAll(escaped, "\n", "<br>")
+}
+
+var (
+	cueBreakTag    = regexp.MustCompile(`(?i)(?:<|&lt;)\s*/?\s*br\s*/?\s*(?:>|&gt;)|\\[Nn]`)
+	cueOverride    = regexp.MustCompile(`\{[^}]*\}`)
+	cueFontTag     = regexp.MustCompile(`(?i)(?:<|&lt;)/?font(?:[\s](?:(?:&gt;)?[^>&]|&(?:[^g]|g(?:[^t]|t[^;])))*)?(?:>|&gt;)`)
+	cueEscapedTag  = regexp.MustCompile(`(?i)&lt;(/?[ibu])&gt;`)
+	cueFormatTag   = regexp.MustCompile(`(?i)</?[ibu]>`)
+	assFormatBlock = regexp.MustCompile(`(?i)\{\\([ibu])([01])\}`)
+)
+
+// escapeCueMarkup escapes the characters that are markup in WebVTT so plain
+// ASS dialogue text is not read as tags.
+func escapeCueMarkup(value string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(value)
+}
+
+// normalizeCueText resolves every <br> spelling (literal or entity-escaped,
+// "</br>" included) and the ASS \N / \n breaks into real newlines, maps ASS
+// {\i1} style overrides to <i>/<b>/<u> and drops every other override block
+// and <font> tag. Empty lines are removed, since a blank line would end the
+// cue. keepFormatting=false also drops <i>/<b>/<u>.
+func normalizeCueText(value string, keepFormatting bool) string {
+	value = strings.ReplaceAll(value, "\r", "")
+	value = cueBreakTag.ReplaceAllString(value, "\n")
+	value = assFormatBlock.ReplaceAllStringFunc(value, func(block string) string {
+		m := assFormatBlock.FindStringSubmatch(block)
+		if m[2] == "1" {
+			return "<" + strings.ToLower(m[1]) + ">"
+		}
+		return "</" + strings.ToLower(m[1]) + ">"
+	})
+	value = cueOverride.ReplaceAllString(value, "")
+	value = cueFontTag.ReplaceAllString(value, "")
+	value = cueEscapedTag.ReplaceAllString(value, "<$1>")
+	if !keepFormatting {
+		value = cueFormatTag.ReplaceAllString(value, "")
+	}
+	lines := strings.Split(value, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if line = strings.TrimSpace(line); line != "" {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
+}
+
+// sanitizeVTTCues rewrites every cue payload of a WebVTT document through
+// normalizeCueText so no break tag, ASS override or <font> tag reaches a
+// player as raw text. It is idempotent.
+func sanitizeVTTCues(text string) string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	for i := 0; i < len(lines); i++ {
+		out = append(out, lines[i])
+		if !vttCueTiming.MatchString(lines[i]) {
+			continue
+		}
+		payload := []string{}
+		for i+1 < len(lines) && strings.TrimSpace(lines[i+1]) != "" {
+			i++
+			payload = append(payload, lines[i])
+		}
+		if cleaned := normalizeCueText(strings.Join(payload, "\n"), true); cleaned != "" {
+			out = append(out, cleaned)
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 func sameStem(media, sub string) bool {
@@ -645,22 +793,30 @@ var subtitleNameMarkers = map[string]bool{
 	"cc": true, "forced": true, "sdh": true, "sub": true, "subs": true, "subtitle": true, "subtitles": true, "subtitrari": true,
 }
 
-var subtitleNameTokens = regexp.MustCompile(`[^a-z]+`)
+var subtitleNameTokens = regexp.MustCompile(`[^\p{L}]+`)
 
 // subtitleLanguage derives the canonical subtitle language hinted by a
-// torrent-contained sidecar file name. A language tag is only recognized in
-// the last tokens of the name, optionally followed by subtitle markers;
-// anything else is undetermined so release words are never mistaken for
-// language codes.
+// torrent-contained sidecar file name. A language word (ISO code or English or
+// native name: ro, ron, rum, mol, Romanian, Română) is only recognized in the
+// last tokens of the file name, optionally followed by subtitle markers
+// (Movie.ro.forced.srt, Subs/2_Romanian.srt), or as the whole name of the
+// parent folder (Subs/Romanian/2_Track.srt). Anything else is undetermined so
+// release words are never mistaken for languages.
 func subtitleLanguage(name string) string {
 	base := strings.TrimSuffix(strings.ToLower(filepath.Base(name)), strings.ToLower(filepath.Ext(name)))
 	tokens := subtitleNameTokens.Split(base, -1)
 	for i := len(tokens) - 1; i >= 0 && len(tokens)-i <= 3; i-- {
-		if code := domain.NormalizeLanguage(tokens[i]); code != "" {
+		if code := domain.LanguageFromName(tokens[i]); code != "" {
 			return code
 		}
 		if !subtitleNameMarkers[tokens[i]] {
-			return ""
+			break
+		}
+	}
+	if dir := filepath.Base(filepath.Dir(filepath.FromSlash(name))); dir != "." && dir != string(filepath.Separator) {
+		parent := strings.Fields(strings.TrimSpace(subtitleNameTokens.ReplaceAllString(strings.ToLower(dir), " ")))
+		if len(parent) == 1 {
+			return domain.LanguageFromName(parent[0])
 		}
 	}
 	return ""
