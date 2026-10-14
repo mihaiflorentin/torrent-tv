@@ -117,6 +117,7 @@ type Repository interface {
 	RemoveRelease(context.Context, string) error
 	AppendEvent(context.Context, string, string) (domain.Event, error)
 	ListEvents(context.Context, int64, int) ([]domain.Event, error)
+	PruneEvents(context.Context, time.Time, int) error
 	SavePlayback(context.Context, domain.PlaybackState) error
 	GetPlayback(context.Context, string, string) (domain.PlaybackState, error)
 	ListPlayback(context.Context, string) ([]domain.PlaybackState, error)

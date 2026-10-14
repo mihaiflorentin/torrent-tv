@@ -1146,6 +1146,16 @@ func (r *Repository) AppendEvent(ctx context.Context, kind, payload string) (dom
 	return domain.Event{ID: id, Kind: kind, Payload: payload, CreatedAt: now}, err
 }
 
+// PruneEvents deletes journal rows older than before, always keeping the
+// newest minKeep rows so a quiet server still has history to replay.
+func (r *Repository) PruneEvents(ctx context.Context, before time.Time, minKeep int) error {
+	if minKeep < 0 {
+		minKeep = 0
+	}
+	_, err := r.db.ExecContext(ctx, `DELETE FROM event_journal WHERE created_at<? AND id NOT IN (SELECT id FROM event_journal ORDER BY id DESC LIMIT ?)`, before.Unix(), minKeep)
+	return err
+}
+
 func (r *Repository) ListEvents(ctx context.Context, after int64, limit int) ([]domain.Event, error) {
 	if limit < 1 || limit > 500 {
 		limit = 100

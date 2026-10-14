@@ -653,6 +653,19 @@ func isTransient(err error) bool {
 	return strings.Contains(text, "timeout") || strings.Contains(text, "temporar") || strings.Contains(text, "connection reset") || strings.Contains(text, "http 5") || strings.Contains(text, "returned 5")
 }
 
+// Job logs and the event journal keep 30 days of history; the journal also
+// keeps its newest 1000 rows so a quiet server can still replay recent events.
+const (
+	historyRetention      = 30 * 24 * time.Hour
+	eventJournalMinRetain = 1000
+)
+
+func (s *Service) pruneHistory() {
+	cutoff := time.Now().Add(-historyRetention)
+	_ = s.repo.PruneJobLogs(context.Background(), cutoff, 500)
+	_ = s.repo.PruneEvents(context.Background(), cutoff, eventJournalMinRetain)
+}
+
 func (s *Service) StartScheduler() {
 	s.wg.Add(1)
 	go func() {
@@ -660,7 +673,7 @@ func (s *Service) StartScheduler() {
 		s.recoverInterruptedJobs()
 		s.retryDueJobs(true)
 		s.retryDueJobs(false)
-		_ = s.repo.PruneJobLogs(context.Background(), time.Now().Add(-30*24*time.Hour), 500)
+		s.pruneHistory()
 		_, _ = s.SyncCatalog("latest")
 		_, _ = s.RunRetention()
 		latest := time.NewTicker(time.Hour)
@@ -676,7 +689,7 @@ func (s *Service) StartScheduler() {
 				_, _ = s.SyncCatalog("latest")
 				_, _ = s.RunRetention()
 			case <-rebuild.C:
-				_ = s.repo.PruneJobLogs(context.Background(), time.Now().Add(-30*24*time.Hour), 500)
+				s.pruneHistory()
 				_, _ = s.SyncCatalog("rebuild")
 			case <-due.C:
 				s.retryDueJobs(true)
