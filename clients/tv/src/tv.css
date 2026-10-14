@@ -37,13 +37,19 @@ input {
 }
 
 button:focus,
-input:focus {
+input:focus,
+select:focus {
  outline: 0;
  border-color: #fff;
  box-shadow: 0 0 0 5px var(--teal), 0 12px 34px #000b;
  transform: scale(1.045);
  position: relative;
  z-index: 30
+}
+
+/* Busy controls stay focusable (aria-disabled) so the remote keeps its place. */
+button[aria-disabled="true"] {
+ opacity: .55
 }
 
 button.primary {
@@ -854,7 +860,8 @@ button.primary {
  width: 100%
 }
 
-.tv-removal-confirm button:disabled {
+.tv-removal-confirm button:disabled,
+.tv-removal-confirm button[aria-disabled="true"] {
  opacity: .55
 }
 
@@ -1685,9 +1692,10 @@ button.primary {
  font-size: 19px
 }
 
-.tv-update-notice a {
+.tv-update-notice .tv-release-link {
  display: block;
  margin-top: 10px;
+ text-align: left;
  color: var(--teal);
  font-size: 18px;
  white-space: normal;

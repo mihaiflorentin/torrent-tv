@@ -6,7 +6,7 @@
 .tv-content{margin-left:104px;width:1816px;contain:layout paint}
 .poster-card{contain:layout paint style}
 .poster-card img{background:#11181d}
-button:focus,input:focus,select:focus{transform:none;box-shadow:0 8px 24px #000a}
+button:focus,input:focus,select:focus{transform:none}
 .tv-filters{display:flex;margin:18px 0 24px}.tv-filters>*+*{margin-left:12px}
 .tv-filters button{padding:13px 19px}
 .tv-filters button.active{background:var(--teal);color:#06241e;font-weight:700}

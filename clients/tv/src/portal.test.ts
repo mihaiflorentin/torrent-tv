@@ -3,9 +3,12 @@ import type { UpdateStatus } from '@torrent-tv/shared';
 import {
   PROJECTS_MENU_ROW,
   SETTINGS_FORGET_SERVER_ROW,
+  SETTINGS_SAVE_ROW,
+  SETTINGS_TEST_FIRST_ROW,
   UPDATE_APPLY_ROW,
   UPDATE_CHECK_ROW,
   UPDATE_DIALOG_REGION,
+  UPDATE_RELEASE_LINK_ROW,
   confirmDialogStale,
   dialogRestoreKey,
   promotionsVisible,
@@ -104,6 +107,8 @@ describe('dialog focus restore', () => {
 
 describe('focus identities', () => {
   it('pins the appended TVSettings rows and the projects menu row', () => {
+    expect(UPDATE_RELEASE_LINK_ROW).toBe(SETTINGS_SAVE_ROW + 1);
+    expect(SETTINGS_TEST_FIRST_ROW).toBe(UPDATE_RELEASE_LINK_ROW + 1);
     expect(UPDATE_CHECK_ROW).toBe(SETTINGS_FORGET_SERVER_ROW + 1);
     expect(UPDATE_APPLY_ROW).toBe(UPDATE_CHECK_ROW + 1);
     expect(PROJECTS_MENU_ROW).toBe(33);

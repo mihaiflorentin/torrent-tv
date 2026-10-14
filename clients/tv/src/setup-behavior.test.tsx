@@ -257,7 +257,7 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     await new Promise(r => setTimeout(r, 20));
 
-    const link = container.querySelector<HTMLAnchorElement>('.tv-update-notice a');
+    const link = container.querySelector<HTMLButtonElement>('.tv-update-notice [data-focus-key="update-release-link"]');
     expect(link).not.toBeNull();
     expect(link?.textContent).toBe(releaseUrl);
 
