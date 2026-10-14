@@ -401,6 +401,16 @@ button.primary.active {
  width: 860px
 }
 
+.tv-recent {
+ display: flex;
+ flex-wrap: wrap;
+ margin: 0 0 var(--tt-space-3)
+}
+
+.tv-recent>* {
+ margin: 0 var(--tt-space-4) var(--tt-space-3) 0
+}
+
 .tv-filters {
  display: flex;
  flex-wrap: wrap;
@@ -916,6 +926,20 @@ button.primary.active {
  text-overflow: ellipsis
 }
 
+.tv-prepare-wait {
+ margin-top: var(--tt-space-4)
+}
+
+.tv-prepare-elapsed {
+ display: block;
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold)
+}
+
+.tv-prepare-wait .supporting {
+ margin-top: var(--tt-space-3)
+}
+
 .tv-prepare-actions {
  display: flex;
  margin-top: var(--tt-space-4)
@@ -1079,6 +1103,21 @@ button.primary.active {
 .episode-tile small {
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
+}
+
+/* Episode progress: a static bar whose width is set by state, never animated. */
+.episode-tile .episode-progress {
+ display: block;
+ width: 360px;
+ height: 10px;
+ background: var(--tt-scrim-text);
+ overflow: hidden
+}
+
+.episode-tile .episode-progress b {
+ display: block;
+ height: 100%;
+ background: var(--tt-accent)
 }
 
 .episode-tile .tv-state-badges {
@@ -2165,4 +2204,55 @@ button.primary.active {
   display: flex;
   flex-wrap: wrap
  }
+}
+
+/* Getting ready: a calm centred panel while the stream opens, buffers or waits. Static, never focusable. */
+.player-ready {
+ position: absolute;
+ z-index: 4;
+ top: 340px;
+ left: 50%;
+ width: 900px;
+ padding: var(--tt-space-6) var(--tt-space-7);
+ background: var(--tt-controls-surface);
+ border: 1px solid var(--tt-line-strong);
+ border-radius: var(--tt-radius-lg);
+ transform: translateX(-50%);
+ pointer-events: none
+}
+
+.player-ready-title {
+ display: block;
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.player-ready-bar {
+ position: relative;
+ height: var(--tt-tv-timeline-height);
+ margin-top: var(--tt-space-5);
+ background: var(--tt-line-strong);
+ border-radius: var(--tt-radius-pill);
+ overflow: hidden
+}
+
+.player-ready-fill {
+ display: block;
+ height: 100%;
+ background: var(--tt-accent)
+}
+
+.player-ready-facts {
+ display: flex;
+ margin-top: var(--tt-space-4);
+ font-size: var(--tt-tv-text-body);
+ color: var(--tt-text-muted)
+}
+
+.player-ready-facts b {
+ margin-right: var(--tt-space-5);
+ color: var(--tt-text)
 }

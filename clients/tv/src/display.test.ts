@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogTitle, Download, HouseholdItem, Job, ParsedRelease, PlaybackPreferences } from '@torrent-tv/shared';
-import { cardMeta, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
+import { cardMeta, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
 
 // DESIGN.md "Information priorities": what each TV screen shows, decided as pure text so the
 // markup only places it. Unknown facts are omitted, never printed as a placeholder.
@@ -153,4 +153,24 @@ describe('jobs', () => {
   });
   it('shows progress only while running', () => expect(jobStatusLine(job({ state: 'running', progress: 0.25 }))).toBe('Running · 25%'));
   it('names a completed job and its update time', () => expect(jobStatusLine(job(), () => '14 Oct, 10:05')).toBe('Completed · 14 Oct, 10:05'));
+});
+
+describe('getting ready panel', () => {
+  const live = (over: Partial<Download> = {}): Download => ({ id: 'd', releaseId: 'r', trackerId: 't', trackerName: 'FileList', engineId: 'e', fileIndex: 0, filePath: 'a.mkv', mimeType: 'video/x-matroska', sizeBytes: 1000, state: 'downloading', progress: 0.37, playbackMode: 'progressive', downloadedBytes: 370, speedBytesPerSecond: 2_100_000, etaSeconds: 240, peers: 12, seeds: 9, leased: false, streamUrl: '/s', ...over });
+  it('lists peers, speed and time left', () => expect(readyLine(live())).toBe('12 peers · 2.1 MB/s · 4 min left'));
+  it('says one peer in the singular', () => expect(readyLine(live({ peers: 1, speedBytesPerSecond: 0, etaSeconds: 0 }))).toBe('1 peer'));
+  it('omits every unknown part', () => expect(readyLine(live({ peers: 0, speedBytesPerSecond: 0, etaSeconds: 0 }))).toBe(''));
+  it('rounds the percent and keeps it between 0 and 100', () => {
+    expect(readyPercent(live())).toBe(37);
+    expect(readyPercent(live({ progress: 4 }))).toBe(100);
+    expect(readyPercent(live({ progress: -1 }))).toBe(0);
+    expect(readyPercent(undefined)).toBe(0);
+  });
+  it('stays quiet during the first 15 seconds', () => expect(prepareHint(14, 7)).toBe(''));
+  it('names the seeder count once it takes longer', () => expect(prepareHint(15, 7)).toBe('Still looking for peers. This release has 7 seeders, so it can take a little longer.'));
+  it('uses the singular for one seeder', () => expect(prepareHint(20, 1)).toContain('1 seeder,'));
+  it('omits the seeder count when it is unknown or zero', () => {
+    expect(prepareHint(30)).toBe('Still looking for peers. It can take a little longer.');
+    expect(prepareHint(30, 0)).toBe('Still looking for peers. It can take a little longer.');
+  });
 });

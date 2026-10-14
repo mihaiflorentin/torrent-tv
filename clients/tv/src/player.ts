@@ -1,4 +1,4 @@
-import { canonicalLanguage, languageDisplayName, type Download } from '@torrent-tv/shared';
+import { canonicalLanguage, cueDisplayText, languageDisplayName, languageFromWord, type Download } from '@torrent-tv/shared';
 
 export type PlayerAction = 'left' | 'right' | 'up' | 'down' | 'enter' | 'back' | 'play' | 'pause' | 'play-pause' | 'stop' | 'rewind' | 'fast-forward' | 'previous' | 'next' | 'previous-episode' | 'next-episode' | null;
 
@@ -69,8 +69,11 @@ export function preferredAudio(tracks: AVTrack[], language: string, index: numbe
 export function normalizeTrack(track: any): AVTrack {
   let extra: Record<string, unknown> = {};
   try { extra = typeof track.extra_info === 'string' ? JSON.parse(track.extra_info) : track.extra_info || {}; } catch { }
-  const language = String(extra.track_lang || extra.language || extra.Language || extra.lang || extra.LANGUAGE || '').toLowerCase();
-  const rawCodec = String(extra.subtitle_type || extra.fourCC || extra.codec || extra.Codec || extra.codec_name || '');
+  const rawLanguage = String(extra.track_lang || extra.language || extra.Language || extra.lang || extra.LANGUAGE || '').trim().toLowerCase();
+  const language = canonicalLanguage(rawLanguage) ? rawLanguage : languageFromWord(rawLanguage) || rawLanguage;
+  // Samsung reports subtitle_type as an integer kind ("0", "-1", "1"); the codec identifier is fourCC.
+  const subtitleType = String(extra.subtitle_type ?? '');
+  const rawCodec = String(extra.fourCC || (/^-?\d+$/.test(subtitleType) ? '' : subtitleType) || extra.codec || extra.Codec || extra.codec_name || '');
   const codec = /^(text\/plain|text|unknown|0|-1)$/i.test(rawCodec) ? '' : rawCodec;
   const type = String(track.type || '').toUpperCase();
   const title = String(extra.track_title || extra.title || extra.Title || '').trim();
@@ -79,9 +82,12 @@ export function normalizeTrack(track: any): AVTrack {
   return { index: Number(track.index), type, language, label };
 }
 
-export function preferredSubtitle(tracks: AVTrack[]): AVTrack | null {
+// Native text track for auto-selection: the preferred language, then the fallback language; never another language.
+export function preferredSubtitle(tracks: AVTrack[], language = 'ro', fallback = 'en'): AVTrack | null {
   const text = tracks.filter(track => track.type === 'TEXT');
-  return text.find(track => /^(ro|ron|rum)/.test(track.language)) || text.find(track => /^(en|eng)/.test(track.language)) || null;
+  const wanted = canonicalLanguage(language) || 'ro';
+  const second = canonicalLanguage(fallback) || (wanted === 'en' ? 'ro' : 'en');
+  return text.find(track => canonicalLanguage(track.language) === wanted) || text.find(track => canonicalLanguage(track.language) === second) || null;
 }
 
 export interface SubtitleCue { start: number; end: number; text: string }
@@ -95,7 +101,7 @@ function cueTime(value: string): number {
 
 export function parseVTT(input: string): SubtitleCue[] {
   const blocks = input.replace(/^\uFEFF/, '').replace(/\r/g, '').split(/\n{2,}/); const cues: SubtitleCue[] = [];
-  for (const block of blocks) { const lines = block.split('\n').filter(Boolean); if (!lines.length || /^WEBVTT/i.test(lines[0]) || /^NOTE(?:\s|$)/.test(lines[0])) continue; const timing = lines.findIndex(line => line.includes('-->')); if (timing < 0) continue; const [rawStart, rawEnd] = lines[timing].split('-->'); const start = cueTime(rawStart); const end = cueTime(rawEnd.trim().split(/\s+/)[0]); if (start < 0 || end <= start) continue; const text = lines.slice(timing + 1).join('\n').replace(/<[^>]+>/g, '').trim(); if (text) cues.push({ start, end, text }); }
+  for (const block of blocks) { const lines = block.split('\n').filter(Boolean); if (!lines.length || /^WEBVTT/i.test(lines[0]) || /^NOTE(?:\s|$)/.test(lines[0])) continue; const timing = lines.findIndex(line => line.includes('-->')); if (timing < 0) continue; const [rawStart, rawEnd] = lines[timing].split('-->'); const start = cueTime(rawStart); const end = cueTime(rawEnd.trim().split(/\s+/)[0]); if (start < 0 || end <= start) continue; const text = cueDisplayText(lines.slice(timing + 1).join('\n')); if (text) cues.push({ start, end, text }); }
   return cues.sort((a, b) => a.start - b.start);
 }
 

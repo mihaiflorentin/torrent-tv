@@ -55,6 +55,9 @@ _Avoid_: torrent client (unqualified), backend
 **Prepare**:
 Resolve or create the Managed download behind a Source and return its stream URL; the step before any playback.
 
+**Best version**:
+The Source that the primary Play on a title page prepares, picked by the shared `rankSources()` policy (see DESIGN.md "Best version"). The full list stays behind Choose version.
+
 **Source**:
 A playable file entry of a Release — a file inside the torrent, or a virtual per-episode entry.
 _Avoid_: "source" for quality attributes (resolution/codec) — say quality attributes
@@ -126,6 +129,9 @@ Menus display `contained` — and provider candidates already downloaded — as 
 
 **Household**:
 The single server-side profile: favorites, resume positions, watched state. Survives torrent deletion.
+
+**My List**:
+The on-screen name of the Household's favorites in both clients (Home rail, sidebar entry, title button). Routes, API names and stored data keep the word favorites.
 
 **Job**:
 A persisted unit of background work with a dedupe key, states, and retries.

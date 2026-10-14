@@ -94,7 +94,7 @@ describe('overlay Escape', () => {
 
   it('closes the source picker on Escape while the Detail overlay stays open', async () => {
     await openDetailOverlay();
-    const play = Array.from(document.querySelectorAll<HTMLButtonElement>('.overlay .actions button')).find(button => button.textContent?.includes('Play'))!;
+    const play = Array.from(document.querySelectorAll<HTMLButtonElement>('.overlay .actions button')).find(button => button.textContent?.includes('Choose version'))!;
     await act(async () => { play.click() });
     expect(document.querySelector('.overlay.picker')).not.toBeNull();
     pressEscape();

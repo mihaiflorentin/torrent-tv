@@ -60,15 +60,17 @@ func (e *subtitleEngineStub) Files(context.Context, string) ([]domain.TorrentFil
 
 type subtitleProbeStub struct {
 	MediaProbe
-	tracks  []domain.MediaSubtitleTrack
-	content string
+	tracks    []domain.MediaSubtitleTrack
+	content   string
+	extracted []int
 }
 
 func (p *subtitleProbeStub) ProbeSubtitles(context.Context, string) ([]domain.MediaSubtitleTrack, error) {
 	return p.tracks, nil
 }
 
-func (p *subtitleProbeStub) ExtractSubtitle(_ context.Context, _ string, _ int, target string) error {
+func (p *subtitleProbeStub) ExtractSubtitle(_ context.Context, _ string, ordinal int, target string) error {
+	p.extracted = append(p.extracted, ordinal)
 	return os.WriteFile(target, []byte(p.content), 0o600)
 }
 
@@ -113,7 +115,7 @@ func newSubtitleTestServiceWithRepo(t *testing.T, engine *subtitleEngineStub, pr
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	download := domain.Download{ID: "source", ReleaseID: release.ID, EngineID: "qb:abc", FileIndex: 0, FilePath: "movie.mkv", AbsolutePath: media, State: "complete", CreatedAt: now, UpdatedAt: now}
+	download := domain.Download{ID: "source", ReleaseID: release.ID, EngineID: "qb:abc", FileIndex: 0, FilePath: "movie.mkv", AbsolutePath: media, State: "complete", Progress: 1, SizeBytes: 5, CreatedAt: now, UpdatedAt: now}
 	if err := repo.SaveDownload(ctx, download); err != nil {
 		t.Fatal(err)
 	}
