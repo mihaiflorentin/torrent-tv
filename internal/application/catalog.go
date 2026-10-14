@@ -217,7 +217,11 @@ func buildSeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPa
 			return seasonNumber, n, true
 		}
 		for _, season := range providerSeasons.Seasons {
-			if season.Number >= 1 && n > offsets[season.Number] && n <= offsets[season.Number]+season.EpisodeCount {
+			// Absolute numbering may only land in the claimed season
+			// itself (S2 - 26 is season 2 episode 1). A file is never moved
+			// into another season, or it would merge with that season's
+			// real sources.
+			if season.Number >= 1 && (seasonNumber < 1 || season.Number == seasonNumber) && n > offsets[season.Number] && n <= offsets[season.Number]+season.EpisodeCount {
 				return season.Number, n - offsets[season.Number], true
 			}
 		}
