@@ -229,6 +229,7 @@ validate-webos-ipk:
 smoke-tizen-engine:
 	@echo "smoke-tizen-engine: pinned engine selenoid/chrome:63.0 (Google Chrome 63.0.3239.84) — oldest reliably obtainable Chromium at the Tizen 5.0 floor; ceiling of this guarantee"
 	node tools/smoke_tizen_engine/smoke.mjs --cases clean,fatal
+	node tools/smoke_tizen_engine/smoke.mjs --cases promotions
 	@status=0; node tools/smoke_tizen_engine/smoke.mjs --cases broken || status=$$?; \
 	if [ "$$status" -eq 3 ]; then \
 		echo "smoke-tizen-engine: broken-bundle fixture correctly rejected (case 3, exit 3)"; \
