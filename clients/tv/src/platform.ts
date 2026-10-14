@@ -104,7 +104,11 @@ export function onAppVisibilityChange(listener: (visible: boolean) => void): () 
       return subscribe(listener) || (() => { });
     }
   } catch { }
-  return () => { };
+  // No platform hook (Tizen): fall back to the standard Page Visibility API.
+  if (typeof document === 'undefined') return () => { };
+  const onChange = () => listener(!document.hidden);
+  document.addEventListener('visibilitychange', onChange);
+  return () => document.removeEventListener('visibilitychange', onChange);
 }
 
 export function registerMediaKeys(): void {

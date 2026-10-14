@@ -61,9 +61,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  const session = useRef(0);
  const completedRetryUsed = useRef(false);
  const pollTimer = useRef(0);
- const scrubTimer = useRef(0);
  const messageTimer = useRef(0);
- const scrubTarget = useRef<number | null>(null);
  const audioTimer = useRef(0);
  const autoplayIntent = useRef(true);
  const suspendedState = useRef<{ position: number; playing: boolean } | null>(null);
@@ -137,18 +135,6 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
   controls.setPanelOpen(true);
   revealControls(true);
   window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="${openerKey}"]`)), 0);
- }
-
- function seek(target: number) {
-  const av = window.webapis?.avplay;
-  const next = clampSeek(target, duration.current);
-  try { av?.seekTo(next); current.current = next; setPosition(next); } catch { }
- }
-
- function scrub(delta: number, hidden = false) {
-  const next = clampSeek((scrubTarget.current ?? current.current) + delta, duration.current); scrubTarget.current = next; setPosition(next);
-  if (hidden) showTransientMessage(`${formatTime(next)} / ${formatTime(duration.current)}`, 1500);
-  window.clearTimeout(scrubTimer.current); scrubTimer.current = window.setTimeout(() => { const target = scrubTarget.current; scrubTarget.current = null; if (target !== null) seek(target); }, 550);
  }
 
  function refreshTracks() { const av = window.webapis?.avplay; try { const all = (av?.getTotalTrackInfo?.() || []).map(normalizeTrack); if (all.length) setTracks(all); } catch { } }
@@ -234,7 +220,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
      }
     },
     onstreamcompleted: () => { if (token === session.current) { current.current = duration.current; void save().then(() => onComplete(preferenceRef.current)); } },
-    oncurrentplaytime: (value: number) => { if (token === session.current) { current.current = value; if (scrubTarget.current === null) setPosition(value); if (subtitleCues.current.length) setExternalSubtitle(subtitleAt(subtitleCues.current, value, subtitleDelayRef.current)); if (Date.now() - lastSaved.current >= 10_000) { lastSaved.current = Date.now(); save(); } } },
+    oncurrentplaytime: (value: number) => { if (token === session.current) { if (keysRef.current && !keysRef.current.playtime(value)) return; current.current = value; setPosition(value); if (subtitleCues.current.length) setExternalSubtitle(subtitleAt(subtitleCues.current, value, subtitleDelayRef.current)); if (Date.now() - lastSaved.current >= 10_000) { lastSaved.current = Date.now(); save(); } } },
     onsubtitlechange: (_duration: number, text: string) => { if (token === session.current) setExternalSubtitle(String(text || '')); },
     ontrackschanged: () => { if (token === session.current) refreshTracks(); },
     onerror: (error: string) => void recover(error, token),
@@ -260,7 +246,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
     suspendedState.current = { position: current.current, playing: playing.current };
     session.current++;
     window.clearTimeout(pollTimer.current);
-    window.clearTimeout(scrubTimer.current);
+    keysRef.current?.dispose();
     window.clearTimeout(messageTimer.current);
     window.clearTimeout(audioTimer.current);
     controls.dispose();
@@ -273,7 +259,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
     openPlayer(position, wasPlaying);
    }
   });
-  return () => { cancelled = true; disposeVisibility(); session.current++; window.clearTimeout(focusTimer); window.clearTimeout(pollTimer.current); controls.dispose(); window.clearTimeout(scrubTimer.current); window.clearTimeout(messageTimer.current); window.clearTimeout(audioTimer.current); void save(); stopAVPlay(); };
+  return () => { cancelled = true; disposeVisibility(); session.current++; window.clearTimeout(focusTimer); window.clearTimeout(pollTimer.current); controls.dispose(); keysRef.current?.dispose(); window.clearTimeout(messageTimer.current); window.clearTimeout(audioTimer.current); void save(); stopAVPlay(); };
  }, [download.id]);
  useEffect(() => {
   const remember = (event: FocusEvent) => {
@@ -297,7 +283,16 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    remembered: () => lastControlFocus.current,
    remember: key => { lastControlFocus.current = key; },
    reveal: hold => revealControls(hold),
-   seek: (delta, hidden) => scrub(delta, hidden),
+   duration: () => duration.current,
+   position: () => current.current,
+   setPosition: ms => { current.current = ms; setPosition(ms); },
+   announce: ms => showTransientMessage(`${formatTime(ms)} / ${formatTime(duration.current)}`, 1500),
+   avSeekTo: (ms, onSuccess, onError) => {
+    const av = window.webapis?.avplay;
+    if (!av) throw new Error('AVPlay is unavailable on this device.');
+    av.seekTo(ms, onSuccess, (error: any) => onError(String(error?.message || error?.name || error || 'AVPlay could not seek.')));
+   },
+   seekFailed: error => { setMessage(`Seek failed: ${error}`); void recover(`Seek failed: ${error}`, session.current); },
    focusControl: key => focusControl(key),
    activateControl: key => document.querySelector<HTMLElement>(`[data-player-control="${key}"]`)?.click(),
    activateFocused: () => (document.activeElement as HTMLElement | null)?.click(),
@@ -311,11 +306,11 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    const action = playerAction(event.key, event.keyCode);
    if (!action) return;
    event.preventDefault();
-   keys.handle(action);
+   keys.handle(action, event.repeat);
   };
   addEventListener('focusin', remember);
   addEventListener('keydown', key);
-  return () => { keysRef.current = null; removeEventListener('focusin', remember); removeEventListener('keydown', key); };
+  return () => { keys.dispose(); keysRef.current = null; removeEventListener('focusin', remember); removeEventListener('keydown', key); };
  }, [download.id]);
 
  function chooseTrack(type: 'AUDIO' | 'TEXT', index: number | null) {
@@ -338,7 +333,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
      window.clearTimeout(audioTimer.current);
      audioTimer.current = window.setTimeout(() => {
       try {
-       av.seekTo(clampSeek(current.current, duration.current));
+       av.seekTo(clampSeek(keysRef.current?.resumeTarget() ?? current.current, duration.current));
        if (!wasPlaying) av.pause();
        refreshTracks();
       } catch { }
@@ -391,8 +386,8 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    <button class="player-timeline" data-player-control="timeline" data-focus-region="player-controls" data-focus-row="0" data-focus-col="0" data-focus-key="player-timeline" onClick={() => { revealControls(); focusControl('timeline') }} aria-label="Playback timeline; use left and right to seek"><span style={{ width: `${percent}%` }}></span></button>
    <div class="player-time"><span>{formatTime(position)}</span><span>{formatTime(total)}</span></div>
    <div class="player-toolbar">
-    <button data-player-control="restart" data-focus-region="player-controls" data-focus-row="1" data-focus-col="0" data-focus-key="player-restart" onClick={() => keepControl('restart', () => seek(0))}>Restart</button><button data-player-control="back-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="1" data-focus-key="player-back-10" onClick={() => keepControl('back-10', () => seek(current.current - 10_000))}>−10s</button>
-    <button data-player-control="play" data-focus-region="player-controls" data-focus-row="1" data-focus-col="2" data-focus-key="player-play" class="primary" onClick={() => keepControl('play', () => togglePlayback())}>{playing.current ? 'Pause' : 'Play'}</button><button data-player-control="forward-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="3" data-focus-key="player-forward-10" onClick={() => keepControl('forward-10', () => seek(current.current + 10_000))}>+10s</button>
+    <button data-player-control="restart" data-focus-region="player-controls" data-focus-row="1" data-focus-col="0" data-focus-key="player-restart" onClick={() => keepControl('restart', () => keysRef.current?.seekTo(0))}>Restart</button><button data-player-control="back-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="1" data-focus-key="player-back-10" onClick={() => keepControl('back-10', () => keysRef.current?.seekBy(-10_000))}>−10s</button>
+    <button data-player-control="play" data-focus-region="player-controls" data-focus-row="1" data-focus-col="2" data-focus-key="player-play" class="primary" onClick={() => keepControl('play', () => togglePlayback())}>{playing.current ? 'Pause' : 'Play'}</button><button data-player-control="forward-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="3" data-focus-key="player-forward-10" onClick={() => keepControl('forward-10', () => keysRef.current?.seekBy(10_000))}>+10s</button>
     <button data-player-control="audio" data-focus-region="player-controls" data-focus-row="1" data-focus-col="4" data-focus-key="player-audio" onClick={() => openMenu('audio', 'audio')}>Audio ({audioTracks.length})</button><button data-player-control="subtitles" data-focus-region="player-controls" data-focus-row="1" data-focus-col="5" data-focus-key="player-subtitles" onClick={() => { openMenu('subtitles', 'subtitles'); void findSubtitles(false, 'local') }}>Subtitles ({subtitleTracks.length + subtitleCandidates.length})</button>
     <button data-player-control="options" data-focus-region="player-controls" data-focus-row="1" data-focus-col="6" data-focus-key="player-options" onClick={() => openMenu('options', 'options')}>Options</button><button data-player-control="back" data-focus-region="player-controls" data-focus-row="1" data-focus-col="7" data-focus-key="player-back" onClick={() => { save(); onClose(); }}>Back</button><button data-player-control="hide" data-focus-region="player-controls" data-focus-row="1" data-focus-col="8" data-focus-key="player-hide" onClick={hideControls}>Hide</button>
    </div>

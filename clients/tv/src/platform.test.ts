@@ -243,4 +243,32 @@ describe('subscription hooks', () => {
     expect(() => unsubKeyboard()).not.toThrow();
     expect(() => unsubVisibility()).not.toThrow();
   });
+
+  describe('document visibility fallback', () => {
+    const setHidden = (hidden: boolean) => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    afterEach(() => { delete (document as unknown as { hidden?: boolean }).hidden; });
+
+    it('reports hide and show from visibilitychange when no platform hook exists', () => {
+      delete platformWindow.FileListTVPlatform;
+      const seen: boolean[] = [];
+      const unsub = onAppVisibilityChange(visible => seen.push(visible));
+      setHidden(true);
+      setHidden(false);
+      expect(seen).toEqual([false, true]);
+      unsub();
+      setHidden(true);
+      expect(seen).toEqual([false, true]);
+    });
+
+    it('prefers the platform hook over the document events', () => {
+      const seen: boolean[] = [];
+      platformWindow.FileListTVPlatform = { onVisibility: () => () => { } };
+      onAppVisibilityChange(visible => seen.push(visible));
+      setHidden(true);
+      expect(seen).toEqual([]);
+    });
+  });
 });
