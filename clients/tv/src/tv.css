@@ -916,6 +916,20 @@ button.primary.active {
  text-overflow: ellipsis
 }
 
+.tv-prepare-wait {
+ margin-top: var(--tt-space-4)
+}
+
+.tv-prepare-elapsed {
+ display: block;
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold)
+}
+
+.tv-prepare-wait .supporting {
+ margin-top: var(--tt-space-3)
+}
+
 .tv-prepare-actions {
  display: flex;
  margin-top: var(--tt-space-4)
@@ -2165,4 +2179,55 @@ button.primary.active {
   display: flex;
   flex-wrap: wrap
  }
+}
+
+/* Getting ready: a calm centred panel while the stream opens, buffers or waits. Static, never focusable. */
+.player-ready {
+ position: absolute;
+ z-index: 4;
+ top: 340px;
+ left: 50%;
+ width: 900px;
+ padding: var(--tt-space-6) var(--tt-space-7);
+ background: var(--tt-controls-surface);
+ border: 1px solid var(--tt-line-strong);
+ border-radius: var(--tt-radius-lg);
+ transform: translateX(-50%);
+ pointer-events: none
+}
+
+.player-ready-title {
+ display: block;
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.player-ready-bar {
+ position: relative;
+ height: var(--tt-tv-timeline-height);
+ margin-top: var(--tt-space-5);
+ background: var(--tt-line-strong);
+ border-radius: var(--tt-radius-pill);
+ overflow: hidden
+}
+
+.player-ready-fill {
+ display: block;
+ height: 100%;
+ background: var(--tt-accent)
+}
+
+.player-ready-facts {
+ display: flex;
+ margin-top: var(--tt-space-4);
+ font-size: var(--tt-tv-text-body);
+ color: var(--tt-text-muted)
+}
+
+.player-ready-facts b {
+ margin-right: var(--tt-space-5);
+ color: var(--tt-text)
 }

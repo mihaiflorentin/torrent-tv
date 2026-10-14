@@ -8,7 +8,7 @@ import { PlayerKeyController, type PlayerFocus } from './player-keys';
 import { householdSections, nearEnd, trackerCategories } from './catalog-data';
 import { discoverServers, DiscoveredServer, normalizeServerURL } from './discovery';
 import { Backdrop } from './backdrop';
-import { cardMeta, downloadFacts, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
+import { cardMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
 import { appIdentity } from './app-name';
 import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL, registerMediaKeys } from './platform';
 import { detectCapabilities } from './capability';
@@ -77,6 +77,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  const [externalSubtitle, setExternalSubtitle] = useState('');
  const [aspect, setAspect] = useState('PLAYER_DISPLAY_MODE_AUTO_ASPECT_RATIO');
  const [liveDownload, setLiveDownload] = useState(download);
+ const [readyDownload, setReadyDownload] = useState<Download | null>(null);
  const [choice, setChoice] = useState(() => playerChoiceLine(preferences || defaultPlayerPreferences));
  const current = useRef(resumeMs);
  const duration = useRef(0);
@@ -304,6 +305,21 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
   });
   return () => { cancelled = true; disposeVisibility(); session.current++; window.clearTimeout(focusTimer); window.clearTimeout(pollTimer.current); controls.dispose(); keysRef.current?.dispose(); window.clearTimeout(messageTimer.current); window.clearTimeout(audioTimer.current); void save(); stopAVPlay(); };
  }, [download.id]);
+ // Getting ready: while the stream opens, buffers or waits for a segment, poll the download every 2 s for the
+ // progress panel. Render-only: never touches focus, controls or the key controller; a failed poll keeps the plain status.
+ const gettingReady = phase === 'opening' || phase === 'buffering' || phase === 'waiting';
+ useEffect(() => {
+  if (!gettingReady) return;
+  let stopped = false; let running = false;
+  const refresh = async () => {
+   if (stopped || running || suspendedState.current) return;
+   running = true;
+   try { const found = (await api.downloads()).items.find(item => item.id === download.id); if (!stopped && found) setReadyDownload(found); } catch { } finally { running = false; }
+  };
+  void refresh();
+  const timer = window.setInterval(() => void refresh(), 2000);
+  return () => { stopped = true; window.clearInterval(timer); };
+ }, [download.id, gettingReady]);
  useEffect(() => {
   const remember = (event: FocusEvent) => {
    const target = event.target as HTMLElement | null;
@@ -426,6 +442,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  const osd = message || osdText.current;
  return <div class="player-shell"><object id="av-player" type="application/avplayer"></object><div class={`player ${controlsVisible ? 'controls-visible' : ''}`}>
   {externalSubtitle && <div class="external-subtitle">{externalSubtitle}</div>}
+  {gettingReady && readyDownload && <div class="player-ready" aria-live="polite"><strong class="player-ready-title">{readyTitle(download)}</strong><div class="player-ready-bar"><span class="player-ready-fill" style={{ width: `${readyPercent(readyDownload)}%` }} /></div><div class="player-ready-facts"><b>{readyPercent(readyDownload)}%</b>{readyLine(readyDownload) && <span>{readyLine(readyDownload)}</span>}</div></div>}
   {osd && <div class={`player-message${message ? ' on' : ''}`} aria-live="polite">{osd}</div>}
   <div class="player-controls"><div class="player-bar">
    <div class="player-heading"><div class="player-title">{download.displayTitle || download.filePath}</div>{choice && <div class="player-choice">{choice}</div>}</div>
@@ -513,9 +530,25 @@ const menuGroups: Array<{ label: string; items: Array<{ id: TVRoute; label: stri
 export type TVPreparingState = {
  trackerName: string;
  label: string;
+ seeders?: number;
  error?: string;
  hint?: string;
 };
+
+function readyTitle(download: Download): string {
+ const name = download.displayTitle || download.filePath;
+ const code = episodeCode(download.parsed?.seasonStart, download.parsed?.episodeStart);
+ return code && name.indexOf(code) < 0 ? `${name} · ${code}` : name;
+}
+
+// Prepare is one blocking request, so the only honest progress is time. Counts seconds and, after 15 s, says why
+// it is slow. Not focusable; Cancel stays the only control. The interval dies with the modal.
+function PrepareElapsed({ seeders }: { seeders?: number }) {
+ const [seconds, setSeconds] = useState(0);
+ useEffect(() => { const started = Date.now(); const timer = window.setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000); return () => window.clearInterval(timer) }, []);
+ const hint = prepareHint(seconds, seeders);
+ return <div class="tv-prepare-wait" role="status"><span class="tv-prepare-elapsed">{seconds} s</span>{hint && <p class="supporting">{hint}</p>}</div>;
+}
 
 export function Catalog({ api, status, titles, facets, household, downloads, jobs, restoreFocus, portal, updateStatus, onUpdateStatus, onFocus, onRetry, onChangeServer, onForgetServer, onPlay, onPlayDownload, onManageDownload, onManageSeasonPack, onRefreshDownloads, onFavorite, preparing, onCancelPrepare, onRetryPrepare }: { api: API; status: string; titles: CatalogTitle[]; facets: CatalogFacets; household: HouseholdState; downloads: Download[]; jobs: Job[]; restoreFocus: string | null; portal: PortalState | null; updateStatus: UpdateStatus | null; onUpdateStatus: (status: UpdateStatus) => void; onFocus: (key: string) => void; onRetry: () => void; onChangeServer: () => void; onForgetServer: () => void; onPlay: (release: Release, fileIndex?: number, resumeMs?: number) => void; onPlayDownload: (download: Download) => void; onManageDownload: (download: Download, action: string) => Promise<void>; onManageSeasonPack: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onRefreshDownloads: () => Promise<void>; onFavorite: (title: CatalogTitle, value: boolean) => void; preparing?: TVPreparingState | null; onCancelPrepare?: () => void; onRetryPrepare?: () => void }) {
  const [route, setRoute] = useState<TVRoute>('home');
@@ -690,6 +723,7 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
     </div>
    </> : <>
     <p class="supporting">Asking {preparing.trackerName} for this release. Playback starts as soon as the server has the download ready. Press Back to cancel.</p>
+    <PrepareElapsed seeders={preparing.seeders} />
     <button ref={prepareCancelRef} data-focus-region="prepare-dialog" data-focus-row="0" data-focus-col="0" data-focus-key="prepare-cancel" onClick={onCancelPrepare}>Cancel</button>
    </>}
   </section>
@@ -1131,7 +1165,7 @@ export function App() {
    prepareOriginKey.current = document.activeElement.dataset.focusKey || null;
   }
   const label = attempt.kind === 'source' ? (attempt.release.name || 'Selected version') : `Season ${attempt.season} · ${attempt.source.release.name}`;
-  setPreparing({ trackerName: attempt.kind === 'source' ? attempt.release.trackerName : attempt.source.release.trackerName, label });
+  setPreparing({ trackerName: attempt.kind === 'source' ? attempt.release.trackerName : attempt.source.release.trackerName, label, seeders: attempt.kind === 'source' ? attempt.release.seeders : attempt.source.release.seeders });
   try {
    if (attempt.kind === 'source') {
     const download = await api.prepare(attempt.release.id, attempt.fileIndex, controller?.signal);

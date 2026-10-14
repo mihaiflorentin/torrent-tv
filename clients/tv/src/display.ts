@@ -99,6 +99,23 @@ export function downloadProgressLine(download: Download): string {
   return joined([status.label, download.speedBytesPerSecond > 0 ? `${formatBytes(download.speedBytesPerSecond)}/s` : '', formatEta(download.etaSeconds)]);
 }
 
+/** "Getting ready" panel: percent of the download, 0 to 100. */
+export function readyPercent(download: Download | undefined): number {
+  return download ? Math.round(Math.max(0, Math.min(1, download.progress || 0)) * 100) : 0;
+}
+
+/** "Getting ready" panel facts: peers, speed, time left. A part that is not known yet is left out. */
+export function readyLine(download: Download): string {
+  const peers = download.peers > 0 ? `${download.peers} peer${download.peers === 1 ? '' : 's'}` : '';
+  return joined([peers, download.speedBytesPerSecond > 0 ? `${formatBytes(download.speedBytesPerSecond)}/s` : '', formatEta(download.etaSeconds)]);
+}
+
+/** One calm sentence once Prepare has taken 15 seconds; nothing before that. */
+export function prepareHint(elapsedSeconds: number, seeders?: number): string {
+  if (elapsedSeconds < 15) return '';
+  return seeders && seeders > 0 ? `Still looking for peers. This release has ${seeders} seeder${seeders === 1 ? '' : 's'}, so it can take a little longer.` : 'Still looking for peers. It can take a little longer.';
+}
+
 /** Secondary facts of a download row. Release name, path, index, peers and the engine route are details. */
 export function downloadFacts(download: Download, group: { sizeBytes?: number; files?: number } = {}): string {
   const parsed = download.parsed;
