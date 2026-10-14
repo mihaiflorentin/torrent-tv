@@ -55,6 +55,9 @@ _Avoid_: torrent client (unqualified), backend
 **Prepare**:
 Resolve or create the Managed download behind a Source and return its stream URL; the step before any playback.
 
+**Best version**:
+The Source that the primary Play on a title page prepares, picked by the shared `rankSources()` policy (see DESIGN.md "Best version"). The full list stays behind Choose version.
+
 **Source**:
 A playable file entry of a Release — a file inside the torrent, or a virtual per-episode entry.
 _Avoid_: "source" for quality attributes (resolution/codec) — say quality attributes

@@ -55,6 +55,7 @@ Selecting media in My Library or Tracker opens its details. A series item record
 
 - **Play** uses an already managed local or progressive source.
 - **Play and download** adds an unmanaged source and starts playback when its opening pieces are available.
+- The title page's main button picks the **best version** for you: it skips cam and telesync captures, prefers what is already downloaded, then a healthy swarm, 1080p, a good source quality, and a smaller file, and it names the choice on the button. **Choose version** lists every version in that order. For a series it plays the first episode of the season you are looking at.
 - **Resume SxxExx** replaces the primary Play action when a series has unfinished playback. It selects the newest unfinished episode and continues from its saved position; movies use **Resume**.
 - A partial marker on a season means at least one episode is managed but the whole season is not downloaded.
 - A completed download marker means every known episode has at least one completed version.

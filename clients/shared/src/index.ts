@@ -251,5 +251,7 @@ export { ControlsVisibility } from './controls-visibility';
 export type { ControlsVisibilityOptions, ControlsVisibilityPolicy } from './controls-visibility';
 export { DEFAULT_PLAYER_SETTINGS, PLAYER_MUTED_KEY, PLAYER_VOLUME_KEY, clampVolume, loadPlayerSettings, savePlayerSettings } from './player-settings';
 export type { PlayerSettings, PlayerSettingsStorage } from './player-settings';
+export { SEEDERS_BIG_SWARM, SEEDERS_HEALTHY, bestSourceForDetail, playActionLabel, rankSources } from './sources';
+export type { RankOptions } from './sources';
 export { buildPath, parsePath } from './routes';
 export type { Route, View } from './routes';

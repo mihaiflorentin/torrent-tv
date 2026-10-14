@@ -171,6 +171,19 @@ Observed before the redesign: poster cards on both clients show seeders, tracker
 
 Rules that follow. A card answers "what is this and where am I with it", so state beats tracker data. Seeders, size and codec appear at the decision point, the version row, because that is where they change a choice. The release name is evidence, not a headline: it is never the largest text when parsed title data exists, and raw release rows (no catalog match) keep it as the title because nothing better exists. Empty and error states state the cause and the next action in one sentence each.
 
+## Best version
+
+The primary Play on a title page prepares one Source chosen by `rankSources()` (`clients/shared/src/sources.ts`, unit-tested); the button names the choice ("Play and download · 1080p WEB-DL · 4.2 GB") and **Choose version** (web: the picker, whose default sort is Best match; TV: focus moves to the version list) shows every version in the same order. Resume still replaces Play. Ranking, in priority order:
+
+1. Junk captures (CAM, TS, HDCAM, screeners, found in the quality or the release name) go last and lead only when nothing else exists.
+2. Downloaded beats managed (queued, downloading, partial) beats a new Prepare.
+3. A swarm of 3 or more seeders beats a thinner one; when none qualifies, seeders alone decide.
+4. Resolution tier: 1080p, then 4K with HDR or 20+ seeders, 720p, plain 4K, lower, unknown. A small box progressing a 60 GB remux is a worse default than 1080p.
+5. Quality: BluRay, REMUX or WEB-DL, then WEBRip, HDTV, unknown.
+6. More seeders, then the smaller file. Ties keep the server order.
+
+For a series the target is the resume episode, else the target episode of the opened link, else the first episode of the selected season; sources that name another season or episode rank after those that match. A season that only has packs shows no Play (the pack controls stay).
+
 ## Support floor for shipped CSS
 
 Everything shipped to the TV runs on Chromium 63 (Tizen 5) and Chromium 53 (webOS 4): no `gap`, `inset`, `aspect-ratio`, `:is()`, `:where()`, `:focus-visible`, `min()`, `max()`, `clamp()`; no 4- or 8-digit hex; grid only with a flex fallback (the TV stylesheet uses no grid at all, and keeps the empty-handed `@supports not (display: grid)` block that `tools/webos_ipk.py` requires); custom properties are fine (Chromium 49+) but not inside `@media` queries; and comments are scanned too, so do not spell a forbidden construct in a comment. Authored CSS ships verbatim (`cssMinify: false`). `tools/tizen_wgt.py` and `tools/webos_ipk.py` reject violations at pack time; `clients/tv/src/chromium53-css.test.ts` and the design-token test cover the sources.

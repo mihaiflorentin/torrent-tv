@@ -1,6 +1,6 @@
 import { Fragment, render, type JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { API, canonicalHouseholdItems, canonicalLanguage, ControlsVisibility, subtitleRank, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
+import { API, bestSourceForDetail, playActionLabel, canonicalHouseholdItems, canonicalLanguage, ControlsVisibility, subtitleRank, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
 import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation } from './navigation';
 import { PROJECTS_MENU_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_DIAGNOSTICS_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, UPDATE_RELEASE_LINK_ROW, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
 import { AVTrack, clampSeek, formatTime, isDownloadComplete, isEditableTarget, normalizeTrack, parseVTT, playerAction, preferredAudio, SubtitleCue, subtitleAt } from './player';
@@ -1017,7 +1017,14 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
  // for any pack count.
  const packCount = selected?.packSources?.length || 0;
  const episodeRowBase = packsOpen && packCount > 0 ? 5 + packCount * 4 : 4;
- const firstSource = detail.sources[0] || selected?.episodes[0]?.sources[0];
+ // Best version: the primary Play prepares the top-ranked source of the selected season's target episode (movies: of the title). The full list stays below and behind Choose version.
+ const playEpisode = selected && (target.episode && target.season === selected.number ? selected.episodes.find(item => item.number === target.episode) : undefined) || selected?.episodes[0];
+ const firstSource = bestSourceForDetail(detail, { season: selected?.number, episode: playEpisode?.number });
+ const chooseVersion = () => {
+  const episodeKey = playEpisode ? `${playEpisode.season}:${playEpisode.number}` : '';
+  if (episodeKey && expanded !== episodeKey) setExpanded(episodeKey);
+  window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('.source-button')), 0);
+ };
  useEffect(() => { const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(timer); }, []);
  useEffect(() => { if (!pendingPack) return; const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(timer) }, [pendingPack]);
  useEffect(() => { if (!expanded && !expandedPack && !pendingPack) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (pendingPack && !deleting) setPendingPack(null); else if (expandedPack) setExpandedPack(''); else setExpanded('') }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [expanded, expandedPack, pendingPack, deleting]);
@@ -1038,9 +1045,10 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
    <TVStateBadges state={detail.title.libraryState} />
    <p class="detail-overview">{detail.title.overview || 'No description yet. Pick a version to play.'}</p>
    <div class="detail-actions">
-    {resume ? <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onResume(resume)} aria-label={`${resumeActionLabel(resume, detail.title.kind)} at saved position`}>{resumeActionLabel(resume, detail.title.kind)}</button> : firstSource && <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onPlay(firstSource.release, firstSource.fileIndex)}>{sourceActionLabel(firstSource)}</button>}
-    <button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="detail-favorite" aria-pressed={favorite} onClick={() => onFavorite(detail.title, !favorite)}>{favorite ? 'In favorites' : 'Add to favorites'}</button>
-    <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="detail-refresh" aria-disabled={refreshing ? 'true' : undefined} aria-label="Refresh data: fetches fresh series information from the metadata providers and searches all trackers again, then rebuilds the episode list." onClick={() => void refresh()}>{refreshing ? 'Refreshing…' : 'Refresh data'}</button>
+    {resume ? <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onResume(resume)} aria-label={`${resumeActionLabel(resume, detail.title.kind)} at saved position`}>{resumeActionLabel(resume, detail.title.kind)}</button> : firstSource && <button class="primary" data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onPlay(firstSource.release, firstSource.fileIndex)}>{playActionLabel(firstSource)}</button>}
+    {firstSource && <button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="detail-versions" onClick={chooseVersion}>Choose version</button>}
+    <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="detail-favorite" aria-pressed={favorite} onClick={() => onFavorite(detail.title, !favorite)}>{favorite ? 'In favorites' : 'Add to favorites'}</button>
+    <button data-focus-region="content" data-focus-row="1" data-focus-col="3" data-focus-key="detail-refresh" aria-disabled={refreshing ? 'true' : undefined} aria-label="Refresh data: fetches fresh series information from the metadata providers and searches all trackers again, then rebuilds the episode list." onClick={() => void refresh()}>{refreshing ? 'Refreshing…' : 'Refresh data'}</button>
    </div>
    {resume && <small class="resume-file">{resumeLine(resume, detail.title.kind)}</small>}
   </div>
