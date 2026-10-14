@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ControlsVisibility } from '@torrent-tv/shared';
-import { PlayerKeyController, type PlayerFocus } from './player-keys';
+import { PlayerKeyController, SKIP_STEP_MS, type PlayerFocus } from './player-keys';
 
 const TOOLBAR = ['restart', 'back-10', 'play', 'forward-10', 'audio', 'subtitles', 'options', 'back', 'hide'];
 
@@ -89,8 +89,8 @@ describe('Wake: hidden controls', () => {
     expect(calls).toEqual(['reveal', 'focus(subtitles)', 'activate(subtitles)']);
   });
 
-  for (const [action, delta] of [['rewind', -10_000], ['fast-forward', 10_000], ['previous', -10_000], ['next', 10_000]] as const) {
-    it(`${action} seeks one Seek step and the controls stay hidden`, () => {
+  for (const [action, delta] of [['rewind', -10_000], ['fast-forward', 10_000], ['previous', -60_000], ['next', 60_000]] as const) {
+    it(`${action} seeks its step and the controls stay hidden`, () => {
       const { calls, controls, keys } = setupHidden();
       keys.handle(action);
       expect(controls.visible).toBe(false);
@@ -496,5 +496,39 @@ describe('held keys', () => {
     keys.handle('fast-forward', true);
     vi.advanceTimersByTime(550);
     expect(av.requests.map(request => request.ms)).toEqual([90_000]);
+  });
+});
+
+describe('Next and Previous skip a larger step (no episode queue in the player)', () => {
+  it('SKIP_STEP_MS is 60 seconds', () => { expect(SKIP_STEP_MS).toBe(60_000); });
+
+  for (const focus of [
+    { where: 'toolbar', key: 'audio', row: '1' },
+    { where: 'timeline', key: 'timeline', row: '0' },
+    { where: 'none', key: null, row: null },
+  ] as PlayerFocus[]) {
+    it(`skip without moving Control focus and keep visible controls up (${focus.where})`, () => {
+      const { calls, keys, controls } = setup({ focus });
+      keys.handle('next');
+      keys.handle('previous');
+      expect(calls.filter(call => call.startsWith('show'))).toEqual(['show(120000)', 'show(60000)']);
+      expect(calls.some(call => call.startsWith('focus(') || call.startsWith('navigate'))).toBe(false);
+      expect(controls.visible).toBe(true);
+    });
+  }
+
+  it('accumulates on the pending target and commits once; rewind and next mix', () => {
+    const { calls, keys } = setup();
+    keys.handle('next');
+    keys.handle('fast-forward');
+    vi.advanceTimersByTime(600);
+    expect(calls.filter(call => call.startsWith('seekTo'))).toEqual(['seekTo(130000)']);
+  });
+
+  it('clamps at the start', () => {
+    const { calls, keys } = setup();
+    keys.handle('previous');
+    keys.handle('previous');
+    expect(calls.filter(call => call.startsWith('show')).pop()).toBe('show(0)');
   });
 });

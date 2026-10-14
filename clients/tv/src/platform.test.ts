@@ -86,7 +86,13 @@ describe('registerMediaKeys', () => {
     const keys: string[] = [];
     platformWindow.tizen = { tvinputdevice: { registerKey: (key: string) => keys.push(key) } };
     registerMediaKeys();
-    expect(keys).toEqual(['MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop', 'MediaRewind', 'MediaFastForward', 'MediaTrackPrevious', 'MediaTrackNext']);
+    expect(keys).toEqual(['MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop', 'MediaRewind', 'MediaFastForward', 'MediaTrackPrevious', 'MediaTrackNext', 'ChannelUp', 'ChannelDown']);
+  });
+  it('keeps registering when one key is unsupported on older firmware', () => {
+    const keys: string[] = [];
+    platformWindow.tizen = { tvinputdevice: { registerKey: (key: string) => { if (key === 'MediaTrackNext' || key === 'MediaPlay') throw new Error('InvalidValuesError'); keys.push(key); } } };
+    expect(() => registerMediaKeys()).not.toThrow();
+    expect(keys).toEqual(['MediaPlayPause', 'MediaPause', 'MediaStop', 'MediaRewind', 'MediaFastForward', 'MediaTrackPrevious', 'ChannelUp', 'ChannelDown']);
   });
   it('is a silent no-op without the Tizen API', () => {
     expect(() => registerMediaKeys()).not.toThrow();

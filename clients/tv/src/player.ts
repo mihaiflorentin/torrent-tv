@@ -19,6 +19,14 @@ export function isDownloadComplete(download: Download): boolean {
   return download.progress >= 1 || download.state === 'completed' || download.downloadedBytes >= download.sizeBytes;
 }
 
+/** True when key presses belong to a text field, so the player's media keys must leave them alone. */
+export function isEditableTarget(target: { tagName?: string; type?: string; isContentEditable?: boolean } | null | undefined): boolean {
+  if (!target) return false;
+  const tag = String(target.tagName || '').toUpperCase();
+  if (tag === 'TEXTAREA' || target.isContentEditable === true) return true;
+  return tag === 'INPUT' && !/^(checkbox|radio|button|submit|reset|range|image|file|color)$/i.test(target.type || 'text');
+}
+
 export function playerAction(key: string, keyCode: number): PlayerAction {
   if (key === 'MediaPlay') return 'play';
   if (key === 'MediaPause') return 'pause';
@@ -28,6 +36,8 @@ export function playerAction(key: string, keyCode: number): PlayerAction {
   if (key === 'MediaFastForward') return 'fast-forward';
   if (key === 'MediaTrackPrevious') return 'previous';
   if (key === 'MediaTrackNext') return 'next';
+  if (key === 'ChannelUp') return 'next';
+  if (key === 'ChannelDown') return 'previous';
   if (key === 'GoBack' || key === 'BrowserBack' || keyCode === 27) return 'back';
   if (key === 'ArrowLeft' || keyCode === 37) return 'left';
   if (key === 'ArrowRight' || keyCode === 39) return 'right';
@@ -42,7 +52,8 @@ export function playerAction(key: string, keyCode: number): PlayerAction {
   if (keyCode === 412) return 'rewind';
   if (keyCode === 417) return 'fast-forward';
   if (keyCode === 10232) return 'previous';
-  if (keyCode === 10233) return 'next';
+  if (keyCode === 10233 || keyCode === 427) return 'next';
+  if (keyCode === 428) return 'previous';
   return null;
 }
 
