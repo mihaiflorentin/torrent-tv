@@ -273,7 +273,13 @@ func ParseRelease(release TorrentRelease) ParsedRelease {
 	}
 	// Technical tags are read from the part after the title only, as whole
 	// tokens: "HDRip" is not HDR and the title "Atmosphere" is not Atmos.
-	upper := strings.ToUpper(name[titleEnd:])
+	// With no episode marker or year, the tags start at the first technical
+	// token instead.
+	techStart := titleEnd
+	if techStart == len(name) {
+		techStart = boundary
+	}
+	upper := strings.ToUpper(name[techStart:])
 	p.Quality = firstMatch(upper, []string{"REMUX", "BLU-RAY", "BLURAY", "WEB-DL", "WEBRIP", "HDTV", "DVDRIP"})
 	p.VideoCodec = firstMatch(upper, []string{"AV1", "H.265", "H265", "HEVC", "X265", "H.264", "H264", "X264", "XVID"})
 	p.Audio = firstMatch(upper, []string{"TRUEHD", "ATMOS", "DTS-HD", "DTS", "EAC3", "DDP", "AC3", "AAC", "FLAC"})
