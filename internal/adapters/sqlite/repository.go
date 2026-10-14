@@ -781,6 +781,15 @@ func (r *Repository) SaveDownload(ctx context.Context, d domain.Download) error 
 	return err
 }
 
+// UpdateDownloadTelemetry refreshes the live columns of an existing row. It is
+// a no-op when the row is gone, so a poll that raced a delete cannot
+// resurrect the download.
+func (r *Repository) UpdateDownloadTelemetry(ctx context.Context, d domain.Download) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE downloads SET engine_id=?,absolute_path=?,piece_size=?,state=?,progress=?,downloaded_bytes=?,speed_bytes_per_second=?,eta_seconds=?,peers=?,seeds=?,buffered_bytes=?,error=?,tracker_id=?,tracker_name=?,updated_at=? WHERE id=?`,
+		d.EngineID, d.AbsolutePath, d.PieceSize, d.State, d.Progress, d.DownloadedBytes, d.SpeedBytesPerSecond, d.ETASeconds, d.Peers, d.Seeds, d.BufferedBytes, d.Error, d.TrackerID, d.TrackerName, d.UpdatedAt.Unix(), d.ID)
+	return err
+}
+
 func (r *Repository) DeleteDownload(ctx context.Context, id string) error {
 	res, err := r.db.ExecContext(ctx, "DELETE FROM downloads WHERE id=?", id)
 	if err != nil {

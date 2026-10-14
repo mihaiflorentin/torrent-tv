@@ -2215,7 +2215,7 @@ func (s *Service) Downloads(ctx context.Context) ([]domain.Download, error) {
 			// unavailable rather than serving stale persisted state.
 			items[i].Error = s.engineUnavailableErr(items[i].EngineID).Error()
 			items[i].State = "unavailable"
-			_ = s.repo.SaveDownload(ctx, items[i])
+			_ = s.repo.UpdateDownloadTelemetry(ctx, items[i])
 			continue
 		}
 		key := items[i].EngineID + "|" + hash
@@ -2245,7 +2245,7 @@ func (s *Service) Downloads(ctx context.Context) ([]domain.Download, error) {
 		// Telemetry refreshes must not make an existing row look newly added.
 		// Keep UpdatedAt stable so clients can patch progress in place without
 		// the server changing the collection order on every poll.
-		_ = s.repo.SaveDownload(ctx, items[i])
+		_ = s.repo.UpdateDownloadTelemetry(ctx, items[i])
 	}
 	return items, nil
 }

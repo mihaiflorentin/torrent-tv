@@ -97,6 +97,7 @@ type Repository interface {
 	SyncAge(context.Context, string) (int64, error)
 	RecordSync(context.Context, string, int, error) error
 	SaveDownload(context.Context, domain.Download) error
+	UpdateDownloadTelemetry(context.Context, domain.Download) error
 	DeleteDownload(context.Context, string) error
 	GetDownload(context.Context, string) (domain.Download, error)
 	FindDownload(context.Context, string, int) (domain.Download, error)
