@@ -61,7 +61,9 @@ Out: per-request prepare optimization beyond what the lease work touches, `Downl
 
 ### Admission
 
-Serialize survey, reservation, `engine.Add` and row save behind one admission mutex in `Prepare`, held for the shortest span that covers the survey-to-save window. If holding it across `engine.Add` is too long, reserve the requested bytes in memory under the mutex and release the reservation after the row is saved or the add fails. The reservation counts against the Allocation for concurrent callers. Which of the two is used is a ticket-level decision; both satisfy the requirement that no interleaving can exceed the cap.
+Serialize survey, reservation, `engine.Add` and row save behind one admission mutex in `Prepare`, held for the shortest span that covers the survey-to-save window. If holding it across `engine.Add` is too long, reserve the requested bytes in memory under the mutex and release the reservation after the row is saved or the add fails. The reservation counts against the Allocation for concurrent callers. Both satisfy the requirement that no interleaving can exceed the cap.
+
+**Chosen: in-memory reservation.** `ensureAllocationRoom` takes `admissionMu` only for the survey, eviction and reservation, and counts `reservedBytes` as stored. The caller holds an `allocationReservation` and releases it by `defer` once the row is saved or the request fails. `engine.Add` and the metadata wait run outside the lock, so a slow add never stalls another stream's admission.
 
 ### Native session restore
 

@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mihaiflorentin/torrent-tv/internal/domain"
@@ -44,6 +45,8 @@ type Service struct {
 	providerSlots    map[string]chan struct{}
 	pendingMu        sync.Mutex
 	pendingMetadata  map[string]bool
+	admissionMu      sync.Mutex
+	reservedBytes    atomic.Int64
 	leaseMu          sync.Mutex
 	leases           map[string]int
 	mediaInfoMu      sync.Mutex
@@ -1467,7 +1470,11 @@ func (s *Service) TestEngine(ctx context.Context) (string, error) {
 // the retention job uses) and the survey re-run; only when nothing evictable
 // remains does the download fail with a visible Allocation problem. A zero
 // Allocation disables the whole check.
-func (s *Service) ensureAllocationRoom(ctx context.Context, release domain.TorrentRelease, incoming int64) error {
+func (s *Service) ensureAllocationRoom(ctx context.Context, release domain.TorrentRelease, incoming int64, held *allocationReservation) error {
+	s.admissionMu.Lock()
+	defer s.admissionMu.Unlock()
+	// Drop this request's earlier estimate so it never counts against itself.
+	held.release()
 	settings := s.settings.Get()
 	if settings.AllocationGB <= 0 {
 		return nil
@@ -1482,7 +1489,7 @@ func (s *Service) ensureAllocationRoom(ctx context.Context, release domain.Torre
 	if err := refuseUncertainOwners(plan); err != nil {
 		return err
 	}
-	plan.storedBytes += incoming
+	plan.storedBytes += incoming + s.reservedBytes.Load()
 	reason, tripped := retentionDeficit(plan, settings)
 	rules := config.NormalizeEvictionRules(settings.EvictionRules)
 	for tripped {
@@ -1510,10 +1517,33 @@ func (s *Service) ensureAllocationRoom(ctx context.Context, release domain.Torre
 		if err := refuseUncertainOwners(plan); err != nil {
 			return err
 		}
-		plan.storedBytes += incoming
+		plan.storedBytes += incoming + s.reservedBytes.Load()
 		reason, tripped = retentionDeficit(plan, settings)
 	}
+	held.reserve(s, incoming)
 	return nil
+}
+
+// allocationReservation is the in-memory claim one admitted request holds on
+// the Allocation between the capacity decision and its saved download row,
+// the window in which the row-based survey cannot yet see the torrent. Later
+// admissions count claimed bytes as stored. The zero value holds nothing.
+type allocationReservation struct {
+	s     *Service
+	bytes int64
+}
+
+func (r *allocationReservation) reserve(s *Service, bytes int64) {
+	r.s, r.bytes = s, bytes
+	s.reservedBytes.Add(bytes)
+}
+
+// release is idempotent and never blocks, so failure paths can defer it.
+func (r *allocationReservation) release() {
+	if r.s != nil && r.bytes != 0 {
+		r.s.reservedBytes.Add(-r.bytes)
+	}
+	r.bytes = 0
 }
 
 // refuseUncertainOwners is the admission gate for survey uncertainty: a
@@ -1573,7 +1603,10 @@ func (s *Service) Prepare(ctx context.Context, releaseID string, fileIndex int) 
 	if err != nil {
 		return domain.Download{}, err
 	}
-	if err := s.ensureAllocationRoom(ctx, release, 0); err != nil {
+	// The reservation lives until the row is saved or the request fails.
+	reservation := &allocationReservation{}
+	defer reservation.release()
+	if err := s.ensureAllocationRoom(ctx, release, 0, reservation); err != nil {
 		return domain.Download{}, err
 	}
 	metainfo, err := s.releaseMetainfo(ctx, release)
@@ -1599,7 +1632,7 @@ func (s *Service) Prepare(ctx context.Context, releaseID string, fileIndex int) 
 		incoming = totalFiles
 	}
 	if incoming > release.SizeBytes {
-		if err := s.ensureAllocationRoom(ctx, release, incoming); err != nil {
+		if err := s.ensureAllocationRoom(ctx, release, incoming, reservation); err != nil {
 			return domain.Download{}, err
 		}
 	}
@@ -1852,6 +1885,8 @@ func (s *Service) PrepareSeason(ctx context.Context, releaseID string, season in
 		season = 1
 	}
 
+	reservation := &allocationReservation{}
+	defer reservation.release()
 	var engine TorrentEngine
 	engineID, hash, enginePrefix := "", "", ""
 	unavailableOwner := ""
@@ -1877,7 +1912,7 @@ func (s *Service) PrepareSeason(ctx context.Context, releaseID string, season in
 		if err != nil {
 			return nil, err
 		}
-		if err := s.ensureAllocationRoom(ctx, release, 0); err != nil {
+		if err := s.ensureAllocationRoom(ctx, release, 0, reservation); err != nil {
 			return nil, err
 		}
 		metainfo, err := s.releaseMetainfo(ctx, release)
@@ -1903,7 +1938,7 @@ func (s *Service) PrepareSeason(ctx context.Context, releaseID string, season in
 			incoming = totalFiles
 		}
 		if incoming > release.SizeBytes {
-			if fitErr := s.ensureAllocationRoom(ctx, release, incoming); fitErr != nil {
+			if fitErr := s.ensureAllocationRoom(ctx, release, incoming, reservation); fitErr != nil {
 				return nil, fitErr
 			}
 		}
