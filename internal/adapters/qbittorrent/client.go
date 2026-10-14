@@ -31,6 +31,8 @@ type Client struct {
 	ready    sync.Map
 	logged   bool
 	authless bool
+	user     string
+	pass     string
 
 	gateMu    sync.Mutex
 	hashGates map[string]*hashGate
@@ -46,9 +48,11 @@ func (c *Client) login(ctx context.Context) error {
 	defer c.mu.Unlock()
 	base, user, pass := c.settings()
 	base = strings.TrimRight(base, "/") + "/"
-	if c.base != base {
-		c.base = base
-		c.logged = false
+	if c.base != base || c.user != user || c.pass != pass {
+		// New URL or credentials: any session, and the credential-free
+		// assumption, belongs to the previous settings.
+		c.base, c.user, c.pass = base, user, pass
+		c.logged, c.authless = false, false
 	}
 	if c.logged {
 		return nil
@@ -124,14 +128,19 @@ func (c *Client) do(ctx context.Context, method, path string, body io.Reader, co
 	}
 	resp.Body.Close()
 	c.mu.Lock()
-	authless := c.authless
 	c.logged = false
+	c.mu.Unlock()
+	// Re-read the settings: credentials may have been added since an
+	// credential-free start. Only a client that is still credential-free
+	// after that has nothing left to try.
+	if err := c.login(ctx); err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	authless := c.authless
 	c.mu.Unlock()
 	if authless {
 		return nil, fmt.Errorf("qBittorrent rejected the credential-free request with HTTP 403")
-	}
-	if err := c.login(ctx); err != nil {
-		return nil, err
 	}
 	return outbound.Do(ctx, c.http, makeReq, outbound.Policy{Provider: "qBittorrent", Attempts: 3, MaxInlineDelay: 10 * time.Second})
 }
@@ -493,7 +502,7 @@ func playable(p string) bool {
 // unchanged so novel engine states are never silently reclassified.
 func canonicalState(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "downloading", "metadl", "forceddl", "stalleddl", "allocating", "checkingdl", "checkingresumedata":
+	case "downloading", "metadl", "forcedmetadl", "forceddl", "stalleddl", "allocating", "checkingdl", "checkingresumedata":
 		return domain.StateDownloading
 	case "uploading", "stalledup", "forcedup", "checkingup":
 		return domain.StateSeeding

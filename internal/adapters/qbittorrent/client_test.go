@@ -452,7 +452,7 @@ func TestCanonicalState(t *testing.T) {
 	cases := map[string]string{
 		"downloading": domain.StateDownloading, "metaDL": domain.StateDownloading,
 		"forcedDL": domain.StateDownloading, "stalledDL": domain.StateDownloading,
-		"uploading": domain.StateSeeding, "stalledUP": domain.StateSeeding,
+		"uploading": domain.StateSeeding, "stalledUP": domain.StateSeeding, "forcedMetaDL": domain.StateDownloading,
 		"pausedDL": domain.StatePausedDL, "stoppedDL": domain.StatePausedDL,
 		"pausedUP": domain.StatePausedUP, "stoppedUP": domain.StatePausedUP,
 		"queuedDL": domain.StateQueued, "queuedUP": domain.StateQueued,

@@ -144,7 +144,16 @@ func appShell(web fs.FS) http.Handler {
 	files := http.FileServer(http.FS(web))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && !strings.HasPrefix(r.URL.Path, "/api/") {
-			if _, err := fs.Stat(web, strings.TrimPrefix(r.URL.Path, "/")); err != nil {
+			name := strings.TrimPrefix(r.URL.Path, "/")
+			info, err := fs.Stat(web, name)
+			if err == nil && info.IsDir() && name != "" {
+				// The file server would render a directory listing; only a
+				// directory with its own index.html is served as-is.
+				if _, indexErr := fs.Stat(web, name+"/index.html"); indexErr != nil {
+					err = indexErr
+				}
+			}
+			if err != nil {
 				if index, indexErr := fs.ReadFile(web, "index.html"); indexErr == nil {
 					w.Header().Set("Cache-Control", "no-cache")
 					w.Header().Set("Content-Type", "text/html; charset=utf-8")
