@@ -72,14 +72,14 @@ afterEach(() => {
 
 type Mounted = { host: HTMLElement; onClose: Mock; video: HTMLVideoElement; root: HTMLElement };
 
-async function mountPlayer(resumeMs = 0): Promise<Mounted> {
+async function mountPlayer(resumeMs = 0, patch: Partial<Download> = {}): Promise<Mounted> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   mountedHosts.push(host);
   const onClose = vi.fn();
   await act(async () => {
     render(
-      <BrowserPlayer active={{ download, resumeMs, preferences }} onClose={onClose} onStateChanged={vi.fn()} onAdvance={vi.fn()} />,
+      <BrowserPlayer active={{ download: { ...download, ...patch }, resumeMs, preferences }} onClose={onClose} onStateChanged={vi.fn()} onAdvance={vi.fn()} />,
       host,
     );
   });
@@ -496,5 +496,29 @@ describe('OSD feedback', () => {
     expect(mounted.host.querySelector('.osd')).not.toBeNull(); // refreshed, not hidden
     await act(async () => { vi.advanceTimersByTime(500) });
     expect(mounted.host.querySelector('.osd')).toBeNull(); // 2s after the last tick
+  });
+});
+
+describe('player heading', () => {
+  it('names the title with its episode code and leaves the tracker and release name out', async () => {
+    const mounted = await mountPlayer(0, { displayTitle: 'Silo', releaseName: 'Silo.S01E04.1080p.WEB-DL-GRP', parsed: { title: 'Silo', sortTitle: 'silo', kind: 'series', seasonStart: 1, episodeStart: 4 } });
+    const heading = mounted.host.querySelector('.player-heading')!;
+    expect(heading.querySelector('strong')!.textContent).toBe('Silo · S01E04');
+    expect(heading.textContent).not.toMatch(/FileList|WEB-DL|Downloaded file/);
+    expect(mounted.host.querySelector('.tracker-badge')).toBeNull();
+  });
+
+  it('surfaces the transfer mode only while streaming progressively', async () => {
+    const progressive = await mountPlayer(0, { playbackMode: 'progressive' });
+    expect(progressive.host.querySelector('.player-note')!.textContent).toBe('Streaming while downloading');
+    const local = await mountPlayer(0, { playbackMode: 'local' });
+    expect(local.host.querySelectorAll('.player-note')).toHaveLength(0);
+  });
+
+  it('shows the current Audio and Subtitles choice on their buttons', async () => {
+    const mounted = await mountPlayer();
+    const labels = Array.from(mounted.host.querySelectorAll<HTMLButtonElement>('.player-control-row button')).map(button => button.textContent);
+    expect(labels).toContain('Audio · English');
+    expect(labels).toContain('Subtitles · Off');
   });
 });

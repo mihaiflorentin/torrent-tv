@@ -7,6 +7,9 @@ import { formatBytes, SettingsField, TrackerStatus } from '@torrent-tv/shared';
 import { LanguageSelect } from './language-select';
 import { trackerSourceKey } from './tracker-badge';
 import { sharedApi } from './shared-api';
+import { StatusBadge } from './status-badge';
+import { connectionStatus } from './presentation';
+import { Icon } from './icons';
 
 export function Events({ onError, confirmRebuild = false }: { onError: (value: string) => void; confirmRebuild?: boolean }) {
   const [message, setMessage] = useState('');
@@ -15,7 +18,7 @@ export function Events({ onError, confirmRebuild = false }: { onError: (value: s
   // The standalone Events page keeps the one-click behavior; the Settings
   // Maintenance tab asks first because the rebuild sweeps every category.
   const requestRebuild = () => { if (confirmRebuild) setPendingRebuild(true); else void run('rebuild') };
-  return <section class="events-page"><p class="supporting">Run safe server maintenance without waiting for the schedule.</p><div class="event-actions"><article><h2>Fetch latest</h2><p>Append the newest releases from every enabled tracker to the existing catalog.</p><button type="button" class="primary" onClick={() => void run('latest')}>Fetch latest</button></article><article><h2>Rebuild catalog</h2><p>Refresh the maximum API-visible results from every enabled category. Existing discoveries are retained.</p><button type="button" onClick={requestRebuild}>Rebuild catalog</button></article></div>{message && <p role="status" class="success">{message}</p>}{pendingRebuild && <div class="overlay" role="dialog" aria-modal="true" aria-label="Rebuild catalog"><section class="help-modal"><h2>Rebuild catalog?</h2><p>Refreshes every enabled category's latest window and rebuilds local projections. Nothing is removed; the work runs as a background job you can follow on the Jobs page.</p><div class="confirm-actions"><button type="button" onClick={() => setPendingRebuild(false)}>Cancel</button><button type="button" class="primary" onClick={() => void run('rebuild')}>Rebuild now</button></div></section></div>}</section>
+  return <section class="events-page"><p class="supporting">Run catalog maintenance now instead of waiting for the schedule. Both are safe to repeat and never remove titles.</p><div class="event-actions"><article><h2>Fetch latest</h2><p>Add the newest releases from every enabled tracker to the catalog.</p><button type="button" class="primary" onClick={() => void run('latest')}>Fetch latest</button></article><article><h2>Rebuild catalog</h2><p>Refresh every enabled category in full. Titles already in the catalog are kept.</p><button type="button" onClick={requestRebuild}>Rebuild catalog</button></article></div>{message && <p role="status" class="success">{message}</p>}{pendingRebuild && <div class="overlay" role="dialog" aria-modal="true" aria-label="Rebuild catalog"><section class="help-modal"><h2>Rebuild catalog?</h2><p>Refreshes every enabled category's latest window and rebuilds local projections. Nothing is removed; the work runs as a background job you can follow on the Jobs page.</p><div class="confirm-actions"><button type="button" onClick={() => setPendingRebuild(false)}>Cancel</button><button type="button" class="primary" onClick={() => void run('rebuild')}>Rebuild now</button></div></section></div>}</section>
 }
 
 export function CacheCoverage() { const [status, setStatus] = useState<Record<string, unknown> | null>(null); useEffect(() => { sharedApi().call<Record<string, unknown>>('/catalog/status').then(setStatus).catch(() => { }) }, []); if (!status) return null; return <section class="cache-coverage"><h2>Observed catalog coverage</h2><p><strong>{Number(status.observedReleases).toLocaleString()}</strong> releases retained · <strong>{Number(status.discoverableReleases).toLocaleString()}</strong> currently seeded · {Number(status.hiddenDiscovery).toLocaleString()} releases hidden</p><p class="supporting">Trackers expose a bounded recent-release window per request (FileList: {String(status.fileListLatestWindowLimit)}). Searches and future syncs continue growing this append-only cache.</p></section> }
@@ -34,7 +37,7 @@ function TrackerReadiness({ tick }: { tick: number }) {
       <div class="tracker-chips">
         {trackers.map((tracker: TrackerStatus) => (
           <span key={tracker.id} class={`tracker-chip ${tracker.enabled ? 'on' : 'off'}${trackerSourceKey(tracker.id) ? ` accent-${trackerSourceKey(tracker.id)}` : ''}`}>
-            {tracker.name}{tracker.enabled ? (tracker.configured ? ' · ready' : ' · needs setup') : ' · disabled'}
+            {tracker.enabled && !tracker.configured && <Icon name="alert" />}{tracker.name}{tracker.enabled ? (tracker.configured ? ' · ready' : ' · needs setup') : ' · disabled'}
           </span>
         ))}
       </div>
@@ -77,24 +80,32 @@ const TABS: Array<{ id: string; label: string }> = [
 const ACCOUNT_TAB = { id: 'account', label: 'Account' };
 const tabsFor = (accountsEnabled: boolean) => accountsEnabled ? [...TABS.slice(0, 4), ACCOUNT_TAB, ...TABS.slice(4)] : TABS;
 
-const TAB_GROUPS: Record<string, Array<{ title: string; note?: string; fields: SettingsRow[]; when?: (current: Record<string, unknown>) => boolean }>> = {
+type SettingsGroup = { title: string; note?: string; fields: SettingsRow[]; when?: (current: Record<string, unknown>) => boolean; advanced?: boolean };
+const TAB_GROUPS: Record<string, SettingsGroup[]> = {
   tracker: [
     { title: 'Enabled trackers', note: 'Disabling a tracker hides its discovery. Existing downloads remain listed and playable.', fields: [['FileList enabled', 'fileListEnabled', 'checkbox'], ['The Pirate Bay enabled', 'pirateBayEnabled', 'checkbox']] },
     { title: 'FileList account', fields: [['FileList URL', 'fileListUrl'], ['FileList username', 'fileListUsername'], ['FileList passkey', 'fileListPasskey', 'password']] },
-    { title: 'The Pirate Bay', fields: [['The Pirate Bay website URL', 'pirateBayWebsiteUrl'], ['The Pirate Bay API URL (advanced)', 'pirateBayApiUrl']] },
-    { title: 'Metadata', fields: [['TMDB API key or token', 'tmdbApiKey', 'password'], ['Metadata language', 'metadataLanguage', 'language', 'tmdb'], ['Metadata fallback language', 'metadataFallbackLanguage', 'language', 'tmdb'], ['Metadata providers (priority order)', 'metadataProviders']] },
+    { title: 'The Pirate Bay', fields: [['The Pirate Bay website URL', 'pirateBayWebsiteUrl']] },
+    { title: 'Metadata', fields: [['TMDB API key or token', 'tmdbApiKey', 'password'], ['Metadata language', 'metadataLanguage', 'language', 'tmdb'], ['Metadata fallback language', 'metadataFallbackLanguage', 'language', 'tmdb']] },
+    { title: 'Advanced', advanced: true, fields: [['The Pirate Bay API URL (advanced)', 'pirateBayApiUrl'], ['Metadata providers (priority order)', 'metadataProviders']] },
   ],
   storage: [
     { title: 'Download engine', note: 'Selection controls new acquisitions. Existing downloads keep the engine that owns them.', fields: [['Download engine', 'downloadEngine', 'engine-toggle']] },
-    { title: 'Built-in torrent engine', fields: [['Torrent peer port', 'torrentPeerPort', 'number'], ['Torrent public peer port', 'torrentPublicPeerPort', 'number'], ['Torrent session directory', 'torrentSessionDir']], when: current => current.downloadEngine === 'native' },
     { title: 'qBittorrent', fields: [['qBittorrent URL', 'qbittorrentUrl'], ['qBittorrent username', 'qbittorrentUsername'], ['qBittorrent password', 'qbittorrentPassword', 'password']], when: current => current.downloadEngine === 'qbittorrent' },
-    { title: 'Storage', fields: [['Download root', 'downloadRoot'], ['Allocation (GB)', 'allocationGb', 'number', '0.5'], ['Free-space reserve (GB)', 'reserveGb', 'number', '0.5'], ['Eviction rules (comma separated)', 'evictionRules'], ['Protect incomplete downloads', 'protectIncomplete', 'checkbox'], ['Protect actively streamed downloads', 'protectLeased', 'checkbox'], ['Protect favorites', 'protectFavorites', 'checkbox'], ['Protect never-watched downloads', 'protectNeverWatched', 'checkbox'], ['Artwork cache path', 'artworkCachePath'], ['Artwork cache maximum', 'artworkCacheMaxBytes', 'bytes', 'GB']] },
+    { title: 'Storage', fields: [['Download root', 'downloadRoot'], ['Allocation (GB)', 'allocationGb', 'number', '0.5'], ['Free-space reserve (GB)', 'reserveGb', 'number', '0.5'], ['Eviction rules (comma separated)', 'evictionRules'], ['Protect incomplete downloads', 'protectIncomplete', 'checkbox'], ['Protect actively streamed downloads', 'protectLeased', 'checkbox'], ['Protect favorites', 'protectFavorites', 'checkbox'], ['Protect never-watched downloads', 'protectNeverWatched', 'checkbox']] },
+    { title: 'Built-in engine (advanced)', advanced: true, fields: [['Torrent peer port', 'torrentPeerPort', 'number'], ['Torrent public peer port', 'torrentPublicPeerPort', 'number'], ['Torrent session directory', 'torrentSessionDir']], when: current => current.downloadEngine === 'native' },
+    { title: 'Advanced', advanced: true, fields: [['Artwork cache path', 'artworkCachePath'], ['Artwork cache maximum', 'artworkCacheMaxBytes', 'bytes', 'GB']] },
   ],
   playback: [
-    { title: 'Playback and subtitles', fields: [['Initial buffer', 'initialBufferBytes', 'bytes', 'MB'], ['Read-ahead', 'readAheadBytes', 'bytes', 'MB'], ['Piece timeout seconds', 'pieceWaitTimeoutSeconds', 'number'], ['SubDL API URL', 'subDLUrl'], ['SubDL API key', 'subDLApiKey', 'password'], ['Preferred audio language', 'preferredAudioLanguage', 'language'], ['Preferred subtitle language', 'preferredSubtitleLanguage', 'language'], ['Fallback subtitle language', 'fallbackSubtitleLanguage', 'language'], ['Watched threshold percent', 'watchedThresholdPercent', 'number'], ['Subtitle cache path', 'subtitleCachePath'], ['Subtitle cache maximum', 'subtitleCacheMaxBytes', 'bytes', 'GB'], ['ffprobe path', 'ffprobePath'], ['FFmpeg path', 'ffmpegPath']] },
+    { title: 'Buffering', fields: [['Initial buffer', 'initialBufferBytes', 'bytes', 'MB'], ['Read-ahead', 'readAheadBytes', 'bytes', 'MB'], ['Piece timeout seconds', 'pieceWaitTimeoutSeconds', 'number'], ['Watched threshold percent', 'watchedThresholdPercent', 'number']] },
+    { title: 'Languages', fields: [['Preferred audio language', 'preferredAudioLanguage', 'language'], ['Preferred subtitle language', 'preferredSubtitleLanguage', 'language'], ['Fallback subtitle language', 'fallbackSubtitleLanguage', 'language']] },
+    { title: 'Subtitle provider', fields: [['SubDL API key', 'subDLApiKey', 'password']] },
+    { title: 'Advanced', advanced: true, fields: [['SubDL API URL', 'subDLUrl'], ['Subtitle cache path', 'subtitleCachePath'], ['Subtitle cache maximum', 'subtitleCacheMaxBytes', 'bytes', 'GB'], ['ffprobe path', 'ffprobePath'], ['FFmpeg path', 'ffmpegPath']] },
   ],
   server: [
-    { title: 'Server and background work', fields: [['Server name', 'instanceName'], ['Listen address', 'listenAddress'], ['Database path', 'databasePath'], ['Catalog max age hours', 'catalogMaxAgeHours', 'number'], ['Maximum concurrent jobs', 'maxConcurrentJobs', 'number'], ['Title refresh timeout minutes', 'titleRefreshTimeoutMinutes', 'number'], ['Trusted CIDRs (comma separated)', 'trustedCidrs']] },
+    { title: 'Server', fields: [['Server name', 'instanceName'], ['Listen address', 'listenAddress'], ['Trusted CIDRs (comma separated)', 'trustedCidrs']] },
+    { title: 'Background work', fields: [['Catalog max age hours', 'catalogMaxAgeHours', 'number'], ['Maximum concurrent jobs', 'maxConcurrentJobs', 'number'], ['Title refresh timeout minutes', 'titleRefreshTimeoutMinutes', 'number']] },
+    { title: 'Advanced', advanced: true, fields: [['Database path', 'databasePath']] },
   ],
   account: [
     { title: 'Supporter account', fields: [['Supporter API key', 'portalAPIKey', 'password']] },
@@ -289,20 +300,24 @@ export function Settings({ value, fields, onSaved, onError, onDirtyChange, accou
     }
     return <label><span>{label}{info.restartRequired && <small> restart required</small>}{info.readOnly && <small> environment managed</small>}<button type="button" class="help-button" aria-label={`Help for ${label}`} title={info.help} onClick={() => setHelp(info)}>?</button></span><input disabled={info.readOnly} type={type || 'text'} step={type === 'number' ? (step || undefined) : undefined} value={String(current[key] ?? '')} placeholder={type === 'password' && value[`${key}Configured`] ? 'Configured — leave blank to keep' : key === 'evictionRules' ? 'oldest-completed' : ''} onInput={e => setCurrent({ ...current, [key]: type === 'number' ? Number(e.currentTarget.value) : e.currentTarget.value })} /></label>;
   };
-  const diagnostics = (connections: typeof CONNECTIONS) => <section class="diagnostics"><h2>Connection checks</h2>{connections.map(connection => <div key={connection.name}><button type="button" onClick={() => void test(connection.name)}>Test {connection.label}</button><span role="status">{tests[connection.name]}</span>{connection.name === 'storage' && storageFolders && <ul class="storage-folders">{storageFolders.map(folder => <li key={folder.path} class={folder.ok ? 'ok' : 'failed'}><span class="folder-name">{folder.label}</span><code>{folder.path}</code><span class="folder-status">{folder.ok ? `writable${folder.freeBytes ? ` · ${formatBytes(folder.freeBytes)} free` : ''}` : folder.detail}</span></li>)}</ul>}</div>)}</section>;
+  const diagnostics = (connections: typeof CONNECTIONS) => <section class="diagnostics"><h2>Connection checks</h2>{connections.map(connection => { const status = connectionStatus(connState[connection.name]); return <div key={connection.name} class="check-row"><button type="button" onClick={() => void test(connection.name)}>Test {connection.label}</button>{status && <StatusBadge tone={status.tone} label={status.label} />}<span role="status">{tests[connection.name]}</span>{connection.name === 'storage' && storageFolders && <ul class="storage-folders">{storageFolders.map(folder => <li key={folder.path} class={folder.ok ? 'ok' : 'failed'}><span class="folder-name">{folder.label}</span><code>{folder.path}</code><span class="folder-status">{folder.ok ? `writable${folder.freeBytes ? ` · ${formatBytes(folder.freeBytes)} free` : ''}` : folder.detail}</span></li>)}</ul>}</div> })}</section>;
   const panelContent = () => {
     const liveNote = serverLive === false && <p class="supporting" role="note">Start the server to run these — they talk to the live server.</p>;
     if (activeTab === 'maintenance') return <>{liveNote}<CacheCoverage /><Events onError={onError} confirmRebuild /></>;
     if (activeTab === 'test') return <>{liveNote}{diagnostics(CONNECTIONS)}</>;
     const visibleGroups = () => (TAB_GROUPS[activeTab] || []).filter(group => !group.when || group.when(current));
-    return <>{activeTab === 'tracker' && <TrackerReadiness tick={readinessTick} />}{visibleGroups().map(renderGroup)}{connectionsFor(activeTab).length > 0 && diagnostics(connectionsFor(activeTab))}</>;
+    const groupStatus = connectionStatus(tabLed(activeTab));
+    return <>{groupStatus && <p class="group-status"><StatusBadge tone={groupStatus.tone} label={groupStatus.label} /><span>From the connection checks on this tab.</span></p>}{activeTab === 'tracker' && <TrackerReadiness tick={readinessTick} />}{visibleGroups().map(renderGroup)}{connectionsFor(activeTab).length > 0 && diagnostics(connectionsFor(activeTab))}</>;
   };
-  const renderGroup = (group: { title: string; note?: string; fields: SettingsRow[]; when?: (current: Record<string, unknown>) => boolean }) => {
+  const renderGroup = (group: SettingsGroup) => {
     // Switches read best as their own full-width list under the value fields.
     const inputs = group.fields.filter(field => field[2] !== 'checkbox' && field[2] !== 'engine-toggle');
     const switches = group.fields.filter(field => field[2] === 'checkbox');
     const toggles = group.fields.filter(field => field[2] === 'engine-toggle');
-    return <fieldset><legend>{group.title}</legend>{group.note && <p class="supporting group-note">{group.note}</p>}{toggles.length > 0 && <div class="fields">{toggles.map(renderField)}</div>}{inputs.length > 0 && <div class="fields">{inputs.map(renderField)}</div>}{switches.length > 0 && <div class="switch-list">{switches.map(renderField)}</div>}</fieldset>;
+    const body = <>{group.note && <p class="supporting group-note">{group.note}</p>}{toggles.length > 0 && <div class="fields">{toggles.map(renderField)}</div>}{inputs.length > 0 && <div class="fields">{inputs.map(renderField)}</div>}{switches.length > 0 && <div class="switch-list">{switches.map(renderField)}</div>}</>;
+    // Raw paths, ports and ids stay out of the way until asked for; an edited one holds the group open.
+    if (group.advanced) return <details class="advanced-group" open={group.fields.some(field => current[field[1]] !== formValue(field[1], value[field[1]])) || undefined}><summary>{group.title}</summary>{body}</details>;
+    return <fieldset><legend>{group.title}</legend>{body}</fieldset>;
   };
   return <>
     <form class="settings" onSubmit={save}>
@@ -311,7 +326,7 @@ export function Settings({ value, fields, onSaved, onError, onDirtyChange, accou
       </div>
       <div class="settings-panel" role="tabpanel">{panelContent()}</div>
       {isConfigTab(activeTab) && <><div class="settings-actions"><span class="dirty-count" role="status">{tabEdits(activeTab).length > 0 ? `${tabEdits(activeTab).length} unsaved ${tabEdits(activeTab).length === 1 ? 'change' : 'changes'}` : ''}</span><button type="button" disabled={tabEdits(activeTab).length === 0} onClick={discard}>Discard changes</button><button class="primary" type="submit" disabled={tabEdits(activeTab).length === 0}>Save changes</button></div>{message && <p class="settings-status" role="status">{message}</p>}</>}
-      <p class="settings-footer">Stored securely at {String(value.settingsPath || 'data/settings.json')}. Blank secrets keep their current value. Fields supplied by the process environment are shown read-only.</p>
+      <div class="settings-footer"><p>Blank secrets keep their current value. Fields supplied by the process environment are shown read-only.</p><details class="advanced-group"><summary>Settings file</summary><p>Stored securely at {String(value.settingsPath || 'data/settings.json')}.</p></details></div>
     </form>
     {updateSection}
     {help && <div class="overlay" role="dialog" aria-modal="true" aria-label={`Help for ${help.label}`}><section class="help-modal"><button class="close" onClick={() => setHelp(null)}>Close</button><h2>{help.label}</h2><p>{help.help}</p>{help.readOnly && <p><strong>This setting is managed by the process environment and cannot be edited here.</strong></p>}{help.restartRequired && <p><strong>Restart required after changing this setting.</strong></p>}{help.obtain && <><h3>Where to get it</h3><p>{linkify(help.obtain)}</p></>}<button onClick={() => void navigator.clipboard.writeText([help.help, help.obtain].filter(Boolean).join('\n\n')).then(() => setMessage('Help copied.'))}>Copy help</button></section></div>}

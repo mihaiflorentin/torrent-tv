@@ -21,7 +21,7 @@ Environment constraints: no local installs; runtime verification against the Pi 
 | Hide timer | 5000 ms, single literal `web/src.tsx:198` | 5000 ms inside `revealControls`, `clients/tizen/src/main.tsx:97` |
 | Reveal triggers | `mousemove`/`keydown` on player root, `web/src.tsx:165-172` | every recognized remote key routes through `revealControls`, `main.tsx:249` |
 | Paused behavior | hides anyway (`controlsHold` covers only panels/messages, `web/src.tsx:85`) | sticky while paused (`main.tsx:148`) |
-| Cursor hiding | exists, CSS `web/style.css:1897-1905` | n/a |
+| Cursor hiding | exists, CSS `web/style.css` (`.video:not(.controls-visible)`) | n/a |
 | Manual hide button | none | none (toolbar row: Restart, −10s, Play, +10s, Audio, Subtitles, Options, Back — `main.tsx:313-317`, focus cols 0–7) |
 
 Both clients already have the full hide machinery (`controlsVisible` state + `controls-visible` class + CSS); no new plumbing needed.

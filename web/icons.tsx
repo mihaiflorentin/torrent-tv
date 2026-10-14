@@ -10,6 +10,8 @@ export function Icon({ name }: { name: string }) {
     search: 'M10.5 4a6.5 6.5 0 1 0 4.1 11.55L20 21l1-1-5.45-5.4A6.5 6.5 0 0 0 10.5 4z',
     library: 'M4 5h16v14H4zM8 5v14',
     play: 'M8 5v14l11-7z',
+    pause: 'M8 5v14M16 5v14',
+    alert: 'M12 4 2.5 20h19zM12 10v4.5M12 17.4v.2',
     heart: 'M12 21S4 16 4 9.5C4 5 9.5 3 12 7c2.5-4 8-2 8 2.5C20 16 12 21 12 21z',
     check: 'm5 12 4 4L19 6',
     download: 'M12 3v12m-5-5 5 5 5-5M4 21h16',

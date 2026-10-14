@@ -83,20 +83,44 @@ describe('downloads page cards', () => {
   expect(document.body.textContent).not.toContain('No download error');
  });
 
- it('shows which engine owns each download', async () => {
+ it('keeps the engine, swarm and file facts behind the Details control', async () => {
   await openDownloads();
-  const text = document.body.textContent || '';
+  const card = document.querySelector('.download-list article')!;
+  expect(card.textContent).not.toContain('native engine');
+  expect(card.textContent).not.toContain('12 peers');
+  expect(card.textContent).not.toContain('index 0');
+  await act(async () => { Array.from(card.querySelectorAll('button')).find(b => b.textContent === 'Details')!.click() });
+  const text = card.textContent || '';
   expect(text).toContain('native engine');
-  expect(text).toContain('qBittorrent');
+  expect(text).toContain('native:abc123');
+  expect(text).toContain('3 connected seeds');
+  expect(text).toContain('12 peers');
+  expect(text).toContain(nativeDownload.filePath);
+  expect(Array.from(card.querySelectorAll('button')).some(b => b.textContent === 'Hide details')).toBe(true);
+  const other = document.querySelectorAll('.download-list article')[1];
+  await act(async () => { Array.from(other.querySelectorAll('button')).find(b => b.textContent === 'Details')!.click() });
+  expect(other.textContent).toContain('qBittorrent');
  });
 
- it('shows live swarm facts and ETA per card', async () => {
+ it('shows percent, speed and ETA while a download is active', async () => {
+  vi.spyOn(API.prototype, 'downloads').mockResolvedValue({ items: [{ ...nativeDownload, error: '' }] as never[], nextCursor: null, total: 1 });
   await openDownloads();
-  const text = document.body.textContent || '';
-  expect(text).toContain('12 peers');
-  expect(text).toContain('3 connected seeds');
-  expect(text).toContain('ETA 9 min');
-  expect(text).toContain('5.2 MB/s');
+  const text = document.querySelector('.download-list article')!.textContent || '';
+  expect(text).toContain('Downloading · 42% · 5.2 MB/s · ETA 9 min');
+  expect(text).toContain('Playable while downloading');
+ });
+
+ it('shows Paused without speed or ETA', async () => {
+  vi.spyOn(API.prototype, 'downloads').mockResolvedValue({ items: [{ ...nativeDownload, error: '', state: 'pausedDL', speedBytesPerSecond: 0 }] as never[], nextCursor: null, total: 1 });
+  await openDownloads();
+  const text = document.querySelector('.download-list article')!.textContent || '';
+  expect(text).toContain('Paused · 42%');
+  expect(text).not.toContain('ETA');
+ });
+
+ it('leaves out a tracker it cannot name instead of printing a placeholder', async () => {
+  await openDownloads();
+  expect(document.body.textContent).not.toContain('Unknown tracker');
  });
 });
 
