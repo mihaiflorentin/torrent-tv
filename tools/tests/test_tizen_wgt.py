@@ -170,6 +170,9 @@ class WGTTests(unittest.TestCase):
         ("Unicode property escapes", b"var letters=/\\p{L}+/u.test(text);"),
         ("new AbortController", b"var controller=new AbortController();"),
         ("new AbortController", b"var controller=new AbortController;"),
+        ("optional chaining", b"var v=a?.b;"),
+        ("nullish coalescing", b"var v=a??b;"),
+        ("optional catch binding", b"try{x();}catch{y();}"),
     )
 
     def test_rejects_floor_missing_apis(self):

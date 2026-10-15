@@ -1,6 +1,6 @@
 // webOS 4.x TVs run Chromium 53, which lacks Object.entries (added in
 // Chromium 54) and String.prototype.padStart/padEnd (added in Chromium 57)
-// used by the shared TV sources. The core-js modules feature-detect each
+// used by the shared TV sources (and Promise.prototype.finally, Chromium 63). The core-js modules feature-detect each
 // capability internally and install a standards-compliant patch only when the
 // native method is missing, so newer engines keep native behavior. This module
 // is imported before any shared module evaluates (see entry-webos.ts).
@@ -11,3 +11,6 @@
 import 'core-js/modules/es.object.entries';
 import 'core-js/modules/es.string.pad-start';
 import 'core-js/modules/es.string.pad-end';
+// Promise.prototype.finally arrived in Chromium 63; the shared sources avoid it,
+// this keeps a future use (or a dependency) from breaking webOS 4.
+import 'core-js/modules/es.promise.finally';

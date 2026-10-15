@@ -83,6 +83,62 @@ REQUIRED_GRID_FALLBACKS: tuple[bytes, ...] = (
     b".job-log-expanded dl",
 )
 
+# JS API and syntax floor for the Chromium 53 engine of webOS TV 4.x. esbuild
+# (target chrome53) lowers syntax but never adds library APIs, so these shapes
+# would reach the TV and throw (an uncaught TypeError kills the screen).
+# Method rules anchor to the calling dot and owner-qualified rules pin the
+# receiver, as in tizen_wgt.ENGINE_FLOOR_APIS. Object.entries, padStart/padEnd
+# are polyfilled by clients/webos/src/compat.ts and getOwnPropertyDescriptors
+# by startup.js, so they are not listed. The static scan can reject prose that
+# mentions a call shape; the Chromium 53 boot smoke is the dynamic backstop.
+WEBOS_FLOOR_APIS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
+    # Chromium 54-63 additions.
+    ("Object.values", re.compile(rb"\bObject\s*\.\s*values\s*\(")),
+    ("Promise.prototype.finally", re.compile(rb"\.\s*finally\s*\(")),
+    ("queueMicrotask", re.compile(rb"\bqueueMicrotask\s*\(")),
+    # Chromium 64 and later.
+    ("flatMap", re.compile(rb"\.\s*flatMap\s*\(")),
+    ("flat", re.compile(rb"\.\s*flat\s*\(")),
+    ("Object.fromEntries", re.compile(rb"\bObject\s*\.\s*fromEntries\s*\(")),
+    ("globalThis", re.compile(rb"\bglobalThis\s*(?:\.|\[)")),
+    ("String.replaceAll", re.compile(rb"\.\s*replaceAll\s*\(")),
+    ("matchAll", re.compile(rb"\.\s*matchAll\s*\(")),
+    ("structuredClone", re.compile(rb"\bstructuredClone\s*\(")),
+    ("Promise.allSettled", re.compile(rb"\bPromise\s*\.\s*allSettled\s*\(")),
+    ("Promise.any", re.compile(rb"\bPromise\s*\.\s*any\s*\(")),
+    ("Promise.withResolvers", re.compile(rb"\bPromise\s*\.\s*withResolvers\s*\(")),
+    (".at", re.compile(rb"\.\s*at\s*\(")),
+    ("ResizeObserver", re.compile(rb"\bnew\s+ResizeObserver\b|\bResizeObserver\s*\(")),
+    ("trimStart", re.compile(rb"\.\s*trimStart\s*\(")),
+    ("trimEnd", re.compile(rb"\.\s*trimEnd\s*\(")),
+    ("replaceChildren", re.compile(rb"\.\s*replaceChildren\s*\(")),
+    ("Object.hasOwn", re.compile(rb"\bObject\s*\.\s*hasOwn\s*\(")),
+    ("findLast", re.compile(rb"\.\s*findLast(?:Index)?\s*\(")),
+    ("toSorted", re.compile(rb"\.\s*toSorted\s*\(")),
+    ("toReversed", re.compile(rb"\.\s*toReversed\s*\(")),
+    ("regex named groups", re.compile(rb"\(\?<[A-Za-z_$]")),
+    ("Unicode property escapes", re.compile(rb"\\[pP]\{")),
+    # Syntax esbuild should have lowered for target chrome53; residue means the
+    # build target drifted.
+    ("optional chaining", re.compile(rb"\?\.(?![0-9])")),
+    ("nullish coalescing", re.compile(rb"\?\?")),
+    ("optional catch binding", re.compile(rb"\bcatch\s*\{")),
+    ("object spread", re.compile(rb"\{\s*\.\.\.[\w$(\[]")),
+    ("async function", re.compile(rb"\basync\s+function\b|\basync\s*\([^)]*\)\s*=>|\basync\s+[A-Za-z_$][\w$]*\s*=>")),
+)
+# The Promise.prototype.finally rule is waived when the bundle carries the
+# core-js polyfill (compat.ts), which defines it on the prototype.
+PROMISE_FINALLY_POLYFILL = re.compile(rb"prototype\s*\.\s*finally\b|\.finally\.call\(")
+# A bare 'new AbortController' throws on Chromium 53 (added in 66). It is
+# allowed only when a capability guard sits before it. The window is wider than
+# Tizen's because ares-package minifies the app: terser inverts an early
+# 'if (!supportsAbortController) return fallback()' guard and inlines the
+# fallback ahead of the 'new AbortController', pushing the guard ~500 bytes away.
+ABORT_CONTROLLER_NEW = re.compile(rb"\bnew\s+AbortController\b")
+ABORT_CONTROLLER_GUARD = re.compile(rb"typeof\s+AbortController\b|\bsupportsAbortController\b")
+ABORT_CONTROLLER_GUARD_WINDOW = 1500
+FLOOR_SCANNED_SCRIPTS = ("app.js", "startup.js", "fatal-error.js")
+
 ICON_DIMENSIONS: dict[str, tuple[int, int] | tuple[tuple[int, int], ...]] = {
     "icon.png": (80, 80),
     "largeIcon.png": (130, 130),
@@ -330,6 +386,29 @@ def validate_built_css(filename: str, content: bytes) -> None:
             )
 
 
+def validate_app_engine_floor(files: dict[str, bytes]) -> None:
+    """Reject JS API or syntax shapes the Chromium 53 engine of webOS 4 lacks."""
+    for script in FLOOR_SCANNED_SCRIPTS:
+        data = files.get(script)
+        if data is None:
+            continue
+        has_finally_polyfill = bool(PROMISE_FINALLY_POLYFILL.search(data))
+        missing = [
+            name for name, pattern in WEBOS_FLOOR_APIS
+            if pattern.search(data) and not (name == "Promise.prototype.finally" and has_finally_polyfill)
+        ]
+        for match in ABORT_CONTROLLER_NEW.finditer(data):
+            window = data[max(0, match.start() - ABORT_CONTROLLER_GUARD_WINDOW):match.start()]
+            if not ABORT_CONTROLLER_GUARD.search(window):
+                missing.append("new AbortController")
+                break
+        if missing:
+            raise WebosIpkError(
+                f"{script!r} uses {len(missing)} floor-missing API(s): "
+                f"{', '.join(missing)}; the webOS 4 Chromium 53 engine lacks them"
+            )
+
+
 def validate_archive(
     file: Path,
     target_version: str | None = None,
@@ -460,6 +539,7 @@ def validate_archive(
                 )
 
     validate_built_css("app.css", app_files["app.css"])
+    validate_app_engine_floor(app_files)
 
     return (
         f"Compatible webOS package structure: id={pkg_id}, version={appinfo['version']}, "

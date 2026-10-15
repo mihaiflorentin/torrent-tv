@@ -355,6 +355,52 @@ class WebosIpkTests(unittest.TestCase):
                     with self.assertRaisesRegex(webos_ipk.WebosIpkError, "still contains an ES module import or export"):
                         webos_ipk.validate_archive(bad)
 
+    def test_rejects_post_chromium53_apis_and_syntax_in_packaged_js(self):
+        cases = {
+            "Promise.prototype.finally": b"load().then(a).finally(function () { done = true; });",
+            "Object.values": b"var v = Object.values(map);",
+            "flat": b"var f = rows.flat();",
+            "flatMap": b"var f = rows.flatMap(fn);",
+            "Object.fromEntries": b"var o = Object.fromEntries(pairs);",
+            "Promise.allSettled": b"Promise.allSettled(list);",
+            "String.replaceAll": b"name.replaceAll('a', 'b');",
+            "ResizeObserver": b"new ResizeObserver(cb);",
+            "queueMicrotask": b"queueMicrotask(fn);",
+            "optional chaining": b"var v = a?.b;",
+            "nullish coalescing": b"var v = a ?? b;",
+            "optional catch binding": b"try { x(); } catch { y(); }",
+            "object spread": b"var o = {...base, x: 1};",
+            "async function": b"var f = async function () {};",
+            "new AbortController": b"var c = new AbortController();",
+        }
+        with tempfile.TemporaryDirectory() as td:
+            for needle, script in cases.items():
+                for name in ("app.js", "startup.js", "fatal-error.js"):
+                    bad = self.write_ipk_file(
+                        self.make_ipk(extra_data={f"usr/palm/applications/com.torrenttv.app/{name}": script}),
+                        Path(td), name="floor.ipk",
+                    )
+                    with self.subTest(api=needle, script=name):
+                        with self.assertRaisesRegex(webos_ipk.WebosIpkError, re.escape(needle)):
+                            webos_ipk.validate_archive(bad, target_version=ROOT_VERSION)
+
+    def test_accepts_guarded_or_polyfilled_floor_shapes(self):
+        safe = (
+            b"var ok = typeof AbortController == 'function' ? new AbortController() : null;"
+            b"try { x(); } catch (e) { y(); } finally { z(); }"
+            b"var t = a ? .5 : 1; var d = Object.getOwnPropertyDescriptors;"
+            b"var s = Object.entries(m), p = '7'.padStart(2, '0'), c = rows.charAt(0);"
+        )
+        inverted = b"function f(c){return c.supportsAbortController?(function(){" + b"x();" * 150 + b"})():new AbortController}"
+        polyfilled = b"var q = getBuiltIn('Promise').prototype.finally; load().finally(function () {});"
+        with tempfile.TemporaryDirectory() as td:
+            for script in (safe, polyfilled, inverted):
+                ipk = self.write_ipk_file(
+                    self.make_ipk(extra_data={"usr/palm/applications/com.torrenttv.app/app.js": script}),
+                    Path(td), name="safe.ipk",
+                )
+                webos_ipk.validate_archive(ipk, target_version=ROOT_VERSION)
+
     def test_rejects_webapis_reference(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

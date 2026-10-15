@@ -31,7 +31,14 @@ async function attemptOnce(token, tag) {
   });
   if (response.ok) {
     // The payload only decides the log wording; it is never echoed.
-    const { changed } = await response.json();
+    // A 2xx with an empty or non-JSON body is still a completed sync, so a
+    // parse failure must not trigger a retry.
+    let changed;
+    try {
+      ({ changed } = await response.json());
+    } catch {
+      changed = undefined;
+    }
     return changed === false ? 'no-op' : 'synchronized';
   }
   return PERMANENT_STATUSES.has(response.status) ? 'permanent' : 'retry';

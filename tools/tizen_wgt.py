@@ -55,6 +55,12 @@ ENGINE_FLOOR_APIS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     # '(?<name>' only: lookbehind '(?<=' and '(?<!' are not named groups.
     ("regex named groups", re.compile(rb"\(\?<[A-Za-z_$]")),
     ("Unicode property escapes", re.compile(rb"\\[pP]\{")),
+    # Syntax residue: esbuild lowers these for the Chromium 63 target, so a hit
+    # means the build target drifted. Optional catch binding is Chromium 66,
+    # optional chaining and nullish coalescing are Chromium 80.
+    ("optional chaining", re.compile(rb"\?\.(?![0-9])")),
+    ("nullish coalescing", re.compile(rb"\?\?")),
+    ("optional catch binding", re.compile(rb"\bcatch\s*\{")),
 )
 # A bare 'new AbortController' throws on Chromium 63. It is allowed only when a
 # capability guard sits just before it; the window approximates "same function"

@@ -627,7 +627,7 @@ export function Catalog({ api, status, titles, facets, household, downloads, job
  const focusSearchField = () => window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="search-input"]')), 0);
  const runRecent = (term: string) => { setDraftQuery(term); setQuery(term); setRecent(recordRecentSearch(deviceStorage(), term)); focusSearchField() };
  const forgetRecent = () => { clearRecentSearches(deviceStorage()); setRecent([]); focusSearchField() };
- const loadMore = () => { if (loadingMore.current || !nextCursor) return; loadingMore.current = true; api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor: nextCursor }).then(page => { setRemoteTitles(current => [...current, ...page.items]); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); }).catch(() => { }).finally(() => { loadingMore.current = false; }); };
+ const loadMore = () => { if (loadingMore.current || !nextCursor) return; loadingMore.current = true; api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor: nextCursor }).then(page => { setRemoteTitles(current => [...current, ...page.items]); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); }).catch(() => { }).then(() => { loadingMore.current = false; }); };
  useEffect(() => { const updated = (event: Event) => { const titleId = String((event as CustomEvent).detail?.titleId || ''); if (!titleId || detailRef.current?.title.id !== titleId) return; void api.title(titleId).then(next => { setDetail(next); setDetailMessage(needsEpisodeExpansion(next) ? 'Preparing the individual episode list…' : '') }).catch(error => setDetailMessage((error as Error).message)) }; window.addEventListener('catalog-title-updated', updated); return () => window.removeEventListener('catalog-title-updated', updated) }, [api]);
  useEffect(() => {
   const titleId = detail?.title.kind === 'series' ? detail.title.id : ''; if (!titleId) return; let stopped = false; let running = false; const refresh = async () => {
@@ -873,7 +873,7 @@ function TVJobs({ api, items: initial }: { api: API; items: Job[] }) {
   // Catalog signals a jobs keypress near the list end; appends are guarded
   // so rapid keypresses cannot double-fetch the same page.
   let busy = false;
-  const onNear = () => { if (busy || !next) return; busy = true; api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: next }).then(page => { setItems(value => [...value, ...page.items]); setNext(page.nextCursor) }).catch(error => setMessage((error as Error).message)).finally(() => { busy = false }) };
+  const onNear = () => { if (busy || !next) return; busy = true; api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: next }).then(page => { setItems(value => [...value, ...page.items]); setNext(page.nextCursor) }).catch(error => setMessage((error as Error).message)).then(() => { busy = false }) };
   window.addEventListener('tv-jobs-near-end', onNear);
   return () => window.removeEventListener('tv-jobs-near-end', onNear);
  });
