@@ -4,8 +4,10 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -15,10 +17,15 @@ func newSeasonsTestClient(t *testing.T, handler http.HandlerFunc, apiKey string)
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 	var requests []*http.Request
+	var mu sync.Mutex
 	c := New(func() string { return apiKey })
 	c.base = server.URL
 	c.http = server.Client()
-	c.onRequest = func(r *http.Request) { requests = append(requests, r) }
+	c.onRequest = func(r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		requests = append(requests, r)
+	}
 	return c, &requests
 }
 
@@ -83,6 +90,7 @@ func TestSeriesSeasonsFetchesShowAndSeasons(t *testing.T) {
 	if len(paths) != 3 {
 		t.Fatalf("expected show fetch plus two season fetches, got %v", paths)
 	}
+	sort.Strings(paths[1:]) // season fetches run concurrently
 	if paths[0] != "/3/tv/51445?language=ro-RO" {
 		t.Fatalf("show fetch lost the language parameter: %s", paths[0])
 	}
