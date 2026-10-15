@@ -89,3 +89,85 @@ describe('Channel keys skip episodes', () => {
     expect(keys.playtime(1234)).toBe(true);
   });
 });
+
+describe('while an asynchronous episode skip is pending', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  function deferred() {
+    let resolve!: (value: boolean | void) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<boolean | void>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  }
+
+  it('ignores seek input for the episode being left', async () => {
+    const gate = deferred();
+    const { calls, keys } = setup(true, () => gate.promise);
+    keys.handle('next-episode');
+    keys.handle('fast-forward');
+    keys.handle('right');
+    keys.seekBy(10_000);
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls.some(call => call.startsWith('seekTo') || call.startsWith('show'))).toBe(false);
+    gate.resolve(true);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  it('holds an already pending seek timer until the result and drops it on an accepted switch', async () => {
+    const gate = deferred();
+    const { calls, keys } = setup(true, () => gate.promise);
+    keys.handle('fast-forward');
+    keys.handle('next-episode');
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls.some(call => call.startsWith('seekTo'))).toBe(false);
+    gate.resolve(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls.some(call => call.startsWith('seekTo'))).toBe(false);
+    expect(keys.playtime(1234)).toBe(true);
+  });
+
+  it('commits the held seek after a refused result', async () => {
+    const gate = deferred();
+    const { calls, keys } = setup(true, () => gate.promise);
+    keys.handle('fast-forward');
+    keys.handle('next-episode');
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    gate.resolve(false);
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls).toContain('seekTo(70000)');
+  });
+
+  it('commits the held seek after a rejected lookup and accepts input again', async () => {
+    const gate = deferred();
+    const { calls, keys } = setup(true, () => gate.promise);
+    keys.handle('fast-forward');
+    keys.handle('next-episode');
+    gate.reject(new Error('offline'));
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls).toContain('seekTo(70000)');
+    keys.handle('fast-forward');
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls).toContain('seekTo(80000)');
+  });
+
+  it('does not drop a seek for the new episode when dispose already ran before the result', async () => {
+    const gate = deferred();
+    const { calls, keys } = setup(true, () => gate.promise);
+    keys.handle('next-episode');
+    keys.dispose(); // the app reset the controller for the new episode
+    keys.handle('fast-forward');
+    gate.resolve(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls).toContain('seekTo(70000)');
+  });
+});

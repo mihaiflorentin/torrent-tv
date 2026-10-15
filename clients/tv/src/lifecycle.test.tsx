@@ -978,6 +978,22 @@ describe('Player Channel key episode skipping', () => {
     expect(onEpisode).not.toHaveBeenCalled();
   });
 
+  it('ignores seek input while the episode lookup is pending and keeps a refused skip\'s held seek', async () => {
+    let resolve: (value: Download | null) => void = () => { };
+    (mockApi.nextEpisode as Mock).mockReturnValue(new Promise<Download | null>(r => { resolve = r; }));
+    await mount();
+    press('MediaFastForward', 0); // armed, not yet committed
+    press('ChannelUp', 0);
+    await tick();
+    press('MediaFastForward', 0); // ignored: belongs to the episode being left
+    await tick(700);
+    expect(mockAVPlay.seekTo).toHaveBeenCalledTimes(1); // only the initial resume seek
+    resolve(null); // no sibling: the viewer keeps watching, the held seek lands
+    await tick(700);
+    expect(mockAVPlay.seekTo).toHaveBeenCalledTimes(2);
+    expect(mockAVPlay.seekTo).toHaveBeenLastCalledWith(55_000, expect.anything(), expect.anything());
+  });
+
   it('MediaTrackNext still seeks instead of skipping an episode', async () => {
     await mount();
     press('MediaTrackNext', 0);

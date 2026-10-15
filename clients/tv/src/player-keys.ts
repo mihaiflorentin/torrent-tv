@@ -76,6 +76,12 @@ export class PlayerKeyController {
   #committed = false;
   /** Identifies the committed seek, so a superseded seek's callbacks cannot resolve a newer one. */
   #seekId = 0;
+  /** An asynchronous episode skip awaits its result; seek input is ignored meanwhile. */
+  #skipPending = false;
+  /** Invalidates a pending skip's result when dispose() runs before it arrives. */
+  #skipEpoch = 0;
+  /** A seek was waiting on its commit timer when the skip began; it is re-armed if the skip is refused. */
+  #heldCommit = false;
 
   constructor(ports: PlayerKeyPorts) {
     this.#ports = ports;
@@ -94,9 +100,24 @@ export class PlayerKeyController {
       if (!p.skipEpisode) return;
       // The pending seek belongs to the episode being left, but only once the switch is accepted: with no sibling
       // episode or a failed lookup the viewer keeps watching this one and the seek must still land.
+      if (this.#skipPending) return;
       const outcome = p.skipEpisode(action === 'next-episode' ? 'next' : 'previous');
       if (outcome && typeof (outcome as Promise<unknown>).then === 'function') {
-        void (outcome as Promise<boolean | void>).then(accepted => { if (accepted !== false) this.dispose(); }, () => {});
+        // Until the result, seek input is ignored and an armed commit timer is held, so nothing lands on the stream
+        // being left; a dispose() in between (player reset) invalidates this skip.
+        const epoch = ++this.#skipEpoch;
+        this.#skipPending = true;
+        this.#heldCommit = this.#target !== null && !this.#committed;
+        clearTimeout(this.#commitTimer);
+        const settle = (accepted: boolean): void => {
+          if (epoch !== this.#skipEpoch) return;
+          this.#skipPending = false;
+          const held = this.#heldCommit;
+          this.#heldCommit = false;
+          if (accepted) this.dispose();
+          else if (held && this.#target !== null && !this.#committed) this.#commitTimer = setTimeout(() => this.#commit(), SEEK_COMMIT_MS);
+        };
+        void (outcome as Promise<boolean | void>).then(accepted => settle(accepted !== false), () => settle(false));
       } else if (outcome !== false) this.dispose();
       return;
     }
@@ -150,6 +171,7 @@ export class PlayerKeyController {
 
   /** Accumulate one Seek step onto the pending target and commit it after the idle pause. */
   #step(delta: number, hidden: boolean): void {
+    if (this.#skipPending) return;
     const p = this.#ports;
     const next = this.#aim(this.resumeTarget() + delta);
     if (hidden) p.announce(next);
@@ -170,6 +192,7 @@ export class PlayerKeyController {
 
   /** Seek to an absolute position at once (Restart). Tracked like a committed Seek step. */
   seekTo(target: number): void {
+    if (this.#skipPending) return;
     this.#aim(target);
     this.#commit();
   }
@@ -186,6 +209,9 @@ export class PlayerKeyController {
 
   /** Drop the pending target and timers: the player closed, suspended or reopened. */
   dispose(): void {
+    this.#skipEpoch++;
+    this.#skipPending = false;
+    this.#heldCommit = false;
     clearTimeout(this.#commitTimer);
     this.#release();
   }

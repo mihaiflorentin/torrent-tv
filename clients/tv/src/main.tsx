@@ -125,7 +125,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    await save();
    showTransientMessage(direction === 'next' ? 'Loading next episode…' : 'Loading previous episode…', 10_000);
    const target = await (direction === 'next' ? api.nextEpisode(download.id) : api.previousEpisode(download.id));
-   if (token !== session.current) return true;
+   if (token !== session.current) return false; // the player closed or suspended: no switch happened
    if (!target) { showTransientMessage(direction === 'next' ? 'No next episode' : 'No previous episode'); return false; }
    onEpisode(target, preferenceRef.current);
    return true;
