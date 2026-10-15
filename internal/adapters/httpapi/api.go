@@ -80,6 +80,7 @@ func New(service *application.Service, settings *config.Store, log *slog.Logger,
 	mux.HandleFunc("POST /api/v1/catalog/search", a.searchTitles)
 	mux.HandleFunc("GET /api/v1/catalog/titles", a.catalogTitles)
 	mux.HandleFunc("GET /api/v1/catalog/titles/{id}", a.catalogTitle)
+	mux.HandleFunc("GET /api/v1/catalog/titles/{id}/info", a.catalogTitleInfo)
 	mux.HandleFunc("POST /api/v1/catalog/titles/{id}/refresh", a.refreshCatalogTitle)
 	mux.HandleFunc("POST /api/v1/catalog/sync", a.catalogSync)
 	mux.HandleFunc("GET /api/v1/catalog/status", a.catalogStatus)
@@ -168,7 +169,7 @@ func appShell(web fs.FS) http.Handler {
 
 func (a *API) info(w http.ResponseWriter, r *http.Request) {
 	settings := a.settings.Get()
-	write(w, 200, map[string]any{"name": "Torrent TV", "instanceName": settings.InstanceName, "version": a.version, "apiVersion": "v1", "configured": configured(settings), "capabilities": []string{"catalog", "canonicalCatalog", "metadata", "artworkProxy", "qbittorrent", "rangeStreaming", "mediaInfo", "audioAnchor", "settingsFile", "householdState", "canonicalFavorites", "persistentJobs", "subtitles", "serverDiscovery", "browserAudioTranscode"}})
+	write(w, 200, map[string]any{"name": "Torrent TV", "instanceName": settings.InstanceName, "version": a.version, "apiVersion": "v1", "configured": configured(settings), "capabilities": []string{"catalog", "canonicalCatalog", "metadata", "artworkProxy", "qbittorrent", "rangeStreaming", "mediaInfo", "audioAnchor", "settingsFile", "householdState", "canonicalFavorites", "persistentJobs", "subtitles", "titleInfo", "serverDiscovery", "browserAudioTranscode"}})
 }
 
 func (a *API) clientDiagnostic(w http.ResponseWriter, r *http.Request) {
@@ -454,6 +455,15 @@ func (a *API) catalogTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	write(w, http.StatusOK, detail)
+}
+
+func (a *API) catalogTitleInfo(w http.ResponseWriter, r *http.Request) {
+	info, err := a.service.TitleInfo(r.Context(), r.PathValue("id"))
+	if err != nil {
+		problem(w, http.StatusInternalServerError, err)
+		return
+	}
+	write(w, http.StatusOK, info)
 }
 
 func (a *API) catalogFacets(w http.ResponseWriter, r *http.Request) {

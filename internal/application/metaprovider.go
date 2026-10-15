@@ -70,6 +70,21 @@ func (c *metadataChain) SeriesSeasons(ctx context.Context, provider, providerID,
 	return entry.SeriesSeasons(ctx, provider, providerID, language)
 }
 
+// TitleInfo routes an extended-details request to the named provider; a
+// provider that does not implement the capability reports an error so callers
+// degrade to cached metadata.
+func (c *metadataChain) TitleInfo(ctx context.Context, provider, providerID string, kind domain.MediaKind, language, fallback string) (domain.TitleInfo, error) {
+	entry, ok := c.byID[provider]
+	if !ok {
+		return domain.TitleInfo{}, fmt.Errorf("unknown metadata provider %q", provider)
+	}
+	details, ok := entry.(TitleInfoProvider)
+	if !ok {
+		return domain.TitleInfo{}, fmt.Errorf("metadata provider %q does not serve title details", provider)
+	}
+	return details.TitleInfo(ctx, provider, providerID, kind, language, fallback)
+}
+
 func (c *metadataChain) OpenArtwork(ctx context.Context, path, kind string) (io.ReadCloser, string, error) {
 	entry, ok := c.byID["tmdb"]
 	if !ok {

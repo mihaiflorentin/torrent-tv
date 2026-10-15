@@ -89,7 +89,7 @@ describe('Home hero', () => {
     expect(text(hero.querySelector('.hero-kicker'))).toBe('2021 · Movie');
     expect(text(hero.querySelector('.hero-genres'))).toBe('Drama · Mystery');
     expect(text(hero.querySelector('.hero-overview'))).toContain('lighthouse keepers');
-    expect(hero.querySelectorAll('button')).toHaveLength(1);
+    expect(Array.from(hero.querySelectorAll('button')).map(button => text(button))).toEqual(['View versions', 'Info']);
     expect(text(hero.querySelector('button'))).toBe('View versions');
   });
 
@@ -104,7 +104,7 @@ describe('Home hero', () => {
     vi.spyOn(API.prototype, 'titles').mockResolvedValue({ items: [vesper], nextCursor: null, total: 1 });
     await mountApp();
     const hero = document.querySelector('.hero')!;
-    expect(text(hero.querySelector('.hero-kicker'))).toBe('2020 · 2 seasons');
+    expect(text(hero.querySelector('.hero-kicker'))).toBe('Since 2020 · 2 seasons');
     expect(text(hero.querySelector('button'))).toBe('View episodes');
     expect(hero.querySelector('.hero-overview')).toBeNull();
     expect(hero.querySelector('.hero-genres')).toBeNull();

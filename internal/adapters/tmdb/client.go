@@ -193,12 +193,12 @@ func selectResult(result findResult, kind domain.MediaKind, language string) (do
 
 func tvMetadata(result findResult, language string) domain.CatalogMetadata {
 	x := result.TVResults[0]
-	return domain.CatalogMetadata{ProviderID: strconv.FormatInt(x.ID, 10), Title: x.Name, OriginalTitle: x.OriginalName, Overview: x.Overview, PosterPath: x.PosterPath, BackdropPath: x.BackdropPath, Language: language, Rating: x.VoteAverage, RatingVotes: x.VoteCount, RatingProvider: "tmdb", Year: yearFromDate(x.FirstAirDate)}
+	return domain.CatalogMetadata{ProviderID: strconv.FormatInt(x.ID, 10), Title: x.Name, OriginalTitle: x.OriginalName, Overview: x.Overview, PosterPath: x.PosterPath, BackdropPath: x.BackdropPath, Language: language, Rating: x.VoteAverage, RatingVotes: x.VoteCount, RatingProvider: "tmdb", Year: yearFromDate(x.FirstAirDate), ReleaseDate: normalizeDate(x.FirstAirDate), Kind: domain.MediaSeries}
 }
 
 func movieMetadata(result findResult, language string) domain.CatalogMetadata {
 	x := result.MovieResults[0]
-	return domain.CatalogMetadata{ProviderID: strconv.FormatInt(x.ID, 10), Title: x.Title, OriginalTitle: x.OriginalTitle, Overview: x.Overview, PosterPath: x.PosterPath, BackdropPath: x.BackdropPath, Language: language, Rating: x.VoteAverage, RatingVotes: x.VoteCount, RatingProvider: "tmdb", Year: yearFromDate(x.ReleaseDate)}
+	return domain.CatalogMetadata{ProviderID: strconv.FormatInt(x.ID, 10), Title: x.Title, OriginalTitle: x.OriginalTitle, Overview: x.Overview, PosterPath: x.PosterPath, BackdropPath: x.BackdropPath, Language: language, Rating: x.VoteAverage, RatingVotes: x.VoteCount, RatingProvider: "tmdb", Year: yearFromDate(x.ReleaseDate), ReleaseDate: normalizeDate(x.ReleaseDate), Kind: domain.MediaMovie}
 }
 
 func yearFromDate(value string) int {
@@ -217,8 +217,11 @@ func (c *Client) OpenArtwork(ctx context.Context, path, kind string) (io.ReadClo
 		return nil, "", fmt.Errorf("invalid TMDB artwork path")
 	}
 	size := "w500"
-	if kind == "backdrop" {
+	switch kind {
+	case "backdrop":
 		size = "w1280"
+	case "profile":
+		size = "w185"
 	}
 	address := "https://image.tmdb.org/t/p/" + size + path
 	resp, err := outbound.Do(ctx, c.http, func() (*http.Request, error) { return http.NewRequestWithContext(ctx, http.MethodGet, address, nil) }, outbound.Policy{Provider: "TMDB artwork", Attempts: 3, MaxInlineDelay: 10 * time.Second})

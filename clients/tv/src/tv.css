@@ -2256,3 +2256,205 @@ button.primary.active {
  margin-right: var(--tt-space-5);
  color: var(--tt-text)
 }
+
+/* Info panel ----------------------------------------------------------
+   A side sheet over a veil. It is its own focus region, so the D-pad stays inside: Close, the summary
+   block, one row per cast member, the fine print. Everything is flex and block (no grid, no gap, no
+   sticky) for Chromium 53; the sheet scrolls and focus reveals the stop it lands on. */
+.info-panel {
+ position: fixed;
+ top: 0;
+ left: 0;
+ width: 1920px;
+ height: 1080px;
+ z-index: 60;
+ background: var(--tt-veil)
+}
+
+.info-sheet {
+ position: absolute;
+ top: 0;
+ right: 0;
+ width: 1160px;
+ height: 1080px;
+ padding: var(--tt-tv-safe-y) var(--tt-space-7);
+ display: flex;
+ flex-direction: column;
+ background: var(--tt-overlay);
+ border-left: 1px solid var(--tt-line-strong)
+}
+
+.info-head {
+ flex: 0 0 auto;
+ display: flex;
+ align-items: center;
+ justify-content: space-between
+}
+
+.info-head h2 {
+ flex: 1 1 auto;
+ min-width: 0;
+ margin-right: var(--tt-space-5);
+ font-size: var(--tt-tv-text-heading);
+ font-weight: var(--tt-weight-bold);
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap
+}
+
+.info-scroll {
+ flex: 1 1 auto;
+ min-height: 0;
+ margin-top: var(--tt-space-5);
+ padding: var(--tt-space-2) var(--tt-space-3) var(--tt-space-7) var(--tt-space-2);
+ overflow-y: auto
+}
+
+.info-stop {
+ display: block;
+ width: 100%;
+ margin-bottom: var(--tt-space-3);
+ padding: var(--tt-space-4) var(--tt-space-5);
+ text-align: left;
+ font-weight: var(--tt-weight-regular, 400);
+ background: transparent;
+ border-color: transparent
+}
+
+.info-stop:focus {
+ background: var(--tt-raised)
+}
+
+.info-stop>span {
+ display: block
+}
+
+.info-meta {
+ color: var(--tt-accent);
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold)
+}
+
+.info-tagline {
+ margin-top: var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-lead);
+ font-style: italic;
+ line-height: var(--tt-leading-tight)
+}
+
+.info-overview {
+ margin-top: var(--tt-space-4);
+ font-size: var(--tt-tv-text-body);
+ line-height: 1.5
+}
+
+.info-genres {
+ margin-top: var(--tt-space-4);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta)
+}
+
+.info-credit {
+ margin: var(--tt-space-4) 0 0;
+ padding: 0 var(--tt-space-5);
+ font-size: var(--tt-tv-text-body);
+ color: var(--tt-text-muted)
+}
+
+.info-credit b,
+.info-fine b {
+ margin-right: var(--tt-space-2);
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold)
+}
+
+.info-subheading {
+ margin: var(--tt-space-6) 0 var(--tt-space-3);
+ padding: 0 var(--tt-space-5);
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold)
+}
+
+.info-cast {
+ display: flex;
+ align-items: center
+}
+
+.info-avatar {
+ position: relative;
+ flex: 0 0 88px;
+ width: 88px;
+ height: 88px;
+ margin-right: var(--tt-space-5);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ overflow: hidden;
+ border-radius: var(--tt-radius-pill);
+ background: var(--tt-line);
+ color: var(--tt-text);
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-bold)
+}
+
+.info-avatar img {
+ position: absolute;
+ top: 0;
+ left: 0;
+ width: 88px;
+ height: 88px;
+ object-fit: cover
+}
+
+.info-cast-copy {
+ flex: 1 1 auto;
+ min-width: 0
+}
+
+.info-cast-copy b {
+ display: block;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-bold);
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap
+}
+
+.info-cast-copy small {
+ display: block;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap
+}
+
+.info-fine {
+ margin-top: var(--tt-space-5);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta)
+}
+
+.info-fine>span {
+ margin-bottom: var(--tt-space-2)
+}
+
+.info-loading p,
+.info-empty {
+ padding: 0 var(--tt-space-5);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-lead)
+}
+
+.info-skeleton {
+ display: block;
+ height: 28px;
+ margin: var(--tt-space-5) var(--tt-space-5) 0;
+ border-radius: var(--tt-radius-sm);
+ background: var(--tt-line)
+}
+
+.info-skeleton.short {
+ width: 55%
+}

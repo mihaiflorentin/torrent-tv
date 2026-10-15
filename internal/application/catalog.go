@@ -268,10 +268,14 @@ func buildSeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPa
 			season.Title = fmt.Sprintf("Season %d", number)
 		}
 		names := map[int]string{}
+		airDates := map[int]string{}
 		if entry, known := seasonByNumber[number]; known {
 			for _, episode := range entry.Episodes {
 				if episode.Name != "" {
 					names[episode.Number] = episode.Name
+				}
+				if episode.AirDate != "" {
+					airDates[episode.Number] = episode.AirDate
 				}
 			}
 		}
@@ -286,7 +290,7 @@ func buildSeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPa
 			if title == "" {
 				title = fmt.Sprintf("Episode %d", episodeNumber)
 			}
-			season.Episodes = append(season.Episodes, domain.CatalogEpisode{Number: episodeNumber, Season: number, Title: title, SourceCount: len(items), Sources: items})
+			season.Episodes = append(season.Episodes, domain.CatalogEpisode{Number: episodeNumber, Season: number, Title: title, AirDate: airDates[episodeNumber], SourceCount: len(items), Sources: items})
 		}
 		season.EpisodeCount = len(season.Episodes)
 		for _, episode := range unknown[number] {
@@ -763,6 +767,7 @@ func applyMetadata(title *domain.CatalogTitle, metadata domain.CatalogMetadata) 
 	if title.Year == 0 {
 		title.Year = metadata.Year
 	}
+	title.ReleaseDate = metadata.ReleaseDate
 	if metadata.PosterPath != "" {
 		title.PosterURL = "/api/v1/artwork/" + title.ID + "/poster"
 	}
@@ -774,16 +779,27 @@ func applyMetadata(title *domain.CatalogTitle, metadata domain.CatalogMetadata) 
 func errorsIsNoRows(err error) bool { return err == sql.ErrNoRows }
 
 func (s *Service) Artwork(ctx context.Context, titleID, kind string) (string, string, error) {
-	if kind != "poster" && kind != "backdrop" {
+	isCast := strings.HasPrefix(kind, "cast-")
+	if kind != "poster" && kind != "backdrop" && !isCast {
 		return "", "", fmt.Errorf("invalid artwork kind")
 	}
-	metadata, err := s.repo.GetCatalogMetadata(ctx, titleID)
-	if err != nil {
-		return "", "", err
-	}
-	remotePath := metadata.PosterPath
-	if kind == "backdrop" {
-		remotePath = metadata.BackdropPath
+	var remotePath string
+	fetchKind := kind
+	if isCast {
+		path, err := s.castPhotoPath(ctx, titleID, kind)
+		if err != nil {
+			return "", "", err
+		}
+		remotePath, fetchKind = path, "profile"
+	} else {
+		metadata, err := s.repo.GetCatalogMetadata(ctx, titleID)
+		if err != nil {
+			return "", "", err
+		}
+		remotePath = metadata.PosterPath
+		if kind == "backdrop" {
+			remotePath = metadata.BackdropPath
+		}
 	}
 	if remotePath == "" || s.metadata == nil {
 		return "", "", fmt.Errorf("artwork is unavailable")
@@ -797,7 +813,7 @@ func (s *Service) Artwork(ctx context.Context, titleID, kind string) (string, st
 			return path, mime.TypeByExtension(ext), nil
 		}
 	}
-	body, contentType, err := s.metadata.OpenArtwork(ctx, remotePath, kind)
+	body, contentType, err := s.metadata.OpenArtwork(ctx, remotePath, fetchKind)
 	if err != nil {
 		return "", "", err
 	}

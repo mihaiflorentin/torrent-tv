@@ -1,4 +1,4 @@
-import { canonicalLanguage, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, languageDisplayName, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
+import { canonicalLanguage, episodeAirLabel, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
 import { formatTime } from './player';
 
 // Display decisions for the TV screens (DESIGN.md "Information priorities"), kept as pure text
@@ -17,19 +17,25 @@ export function titleKind(title: Pick<CatalogTitle, 'kind' | 'seasonCount'>): st
   return seasons > 0 ? `${seasons} season${seasons === 1 ? '' : 's'}` : 'Series';
 }
 
-/** Home hero eyebrow: kind, then year when known. */
+/** Home hero and title page eyebrow: kind, then the full release date (a series: 'Since <year>') when known. */
 export function heroFacts(title: CatalogTitle): string[] {
-  return [titleKind(title), title.year ? String(title.year) : ''].filter(Boolean);
+  return [titleKind(title), releaseLine(title)].filter(Boolean);
+}
+
+/** Episode tile second line: versions, the air date ('Upcoming' when ahead), then watch progress. */
+export function episodeMeta(episode: { sourceCount: number; airDate?: string }, progress: number, now?: Date): string {
+  const versions = `${episode.sourceCount} version${episode.sourceCount === 1 ? '' : 's'}`;
+  return joined([versions, episodeAirLabel(episode.airDate, now), progress > 0 ? `${progress}% watched` : '']);
 }
 
 /**
- * Poster card second line: year, best resolution, a rating that has votes. Tracker names, source
+ * Poster card second line: release (month and year; a series 'Since <year>'), best resolution, a rating that has votes. Tracker names, source
  * counts and seeders stay off the card, except on a row defined by seeders ("Strong swarms").
  */
 export function cardMeta(title: CatalogTitle, options: { seeders?: boolean } = {}): string {
   const rating = title.ratingVotes && title.rating ? `★ ${title.rating.toFixed(1)}` : '';
   const seeders = options.seeders && title.bestSeeders > 0 ? `${title.bestSeeders} seeders` : '';
-  const text = joined([seeders, title.year, title.resolutions?.[0], rating]);
+  const text = joined([seeders, releaseLine(title, { compact: true }), title.resolutions?.[0], rating]);
   return text || (title.kind === 'series' ? 'Series' : 'Movie');
 }
 

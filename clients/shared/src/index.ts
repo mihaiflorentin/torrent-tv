@@ -13,8 +13,11 @@ export type TransferState = 'idle' | 'queued' | 'active' | 'paused' | 'complete'
 export type WatchState = 'unwatched' | 'inProgress' | 'partial' | 'watched'
 export interface MediaState { downloadState: DownloadState; transferState?: TransferState; watchState: WatchState; downloadId?: string; progress?: number; positionMs?: number; durationMs?: number }
 export interface CatalogSource { release: Release; parsed: ParsedRelease; fileIndex?: number; filePath?: string; fileSizeBytes?: number; libraryState?: MediaState }
-export interface CatalogTitle { id: string; title: string; originalTitle?: string; kind: MediaKind; year?: number; imdbId?: string; overview?: string; posterUrl?: string; backdropUrl?: string; rating?: number; ratingVotes?: number; ratingProvider?: string; genres?: string[]; trackers: TrackerRef[]; categories: string[]; resolutions: string[]; sourceCount: number; seasonCount?: number; episodeCount?: number; bestSeeders: number; largestSizeBytes: number; newestUpload?: string; sources?: CatalogSource[]; libraryState?: MediaState }
-export interface CatalogEpisode { number: number; title: string; season: number; sourceCount: number; sources: CatalogSource[]; libraryState?: MediaState }
+export interface CatalogTitle { id: string; title: string; originalTitle?: string; kind: MediaKind; year?: number; releaseDate?: string; imdbId?: string; overview?: string; posterUrl?: string; backdropUrl?: string; rating?: number; ratingVotes?: number; ratingProvider?: string; genres?: string[]; trackers: TrackerRef[]; categories: string[]; resolutions: string[]; sourceCount: number; seasonCount?: number; episodeCount?: number; bestSeeders: number; largestSizeBytes: number; newestUpload?: string; sources?: CatalogSource[]; libraryState?: MediaState }
+export interface CastMember { name: string; character?: string; imageUrl?: string }
+/** Extended description of a title for the Info panel; every field but titleId and available is optional. */
+export interface TitleInfo { titleId: string; available: boolean; provider?: string; kind?: MediaKind; language?: string; tagline?: string; overview?: string; releaseDate?: string; lastAirDate?: string; status?: string; runtimeMinutes?: number; rating?: number; ratingVotes?: number; ratingProvider?: string; genres?: string[]; cast?: CastMember[]; directors?: string[]; creators?: string[]; countries?: string[]; originalLanguage?: string; seasons?: number; episodes?: number; certification?: string }
+export interface CatalogEpisode { number: number; title: string; season: number; airDate?: string; sourceCount: number; sources: CatalogSource[]; libraryState?: MediaState }
 export interface CatalogSeason { number: number; title: string; episodeCount: number; episodes: CatalogEpisode[]; unknown?: CatalogEpisode[]; packSources?: CatalogSource[]; libraryState?: MediaState }
 export interface CatalogDetail { title: CatalogTitle; seasons: CatalogSeason[]; sources: CatalogSource[] }
 export interface CatalogFacets { categories: string[]; kinds: string[]; resolutions: string[]; hdr: string[]; qualities: string[]; codecs: string[] }
@@ -216,6 +219,7 @@ export class API {
  refreshTitle(titleId: string, query = '', force = false) { return this.call<Job>(`/catalog/titles/${encodeURIComponent(titleId)}/refresh`, { method: 'POST', body: JSON.stringify({ query, force }) }) }
  titles(query: Record<string, string | number | boolean | undefined> = {}) { const params = new URLSearchParams(); for (const [key, value] of Object.entries(query)) { if (value !== undefined && value !== '') params.set(key, String(value)) } return this.call<Page<CatalogTitle>>('/catalog/titles?' + params.toString()) }
  title(id: string) { return this.call<CatalogDetail>(`/catalog/titles/${encodeURIComponent(id)}`) }
+ titleInfo(id: string) { return this.call<TitleInfo>(`/catalog/titles/${encodeURIComponent(id)}/info`) }
  facets() { return this.call<CatalogFacets>('/catalog/facets') }
  trackers() { return this.call<TrackerStatus[]>('/trackers') }
  prepare(id: string, fileIndex = -1, signal?: AbortSignal) {
@@ -277,3 +281,6 @@ export type { RankOptions } from './sources';
 export { buildPath, parsePath } from './routes';
 export type { Route, View } from './routes';
 export { formatEtaLeft, prepareHint, readyLine, readyPercent } from './getting-ready';
+
+export { castInitials, episodeAirLabel, formatRuntime, formatShortDate, infoView, releaseLine } from './title-info';
+export type { InfoView } from './title-info';
