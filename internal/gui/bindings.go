@@ -460,6 +460,14 @@ func (b *Bindings) ChangeDataDir(target string) error {
 	case StateStarting, StateStopping:
 		return errors.New("server is transitioning; wait for it to stop or start before changing the data directory")
 	}
+	// markBroken records the half-finished move so a Start or save cannot
+	// recreate an empty store at the abandoned location.
+	markBroken := func(err error) error {
+		b.mu.Lock()
+		b.moveBroken = fmt.Errorf("the data directory moved to %s but finishing the move failed (%v); restart the app before starting the server", to, err)
+		b.mu.Unlock()
+		return err
+	}
 	// resume restores the prior state on a pre-commit failure: the data is
 	// still at from (Relocate refuses or fails without deleting it), so
 	// restarting the remembered server against the old store is exactly
@@ -469,10 +477,10 @@ func (b *Bindings) ChangeDataDir(target string) error {
 	// surfaces verbatim. A resume failure joins the relocation error as
 	// the first message.
 	resume := func(fail error) error {
+		if _, statErr := os.Stat(from); os.IsNotExist(statErr) {
+			return markBroken(fail)
+		}
 		if wasRunning {
-			if _, statErr := os.Stat(from); os.IsNotExist(statErr) {
-				return fail
-			}
 			if err := b.supervisor().Start(); err != nil {
 				return errors.Join(fail, err)
 			}
@@ -499,14 +507,6 @@ func (b *Bindings) ChangeDataDir(target string) error {
 	if b.remapPathsFn != nil {
 		remap = b.remapPathsFn
 	}
-	// markBroken records the half-finished move so a Start or save cannot
-	// recreate an empty store at the abandoned location.
-	markBroken := func(err error) error {
-		b.mu.Lock()
-		b.moveBroken = fmt.Errorf("the data directory moved to %s but finishing the move failed (%v); restart the app before starting the server", to, err)
-		b.mu.Unlock()
-		return err
-	}
 	if err := remap(settingsPath, from, to); err != nil {
 		return markBroken(fmt.Errorf("remap settings paths to %s: %w", to, err))
 	}
@@ -530,10 +530,10 @@ func (b *Bindings) ChangeDataDir(target string) error {
 	// new dir during the commit; a failure surfaces verbatim and leaves the
 	// server stopped.
 	if enabled, err := b.AutostartStatus(); err != nil {
-		return err
+		return markBroken(err)
 	} else if enabled {
 		if err := b.enableAutostart(exe, to); err != nil {
-			return err
+			return markBroken(err)
 		}
 	}
 

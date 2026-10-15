@@ -504,3 +504,64 @@ func TestChangeDataDirPostMoveFailureRefusesStartAndSave(t *testing.T) {
 		t.Fatalf("save after a broken move = %v, want a restart-the-app refusal", err)
 	}
 }
+
+// TestChangeDataDirRelocateFailAfterCommitMarksBroken pins that a Relocate
+// that fails after the move committed (source gone, e.g. pointer write
+// error) marks the move broken so Start and save refuse.
+func TestChangeDataDirRelocateFailAfterCommitMarksBroken(t *testing.T) {
+	oldDir := t.TempDir()
+	newDir := t.TempDir()
+	exeDir := t.TempDir()
+
+	b, sup, probe := relocatableBindings(t, oldDir, exeDir)
+	sup.deps.CanStart = b.startBlocked
+	b.relocateFn = func(exePath, from, to string) error {
+		if err := datadir.Relocate(exePath, from, to); err != nil {
+			return err
+		}
+		return errors.New("pointer write failed")
+	}
+	runningServer(t, sup)
+
+	if err := b.ChangeDataDir(newDir); err == nil {
+		t.Fatal("expected the relocate failure")
+	}
+	if err := b.StartServer(); err == nil || !strings.Contains(err.Error(), "restart the app") {
+		t.Fatalf("start after post-commit relocate failure = %v, want restart-the-app refusal", err)
+	}
+	if probe.count() != 1 {
+		t.Fatalf("factory ran again: %d calls", probe.count())
+	}
+	if _, err := os.Stat(oldDir); !os.IsNotExist(err) {
+		t.Fatalf("old directory must not be recreated: %v", err)
+	}
+	store, _, _ := b.snapshot()
+	if _, err := b.SaveSettings(store.Get()); err == nil || !strings.Contains(err.Error(), "restart the app") {
+		t.Fatalf("save = %v, want restart-the-app refusal", err)
+	}
+}
+
+// TestChangeDataDirAutostartFailAfterSwapMarksBroken pins that a post-swap
+// autostart re-registration failure also blocks Start and save.
+func TestChangeDataDirAutostartFailAfterSwapMarksBroken(t *testing.T) {
+	oldDir := t.TempDir()
+	newDir := t.TempDir()
+	exeDir := t.TempDir()
+
+	b, sup, _ := relocatableBindings(t, oldDir, exeDir)
+	sup.deps.CanStart = b.startBlocked
+	b.autostartEnabled = func() (bool, error) { return true, nil }
+	b.autostartEnable = func(autostart.Options) error { return errors.New("launch agent write failed") }
+	runningServer(t, sup)
+
+	if err := b.ChangeDataDir(newDir); err == nil {
+		t.Fatal("expected the autostart failure")
+	}
+	if err := b.StartServer(); err == nil || !strings.Contains(err.Error(), "restart the app") {
+		t.Fatalf("start = %v, want restart-the-app refusal", err)
+	}
+	store, _, _ := b.snapshot()
+	if _, err := b.SaveSettings(store.Get()); err == nil || !strings.Contains(err.Error(), "restart the app") {
+		t.Fatalf("save = %v, want restart-the-app refusal", err)
+	}
+}
