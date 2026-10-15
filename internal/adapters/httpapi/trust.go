@@ -11,8 +11,8 @@ import (
 )
 
 // Environment variables for exposing the server beyond the LAN. Unset, the
-// policy is the LAN default: any Host, and Origins limited to the LAN and the
-// packaged clients. Set, each becomes a strict allowlist. Both take a comma
+// policy is the LAN default: any Host (the admin tier needs an IP or LAN-shaped
+// name), and Origins limited to the LAN and the packaged clients. Set, each becomes a strict allowlist. Both take a comma
 // separated list. See ADR-0012.
 const (
 	envAllowedOrigins = "TORRENT_TV_ALLOWED_ORIGINS"
@@ -75,6 +75,23 @@ func (p *trustPolicy) hostAllowed(hostport string) bool {
 	return p.hosts[hostOnly(hostport)]
 }
 
+// isLANName reports whether a non-IP host is localhost or a single-label,
+// .local, .lan or .home.arpa name: a name a public DNS record cannot own.
+func isLANName(h string) bool {
+	if h == "" {
+		return false
+	}
+	if h == "localhost" || !strings.Contains(h, ".") {
+		return true
+	}
+	for _, suffix := range []string{".local", ".lan", ".home.arpa"} {
+		if strings.HasSuffix(h, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
 // isLANOrigin reports whether origin is an http(s) origin whose host is
 // localhost, a loopback/private/link-local IP, or a single-label, .local,
 // .lan or .home.arpa name.
@@ -91,15 +108,22 @@ func isLANOrigin(origin string) bool {
 		addr = addr.Unmap()
 		return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast()
 	}
-	if h == "localhost" || !strings.Contains(h, ".") {
+	return isLANName(h)
+}
+
+// adminHostAllowed is the extra Host rule of the admin tier. With
+// TORRENT_TV_ALLOWED_HOSTS set, that allowlist (already applied) is the whole
+// rule. Otherwise the Host must be an IP address or a LAN-shaped name, so a
+// DNS-rebinding page served from a public domain is refused.
+func (p *trustPolicy) adminHostAllowed(hostport string) bool {
+	if p.hosts != nil {
+		return p.hosts[hostOnly(hostport)]
+	}
+	h := hostOnly(hostport)
+	if _, err := netip.ParseAddr(h); err == nil {
 		return true
 	}
-	for _, suffix := range []string{".local", ".lan", ".home.arpa"} {
-		if strings.HasSuffix(h, suffix) {
-			return true
-		}
-	}
-	return false
+	return isLANName(h)
 }
 
 // sameOrigin reports whether origin names the same authority as the request
@@ -115,8 +139,9 @@ func sameOrigin(origin, host string) bool {
 // originAllowed applies the tier rule. A missing or same-origin Origin always
 // passes. With TORRENT_TV_ALLOWED_ORIGINS set, only the listed origins pass
 // (client tier only). Otherwise the client tier also takes "null", the
-// packaged-client origins and LAN origins, and the admin tier takes LAN
-// origins but not "null" (a sandboxed iframe on any site sends it).
+// packaged-client origins and LAN origins. The admin tier takes nothing else:
+// another LAN page, "null" (a sandboxed iframe on any site sends it) and the
+// packaged clients are all refused.
 func (p *trustPolicy) originAllowed(origin, host string, admin bool) bool {
 	if origin == "" || sameOrigin(origin, host) {
 		return true
@@ -124,11 +149,11 @@ func (p *trustPolicy) originAllowed(origin, host string, admin bool) bool {
 	if p.origins != nil {
 		return !admin && p.origins[strings.TrimRight(strings.ToLower(origin), "/")]
 	}
-	if isLANOrigin(origin) {
-		return true
-	}
 	if admin {
 		return false
+	}
+	if isLANOrigin(origin) {
+		return true
 	}
 	lower := strings.TrimRight(strings.ToLower(origin), "/")
 	return lower == "null" || slices.Contains(builtinClientOrigins, lower)
@@ -160,8 +185,13 @@ func guard(p *trustPolicy, next http.Handler) http.Handler {
 			return
 		}
 		w.Header().Add("Vary", "Origin")
+		admin := isAdminPath(r.URL.Path)
+		if admin && !p.adminHostAllowed(r.Host) {
+			problem(w, http.StatusForbidden, fmt.Errorf("host %q is not allowed for administration", r.Host))
+			return
+		}
 		origin := r.Header.Get("Origin")
-		if !p.originAllowed(origin, r.Host, isAdminPath(r.URL.Path)) {
+		if !p.originAllowed(origin, r.Host, admin) {
 			problem(w, http.StatusForbidden, fmt.Errorf("origin is not allowed"))
 			return
 		}
