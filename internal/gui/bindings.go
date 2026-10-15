@@ -134,14 +134,14 @@ func (b *Bindings) LoadSettings() httpapi.SettingsView {
 	return httpapi.RedactedSettings(v, store.Path(), b.supervisor().EngineDefault())
 }
 
-// SaveSettings mirrors the HTTP PUT /api/v1/settings contract: native-path
+// SaveSettings mirrors the HTTP PUT /api/v1/settings contract: anchored native-path
 // probe, secrets-preserving save, restart-required diff. A save never starts
 // the server: credentials are advisory, and the runner's unconditional boot
 // auto-start owns every start.
 func (b *Bindings) SaveSettings(next config.Settings) (SaveResult, error) {
 	store, _, _ := b.snapshot()
 	old := store.Get()
-	if err := config.EnsureNativePathsWritable(next.DownloadEngine, next.DownloadRoot, next.TorrentSessionDir); err != nil {
+	if err := store.EnsureNativePathsWritableFor(next); err != nil {
 		return SaveResult{}, err
 	}
 	if err := store.Save(next); err != nil {

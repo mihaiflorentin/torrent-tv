@@ -472,3 +472,26 @@ func TestBindingsSettingsSurfaceParityWithHTTP(t *testing.T) {
 		t.Fatalf("complete store reports missing = %v", missing)
 	}
 }
+
+// A relative download root typed in Settings resolves next to the settings
+// file (where Save anchors it), never in the GUI process's working directory.
+func TestSaveSettingsProbesRelativePathsNextToSettingsFile(t *testing.T) {
+	dir := t.TempDir()
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+	store := completeStore(t, dir)
+	b, _ := newBindingsFixture(t, &fakeApp{}, store, nil)
+
+	next := store.Get()
+	next.DownloadEngine = "native"
+	next.DownloadRoot = "media-rel"
+	if _, err := b.SaveSettings(next); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(cwd, "media-rel")); !os.IsNotExist(err) {
+		t.Fatalf("probe created a stray directory in the working directory: %v", err)
+	}
+	if info, err := os.Stat(filepath.Join(dir, "media-rel")); err != nil || !info.IsDir() {
+		t.Fatalf("anchored download root was not probed next to settings.json: %v", err)
+	}
+}
