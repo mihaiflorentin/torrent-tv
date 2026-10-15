@@ -185,8 +185,8 @@ func TestGuardAdminTier(t *testing.T) {
 		{"http://192.168.1.99:8097", 403}, // another LAN page is not the admin UI
 		{"http://torrenttv.local", 403},
 		{"http://localhost:5173", 403},
-		{"null", 403},
-		{"https://appassets.androidplatform.net", 403},
+		{"null", 200},                                  // Tizen and webOS TV clients
+		{"https://appassets.androidplatform.net", 200}, // Android TV client
 		{"https://evil.example", 403},
 		{"http://8.8.8.8", 403},
 	})
@@ -195,8 +195,47 @@ func TestGuardAdminTier(t *testing.T) {
 		{"http://192.168.1.20:8097", 200},
 		{"http://192.168.1.99:8097", 403},
 		{"https://tv.example", 403},
-		{"null", 403},
+		{"null", 403}, // strict list: TV origins must be listed to reach the admin tier
+		{"https://appassets.androidplatform.net", 403},
 	})
+	run("allowlist-with-tv-origins", map[string]string{"TORRENT_TV_ALLOWED_ORIGINS": "https://tv.example, null"}, []originCase{
+		{"null", 200},
+		{"https://tv.example", 403},
+		{"https://appassets.androidplatform.net", 403},
+	})
+}
+
+// tvSettingsCalls are the exact admin-tier requests the TV Settings screen
+// makes (clients/tv/src/main.tsx: settings load/save, dependency test, update
+// check/apply/current).
+var tvSettingsCalls = []struct{ method, path string }{
+	{"GET", "/api/v1/settings"},
+	{"GET", "/api/v1/settings/schema"},
+	{"PUT", "/api/v1/settings"},
+	{"POST", "/api/v1/dependencies/tmdb/test"},
+	{"POST", "/api/v1/updates/check"},
+	{"POST", "/api/v1/updates/apply"},
+	{"GET", "/api/v1/updates/current"},
+}
+
+func TestGuardTVSettingsCallsReachAdminEndpoints(t *testing.T) {
+	h := guardWith(nil)
+	for _, call := range tvSettingsCalls {
+		for _, origin := range []string{"null", "https://appassets.androidplatform.net", ""} {
+			if got := do(h, call.method, call.path, "192.168.1.20:8097", origin, nil).Code; got != 200 {
+				t.Errorf("%s %s origin %q = %d, want 200", call.method, call.path, origin, got)
+			}
+		}
+		for _, origin := range []string{"https://evil.example", "http://192.168.1.99:8097", "http://8.8.8.8"} {
+			if got := do(h, call.method, call.path, "192.168.1.20:8097", origin, nil).Code; got != 403 {
+				t.Errorf("%s %s origin %q = %d, want 403", call.method, call.path, origin, got)
+			}
+		}
+		// The TV origins do not bypass the LAN-shaped Host rule.
+		if got := do(h, call.method, call.path, "evil.example.com", "null", nil).Code; got != 403 {
+			t.Errorf("%s %s rebound host with null origin = %d, want 403", call.method, call.path, got)
+		}
+	}
 }
 
 func TestGuardPreflight(t *testing.T) {
@@ -210,8 +249,11 @@ func TestGuardPreflight(t *testing.T) {
 	if rec.Header().Get("Access-Control-Allow-Headers") != "Content-Type" || rec.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Fatalf("preflight headers missing: %v", rec.Header())
 	}
-	if rec := do(h, "OPTIONS", "/api/v1/settings", host, "null", pf); rec.Code != 403 {
-		t.Fatalf("admin preflight from null = %d, want 403", rec.Code)
+	if rec := do(h, "OPTIONS", "/api/v1/settings", host, "null", pf); rec.Code != 204 {
+		t.Fatalf("admin preflight from null = %d, want 204", rec.Code)
+	}
+	if rec := do(h, "OPTIONS", "/api/v1/settings", host, "https://evil.example", pf); rec.Code != 403 {
+		t.Fatalf("admin preflight from foreign origin = %d, want 403", rec.Code)
 	}
 	if rec := do(h, "OPTIONS", "/api/v1/playback/x", host, "https://evil.example", pf); rec.Code != 403 {
 		t.Fatalf("foreign preflight = %d, want 403", rec.Code)

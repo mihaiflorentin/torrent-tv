@@ -136,30 +136,35 @@ func sameOrigin(origin, host string) bool {
 	return strings.EqualFold(u.Host, host)
 }
 
+// isTVClientOrigin reports whether origin is one the packaged TV clients send:
+// "null" (Tizen and webOS file:// pages) or the Android WebView asset origin.
+// The TV Settings screen uses the admin endpoints, so the admin tier accepts
+// these too. "null" is also what a sandboxed iframe sends; ADR-0012 records
+// that residual risk, bounded by the LAN-shaped Host rule.
+func isTVClientOrigin(origin string) bool {
+	lower := strings.TrimRight(strings.ToLower(origin), "/")
+	return lower == "null" || slices.Contains(builtinClientOrigins, lower)
+}
+
 // originAllowed applies the tier rule. A missing or same-origin Origin always
-// passes. With TORRENT_TV_ALLOWED_ORIGINS set, only the listed origins pass
-// (client tier only). Otherwise the client tier also takes "null", the
-// packaged-client origins and LAN origins. The admin tier takes nothing else:
-// another LAN page, "null" (a sandboxed iframe on any site sends it) and the
-// packaged clients are all refused.
+// passes. With TORRENT_TV_ALLOWED_ORIGINS set, any other origin must be listed
+// and the built-in rules are off, except that on the admin tier only a listed
+// TV client origin is taken (web and LAN origins never are). Otherwise the
+// packaged TV client origins ("null" and the Android asset origin) pass on both
+// tiers, and the client tier also takes LAN origins. The admin tier refuses
+// every other origin, including another LAN page and any web origin.
 func (p *trustPolicy) originAllowed(origin, host string, admin bool) bool {
 	if origin == "" || sameOrigin(origin, host) {
 		return true
 	}
 	if p.origins != nil {
-		return !admin && p.origins[strings.TrimRight(strings.ToLower(origin), "/")]
+		listed := p.origins[strings.TrimRight(strings.ToLower(origin), "/")]
+		return listed && (!admin || isTVClientOrigin(origin))
 	}
-	if admin {
-		return false
-	}
-	if isLANOrigin(origin) {
-		return true
-	}
-	lower := strings.TrimRight(strings.ToLower(origin), "/")
-	return lower == "null" || slices.Contains(builtinClientOrigins, lower)
+	return isTVClientOrigin(origin) || (!admin && isLANOrigin(origin))
 }
 
-// isAdminPath marks the browser-only administration surface: settings
+// isAdminPath marks the administration surface: settings
 // (which carry executable paths and provider credentials), dependency tests
 // and self-update.
 func isAdminPath(path string) bool {

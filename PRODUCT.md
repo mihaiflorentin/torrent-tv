@@ -29,7 +29,7 @@ The server runs on a Raspberry Pi on the private LAN alongside qBittorrent. The 
 - The application manages only torrents it added to qBittorrent.
 - Tizen direct-plays original media. Browser compatibility may transcode one selected audio stream to AAC stereo while always copying video unchanged; video is never transcoded.
 - Playback before torrent completion is implemented at the range/piece level but remains unreliable on the target hardware and is documented as an open defect.
-- Tizen currently exposes connection management plus playback/subtitle controls inside the player. Provider credentials, dependency diagnostics, storage, and network administration remain browser-only; TV playback-preference settings are future work.
+- Tizen currently exposes connection management plus playback/subtitle controls inside the player. Provider credentials, dependency diagnostics, storage, and network administration are meant to be done in the browser; the TV Settings screen exposes playback preferences, tracker switches and the update check through the same admin endpoints (ADR-0012).
 - No operating-system packages may be installed without explicit permission.
 
 ## Brand Commitments
