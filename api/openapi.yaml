@@ -91,7 +91,18 @@ paths:
             schema:
               {
                 type: string,
-                enum: [filelist, piratebay, qbittorrent, storage, tmdb, subtitles, subdl],
+                enum:
+                  [
+                    filelist,
+                    piratebay,
+                    qbittorrent,
+                    storage,
+                    ffmpeg,
+                    ffprobe,
+                    tmdb,
+                    subtitles,
+                    subdl,
+                  ],
               },
           },
         ]
@@ -739,6 +750,29 @@ paths:
             },
           "404": { $ref: "#/components/responses/Problem" },
         }
+  /downloads/{id}/previous-episode:
+    post:
+      operationId: preparePreviousEpisode
+      parameters:
+        [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        {
+          "200":
+            {
+              description: No earlier episode or not a series,
+              content: { application/json: { schema: { type: "null" } } },
+            },
+          "202":
+            {
+              description: Prepared previous episode,
+              content:
+                {
+                  application/json:
+                    { schema: { $ref: "#/components/schemas/Download" } },
+                },
+            },
+          "409": { $ref: "#/components/responses/Problem" },
+        }
   /downloads/{id}/subtitles:
     get:
       operationId: searchSubtitles
@@ -1091,6 +1125,79 @@ paths:
           "200": { description: Stream headers },
           "206": { description: Range headers },
           "416": { $ref: "#/components/responses/Problem" },
+        }
+  /streams/{id}/browser:
+    get:
+      operationId: streamBrowserCompatible
+      description: The original video copied unchanged with the selected audio track converted to AAC, as a fragmented MP4 for browsers that cannot decode the source audio. Requires ffmpeg; the video is never re-encoded.
+      parameters:
+        [
+          { in: path, name: id, required: true, schema: { type: string } },
+          {
+            in: query,
+            name: startMs,
+            description: Start position in milliseconds,
+            schema: { type: integer, format: int64 },
+          },
+          {
+            in: query,
+            name: snapped,
+            description: "Set to 1 when startMs was already resolved through /streams/{id}/snap",
+            schema: { type: string, enum: ["1"] },
+          },
+          {
+            in: query,
+            name: audioTrack,
+            description: "Audio track to convert; defaults to the default, then English",
+            schema: { type: string },
+          },
+        ]
+      responses:
+        {
+          "200":
+            {
+              description: Fragmented MP4 stream,
+              content: { video/mp4: { schema: { type: string, format: binary } } },
+            },
+          "400": { $ref: "#/components/responses/Problem" },
+          "422": { $ref: "#/components/responses/Problem" },
+          "503": { $ref: "#/components/responses/Problem" },
+        }
+  /streams/{id}/snap:
+    get:
+      operationId: snapStreamStart
+      description: Move a seek target back to the preceding video keyframe so copied video and re-encoded audio start at the same content point.
+      parameters:
+        [
+          { in: path, name: id, required: true, schema: { type: string } },
+          {
+            in: query,
+            name: startMs,
+            schema: { type: integer, format: int64 },
+          },
+        ]
+      responses:
+        {
+          "200":
+            {
+              description: Snapped start position,
+              content:
+                {
+                  application/json:
+                    {
+                      schema:
+                        {
+                          type: object,
+                          properties:
+                            {
+                              requested: { type: integer, format: int64 },
+                              startMs: { type: integer, format: int64 },
+                              snapped: { type: boolean },
+                            },
+                        },
+                    },
+                },
+            },
         }
   /portal/state:
     get:
