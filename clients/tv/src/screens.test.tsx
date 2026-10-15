@@ -205,7 +205,7 @@ describe('TV screens show what helps the next decision', () => {
     it('moves tracker names off the header and summarises a series by its seasons', async () => {
       await open(detail({ kind: 'series', seasonCount: 3, genres: ['Drama', 'Mystery'] }));
       const header = text('.detail-copy');
-      expect(header).toContain('3 seasons · 2019');
+      expect(header).toContain('3 seasons · Since 2019');
       expect(header).toContain('Drama · Mystery');
       expect(header).not.toMatch(/FileList|seeders/);
     });
