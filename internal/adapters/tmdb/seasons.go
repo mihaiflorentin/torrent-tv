@@ -105,24 +105,28 @@ func (c *Client) SeriesSeasons(ctx context.Context, provider, providerID, langua
 			}
 		}
 	}
-	_ = runBounded(ctx, len(needing), func(n int) error {
+	if err := runBounded(ctx, len(needing), func(n int) error {
 		i := needing[n]
 		c.fillUntranslatedNames(ctx, providerID, expanded[i].Number, expanded[i].Episodes)
 		return nil
-	})
+	}); err != nil {
+		return domain.SeriesSeasons{}, err
+	}
 	seasons.Seasons = append(seasons.Seasons, expanded...)
 	return seasons, nil
 }
 
 // runBounded runs fn(0..n-1) with at most seasonFetchConcurrency in flight
 // and returns the first error, skipping work that has not started by then.
-func runBounded(ctx context.Context, n int, fn func(int) error) error {
+// A cancelled parent context is an error too: skipped items leave zero values
+// behind, so the caller must not treat the run as complete.
+func runBounded(parent context.Context, n int, fn func(int) error) error {
 	var (
 		wg    sync.WaitGroup
 		once  sync.Once
 		first error
 	)
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	sem := make(chan struct{}, seasonFetchConcurrency)
 	for i := 0; i < n; i++ {
@@ -145,7 +149,10 @@ func runBounded(ctx context.Context, n int, fn func(int) error) error {
 		}(i)
 	}
 	wg.Wait()
-	return first
+	if first != nil {
+		return first
+	}
+	return parent.Err()
 }
 
 // seasonsFallbackLanguage supplies names TMDB has not translated, mirroring
