@@ -3,7 +3,7 @@
 // that ranking so the components only lay the result out. Nothing here fetches
 // data. An unknown fact is left out of the result instead of becoming a
 // placeholder such as "codec unknown" or "—".
-import { formatBytes, type CatalogSource, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind } from '@torrent-tv/shared';
+import { episodeAirLabel, formatBytes, releaseLine, type CatalogSource, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind } from '@torrent-tv/shared';
 
 const pad2 = (value: number) => String(value).padStart(2, '0');
 const plural = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
@@ -24,14 +24,19 @@ export function kindLabel(title: Pick<CatalogTitle, 'kind' | 'seasonCount'>): st
   return title.seasonCount && title.seasonCount > 0 ? plural(title.seasonCount, 'season') : 'Series';
 }
 
-// Hero and detail header line: year and kind. Seeders and trackers stay out.
-export const titleFacts = (title: CatalogTitle): string[] => [title.year ? String(title.year) : '', kindLabel(title)].filter(Boolean);
+// Hero and detail header line: the full release date (a series: 'Since <year>') and kind. Seeders and trackers stay out.
+export const titleFacts = (title: CatalogTitle): string[] => [releaseLine(title), kindLabel(title)].filter(Boolean);
 
-// Poster card caption: year, best resolution, the rating once when it has votes.
+// Episode row second line: versions, then the air date ('Upcoming' when it is ahead).
+export function episodeFacts(episode: { sourceCount: number; airDate?: string }, now?: Date): string {
+  return [plural(episode.sourceCount, 'version'), episodeAirLabel(episode.airDate, now)].filter(Boolean).join(' · ');
+}
+
+// Poster card caption: release (month and year; a series 'Since <year>'), best resolution, the rating once when it has votes.
 // Seeders appear only on a row defined by seeders ("Strong swarms").
 export function cardFacts(title: CatalogTitle, options: { showSeeders?: boolean } = {}): string[] {
   const rated = title.ratingVotes && title.rating !== undefined ? `★ ${title.rating.toFixed(1)}` : '';
-  return [title.year ? String(title.year) : '', title.resolutions[0] || '', rated, options.showSeeders ? plural(title.bestSeeders, 'seeder') : ''].filter(Boolean);
+  return [releaseLine(title, { compact: true }), title.resolutions[0] || '', rated, options.showSeeders ? plural(title.bestSeeders, 'seeder') : ''].filter(Boolean);
 }
 
 export function libraryProgress(item: Pick<HouseholdItem, 'watched' | 'positionMs' | 'durationMs'>): { percent: number; label: string } {
