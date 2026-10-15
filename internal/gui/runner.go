@@ -194,8 +194,8 @@ func wireSupervisor(bind *Bindings, log *slog.Logger) *Supervisor {
 			// The relocation guard keeps any Start — including the boot
 			// auto-start — out of the move window between Stop and the
 			// holder swap.
-			if bind.relocatingServer() {
-				return errors.New("data directory change in progress; try again when it finishes")
+			if err := bind.startBlocked(); err != nil {
+				return err
 			}
 			// Credentials are advisory: only the native paths gate a start
 			// here. Create and write-probe the engine's directories so an

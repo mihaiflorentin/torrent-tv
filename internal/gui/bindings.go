@@ -73,6 +73,12 @@ type Bindings struct {
 	// defers while it is set, so no Start can race the move (see
 	// ChangeDataDir).
 	relocating bool
+	// moveBroken is set when a ChangeDataDir fails AFTER the move committed:
+	// the data sits at the new location but the holder still names the
+	// deleted old one, so any Start or save would recreate an empty database
+	// there. CanStart and SaveSettings refuse until the app is restarted
+	// (the pointer file already names the new directory).
+	moveBroken error
 
 	// Test seams; nil falls back to the real platform implementation.
 	exePathFn        func() (string, error)
@@ -139,6 +145,12 @@ func (b *Bindings) LoadSettings() httpapi.SettingsView {
 // the server: credentials are advisory, and the runner's unconditional boot
 // auto-start owns every start.
 func (b *Bindings) SaveSettings(next config.Settings) (SaveResult, error) {
+	b.mu.Lock()
+	broken := b.moveBroken
+	b.mu.Unlock()
+	if broken != nil {
+		return SaveResult{}, broken
+	}
 	store, _, _ := b.snapshot()
 	old := store.Get()
 	if err := store.EnsureNativePathsWritableFor(next); err != nil {
@@ -322,13 +334,15 @@ func (b *Bindings) exePath() (string, error) {
 	return os.Executable()
 }
 
-// relocatingServer reports whether a ChangeDataDir is between Stop and its
-// commit: CanStart and the SaveSettings auto-start edge defer on it so no
-// Start races the move.
-func (b *Bindings) relocatingServer() bool {
+// startBlocked is the relocation part of CanStart: a move in progress, or a
+// move that committed but could not finish, both refuse to start the server.
+func (b *Bindings) startBlocked() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.relocating
+	if b.relocating {
+		return errors.New("data directory change in progress; try again when it finishes")
+	}
+	return b.moveBroken
 }
 
 // snapshot returns the current settings store, data dir, and dir source
@@ -485,12 +499,20 @@ func (b *Bindings) ChangeDataDir(target string) error {
 	if b.remapPathsFn != nil {
 		remap = b.remapPathsFn
 	}
+	// markBroken records the half-finished move so a Start or save cannot
+	// recreate an empty store at the abandoned location.
+	markBroken := func(err error) error {
+		b.mu.Lock()
+		b.moveBroken = fmt.Errorf("the data directory moved to %s but finishing the move failed (%v); restart the app before starting the server", to, err)
+		b.mu.Unlock()
+		return err
+	}
 	if err := remap(settingsPath, from, to); err != nil {
-		return fmt.Errorf("remap settings paths to %s: %w", to, err)
+		return markBroken(fmt.Errorf("remap settings paths to %s: %w", to, err))
 	}
 	store, err := config.LoadAt(settingsPath)
 	if err != nil {
-		return err
+		return markBroken(err)
 	}
 
 	// Commit: the move is verified and the new store loaded. The holder

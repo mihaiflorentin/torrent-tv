@@ -471,3 +471,36 @@ func TestChangeDataDirGuardBlocksConcurrentAutoStart(t *testing.T) {
 		t.Fatalf("holder must be swapped, got (%s, %s)", store2.Path(), dir)
 	}
 }
+
+// TestChangeDataDirPostMoveFailureRefusesStartAndSave pins the recovery rule:
+// after a committed move fails to finish, the holder still names the deleted
+// old directory, so Start (via CanStart) and SaveSettings must refuse instead
+// of recreating an empty database there.
+func TestChangeDataDirPostMoveFailureRefusesStartAndSave(t *testing.T) {
+	oldDir := t.TempDir()
+	newDir := t.TempDir()
+	exeDir := t.TempDir()
+
+	b, sup, probe := relocatableBindings(t, oldDir, exeDir)
+	sup.deps.CanStart = b.startBlocked
+	b.remapPathsFn = func(path, from, to string) error { return errors.New("read-only settings.json") }
+	runningServer(t, sup)
+
+	if err := b.ChangeDataDir(newDir); err == nil {
+		t.Fatal("expected the post-move failure")
+	}
+	err := b.StartServer()
+	if err == nil || !strings.Contains(err.Error(), "restart the app") || !strings.Contains(err.Error(), newDir) {
+		t.Fatalf("start after a broken move = %v, want a restart-the-app refusal naming %s", err, newDir)
+	}
+	if probe.count() != 1 {
+		t.Fatalf("factory ran again after a broken move: %d calls", probe.count())
+	}
+	if _, err := os.Stat(oldDir); !os.IsNotExist(err) {
+		t.Fatalf("a refused start must not recreate the old directory: %v", err)
+	}
+	store, _, _ := b.snapshot()
+	if _, err := b.SaveSettings(store.Get()); err == nil || !strings.Contains(err.Error(), "restart the app") {
+		t.Fatalf("save after a broken move = %v, want a restart-the-app refusal", err)
+	}
+}
