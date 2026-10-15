@@ -2268,6 +2268,7 @@ func (s *Service) Downloads(ctx context.Context) ([]domain.Download, error) {
 				}
 			}
 			applyDownloadStatus(&items[i], snapshot.status, selected)
+			s.reconcileDownloadPath(&items[i], snapshot.status)
 		}
 		// Telemetry refreshes must not make an existing row look newly added.
 		// Keep UpdatedAt stable so clients can patch progress in place without
@@ -2304,6 +2305,45 @@ func dedupeManagedDownloads(items []domain.Download) []domain.Download {
 		out = append(out, item)
 	}
 	return out
+}
+
+// reconcileDownloadPath re-derives the absolute media path from the engine's
+// current save path. Rows saved before the native engine reported its
+// per-torrent directory hold a path that does not exist on disk, which made a
+// finished download look incomplete to everything that reads the file.
+func (s *Service) reconcileDownloadPath(d *domain.Download, status domain.DownloadStatus) {
+	if status.SavePath == "" || d.FilePath == "" {
+		return
+	}
+	if abs, err := safeQBPath(s.settings.Get().DownloadRoot, status.SavePath, d.FilePath); err == nil {
+		d.AbsolutePath = abs
+	}
+}
+
+// liveDownload returns d with progress and media path taken from the owning
+// engine, for callers that decide from the file on disk and must not trust a
+// row persisted before the last status poll. Engine failures keep d as is.
+func (s *Service) liveDownload(ctx context.Context, d domain.Download) domain.Download {
+	engine, hash, ok := s.owner(d.EngineID)
+	if !ok {
+		return d
+	}
+	status, err := engine.Status(ctx, hash)
+	if err != nil {
+		return d
+	}
+	var selected *domain.TorrentFile
+	if files, filesErr := engine.Files(ctx, hash); filesErr == nil {
+		for i := range files {
+			if files[i].Index == d.FileIndex {
+				selected = &files[i]
+				break
+			}
+		}
+	}
+	applyDownloadStatus(&d, status, selected)
+	s.reconcileDownloadPath(&d, status)
+	return d
 }
 
 func applyDownloadStatus(download *domain.Download, status domain.DownloadStatus, selected *domain.TorrentFile) {

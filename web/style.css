@@ -3578,8 +3578,11 @@ dl .tracker-badge,
 
 /* ---------- Info dialog ---------- */
 
-.hero-info {
- margin-left: var(--tt-space-3);
+.hero-actions {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ gap: var(--tt-space-3);
 }
 
 .info-dialog {

@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -150,5 +151,34 @@ func TestPreparedEmbeddedAssetOlderThanTheMediaFileIsRegenerated(t *testing.T) {
 	}
 	if len(probe.extracted) != 2 {
 		t.Fatalf("an asset extracted before the media last changed must be regenerated, extractions = %v", probe.extracted)
+	}
+}
+
+func TestEmbeddedSubtitlesUseTheEnginePathWhenTheStoredPathIsStale(t *testing.T) {
+	probe := &subtitleProbeStub{tracks: []domain.MediaSubtitleTrack{{Index: 2, Language: "ron", Codec: "subrip"}}}
+	engine := &subtitleEngineStub{}
+	service, repo := newSubtitleTestServiceWithRepo(t, engine, probe)
+	ctx := context.Background()
+	download, err := repo.GetDownload(ctx, "source")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The file lives under <root>/<hash>/, but the persisted row points at
+	// <root>/ as rows written by the native engine once did.
+	saveDir := filepath.Join(service.settings.Get().DownloadRoot, "hash")
+	if err := os.MkdirAll(saveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(download.AbsolutePath, filepath.Join(saveDir, "movie.mkv")); err != nil {
+		t.Fatal(err)
+	}
+	engine.status = &domain.DownloadStatus{SavePath: saveDir, Progress: 1}
+	engine.files = []domain.TorrentFile{{Index: 0, Path: "movie.mkv", SizeBytes: 5, Progress: 1}}
+	items, warnings, err := service.SearchSubtitles(ctx, "source", "ro", SubtitleScopeLocal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(embeddedIDs(items)) != 1 {
+		t.Fatalf("embedded tracks = %v, warnings = %#v", embeddedIDs(items), warnings)
 	}
 }

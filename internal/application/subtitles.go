@@ -46,6 +46,7 @@ func (s *Service) SearchSubtitles(ctx context.Context, downloadID, language stri
 	if err != nil {
 		return nil, nil, err
 	}
+	d = s.liveDownload(ctx, d)
 	release, err := s.repo.GetRelease(ctx, d.ReleaseID)
 	if err != nil {
 		return nil, nil, err
@@ -155,6 +156,7 @@ func (s *Service) PrepareSubtitle(ctx context.Context, downloadID, providerName,
 	if err != nil {
 		return domain.SubtitleAsset{}, err
 	}
+	d = s.liveDownload(ctx, d)
 	target := "sami"
 	if len(requested) > 0 && requested[0] != "" {
 		target = strings.ToLower(requested[0])

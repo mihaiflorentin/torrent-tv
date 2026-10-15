@@ -529,9 +529,11 @@ func (c *Client) Status(_ context.Context, hash string) (domain.DownloadStatus, 
 		Sequential:                true,
 		FirstLastPriority:         true,
 		TrackerError:              c.announce.Error(hash),
-		SavePath:                  c.dataDir,
-		ContentPath:               filepath.Join(c.dataDir, hash),
-		TempPathEnabled:           false,
+		// Files land under <dataDir>/<hash>/<torrent path>, so that is the
+		// directory a file's relative path resolves against.
+		SavePath:        filepath.Join(c.dataDir, hash),
+		ContentPath:     filepath.Join(c.dataDir, hash),
+		TempPathEnabled: false,
 	}, nil
 }
 

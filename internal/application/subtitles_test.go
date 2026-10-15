@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,6 +53,16 @@ func TestParseSubtitleSearchScope(t *testing.T) {
 type subtitleEngineStub struct {
 	TorrentEngine
 	files []domain.TorrentFile
+	// status is the live engine state; nil makes Status fail so a test keeps
+	// the persisted row unchanged.
+	status *domain.DownloadStatus
+}
+
+func (e *subtitleEngineStub) Status(context.Context, string) (domain.DownloadStatus, error) {
+	if e.status == nil {
+		return domain.DownloadStatus{}, errors.New("engine status unavailable")
+	}
+	return *e.status, nil
 }
 
 func (e *subtitleEngineStub) Files(context.Context, string) ([]domain.TorrentFile, error) {
