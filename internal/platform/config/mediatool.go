@@ -12,17 +12,21 @@ import (
 	"time"
 )
 
-// mediaToolName checks only the path shape: absolute, with a base name of
-// the expected binary (plus .exe on Windows). It does not touch the disk.
+// mediaToolName checks only the path shape: absolute, with a base name
+// starting with the expected binary (case-insensitive, optional .exe on
+// Windows). It does not touch the disk.
 func mediaToolName(key, path, binary string) error {
 	if !filepath.IsAbs(path) {
 		return fmt.Errorf("%s must be an absolute path", key)
 	}
-	base := filepath.Base(path)
+	base := strings.ToLower(filepath.Base(path))
 	if runtime.GOOS == "windows" {
-		base = strings.TrimSuffix(strings.ToLower(base), ".exe")
+		base = strings.TrimSuffix(base, ".exe")
 	}
-	if base != binary {
+	// Distribution builds are named ffmpeg7, ffmpeg-static or ffmpeg.real, so
+	// the name only has to start with the binary; the -version banner check
+	// on save is what proves the program.
+	if !strings.HasPrefix(base, binary) {
 		return fmt.Errorf("%s must name the %s executable, not %q", key, binary, filepath.Base(path))
 	}
 	return nil
