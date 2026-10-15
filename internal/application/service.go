@@ -51,6 +51,8 @@ type Service struct {
 	leaseMu          sync.Mutex
 	leaseWriteMu     sync.Mutex // serialises persisted lease writes
 	leases           map[string]int
+	titleInfoMu      sync.Mutex
+	titleInfoCalls   map[string]*titleInfoCall
 	mediaInfoMu      sync.Mutex
 	mediaInfoCache   map[string]cachedMediaInfo
 	providerMu       sync.Mutex

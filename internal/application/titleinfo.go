@@ -40,16 +40,81 @@ func (s *Service) TitleInfo(ctx context.Context, titleID string) (domain.TitleIn
 		}
 		return s.degradedTitleInfo(titleID, metadata), nil
 	}
+	flightKey := metadata.Provider + "\x00" + metadata.ProviderID + "\x00" + string(kind) + "\x00" + language
+	result, ok := s.titleInfoFlight(ctx, flightKey, func(fetchCtx context.Context) titleInfoResult {
+		return s.fetchTitleInfo(fetchCtx, provider, metadata, kind, language, cached, cacheErr == nil)
+	})
+	if !ok || !result.usable {
+		return s.degradedTitleInfo(titleID, metadata), nil
+	}
+	return s.presentTitleInfo(titleID, result.info, metadata), nil
+}
+
+// titleInfoFetchTimeout bounds the provider call that runs detached from the
+// request that started it.
+const titleInfoFetchTimeout = 30 * time.Second
+
+// titleInfoResult is one shared fetch outcome: usable reports whether info
+// carries provider (or stale-cached) details rather than a degrade.
+type titleInfoResult struct {
+	info   domain.TitleInfo
+	usable bool
+}
+
+type titleInfoCall struct {
+	done   chan struct{}
+	result titleInfoResult
+}
+
+// titleInfoFlight coalesces concurrent fetches of the same key into one
+// provider call. The call runs detached from the first caller's context
+// (bounded by titleInfoFetchTimeout), so closing the Info panel mid-fetch
+// neither aborts it nor poisons the cache; each waiter still leaves as soon
+// as its own context ends (ok=false).
+func (s *Service) titleInfoFlight(ctx context.Context, key string, fetch func(context.Context) titleInfoResult) (titleInfoResult, bool) {
+	s.titleInfoMu.Lock()
+	call, running := s.titleInfoCalls[key]
+	if !running {
+		if s.titleInfoCalls == nil {
+			s.titleInfoCalls = map[string]*titleInfoCall{}
+		}
+		call = &titleInfoCall{done: make(chan struct{})}
+		s.titleInfoCalls[key] = call
+		go func() {
+			fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), titleInfoFetchTimeout)
+			defer cancel()
+			call.result = fetch(fetchCtx)
+			s.titleInfoMu.Lock()
+			delete(s.titleInfoCalls, key)
+			s.titleInfoMu.Unlock()
+			close(call.done)
+		}()
+	}
+	s.titleInfoMu.Unlock()
+	select {
+	case <-call.done:
+		return call.result, true
+	case <-ctx.Done():
+		return titleInfoResult{}, false
+	}
+}
+
+// fetchTitleInfo performs the provider call and cache writes for one flight.
+func (s *Service) fetchTitleInfo(ctx context.Context, provider TitleInfoProvider, metadata domain.CatalogMetadata, kind domain.MediaKind, language string, cached domain.TitleInfo, haveCached bool) titleInfoResult {
 	fetched, err := provider.TitleInfo(ctx, metadata.Provider, metadata.ProviderID, kind, language, s.settings.Get().MetadataFallbackLanguage)
 	now := time.Now().UTC()
 	if err != nil {
-		if cacheErr == nil && cached.Available {
+		if errors.Is(err, context.Canceled) {
+			// A cancellation says nothing about the provider's health.
+			return titleInfoResult{info: cached, usable: haveCached && cached.Available}
+		}
+		if haveCached && cached.Available {
 			cached.ExpiresAt = now.Add(titleInfoBackoff)
 			_ = s.repo.SaveTitleInfo(ctx, cached)
-			return s.presentTitleInfo(titleID, cached, metadata), nil
+			return titleInfoResult{info: cached, usable: true}
 		}
 		_ = s.repo.SaveTitleInfo(ctx, domain.TitleInfo{Provider: metadata.Provider, ProviderID: metadata.ProviderID, Kind: kind, Language: language, FetchedAt: now, ExpiresAt: now.Add(titleInfoBackoff)})
-		return s.degradedTitleInfo(titleID, metadata), nil
+		return titleInfoResult{}
 	}
 	fetched.Provider, fetched.ProviderID, fetched.Kind, fetched.Language, fetched.Available = metadata.Provider, metadata.ProviderID, kind, language, true
 	if fetched.FetchedAt.IsZero() {
@@ -59,7 +124,7 @@ func (s *Service) TitleInfo(ctx context.Context, titleID string) (domain.TitleIn
 		fetched.ExpiresAt = fetched.FetchedAt.Add(30 * 24 * time.Hour)
 	}
 	_ = s.repo.SaveTitleInfo(ctx, fetched)
-	return s.presentTitleInfo(titleID, fetched, metadata), nil
+	return titleInfoResult{info: fetched, usable: true}
 }
 
 // titleInfoKind resolves which provider endpoint serves the title: the kind
