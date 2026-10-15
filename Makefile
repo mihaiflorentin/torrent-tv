@@ -15,7 +15,7 @@ GO_LDFLAGS := -s -w -X github.com/mihaiflorentin/torrent-tv/internal/composition
 WAILS3 ?= wails3
 # GOMODCACHE bind-mount flags for the wails-cross containers (wails3 tool
 # docker-mounts); keeps the cross builds off the network for vendored modules.
-WAILS_DOCKER_MOUNTS := $(shell $(WAILS3) tool docker-mounts)
+WAILS_DOCKER_MOUNTS = $(shell $(WAILS3) tool docker-mounts)
 
 # Host CPU arch drives the linux GUI container choice (build-all,
 # build-arm64): each arch builds its own GUI natively in the host-arch

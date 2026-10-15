@@ -51,6 +51,12 @@ android {
             signingConfig = if (haveReleaseKeystore) {
                 signingConfigs.getByName("torrenttvRelease")
             } else {
+                if (System.getenv("TORRENTTV_REQUIRE_RELEASE_KEY") == "true") {
+                    throw GradleException(
+                        "TORRENTTV_REQUIRE_RELEASE_KEY is set but TORRENTTV_KEYSTORE_PATH/_KEYSTORE_PASSWORD/_KEY_ALIAS/_KEY_PASSWORD " +
+                            "are not all set; refusing to sign a release APK with the debug key."
+                    )
+                }
                 logger.warn(
                     "WARNING: TORRENTTV_KEYSTORE_PATH/_KEYSTORE_PASSWORD/_KEY_ALIAS/_KEY_PASSWORD not all set; " +
                         "signing the release APK with the debug key. It will not upgrade a keystore-signed install."
@@ -77,7 +83,7 @@ dependencies {
 // page variant (TorrentTV branding, no $WEBAPIS tag, platform-bridge.js);
 // everything else — app.js, app.css, boot scripts — ships byte-identical to
 // the Tizen WGT.
-val syncWebApp = tasks.register<Copy>("syncWebApp") {
+val syncWebApp = tasks.register<Sync>("syncWebApp") {
     // Fail loudly instead of packaging a shell without its app: the web
     // bundle must be built before this task runs.
     doFirst {

@@ -60,6 +60,38 @@ jobs:
           java-version: 17
       - name: Ensure Android SDK platform 35
         run: sdkmanager --install "platforms;android-35" >/dev/null 2>&1 || true
+      - name: Prepare the Android release signing key
+        # A tagged release must be signed with the one fixed release key, or the
+        # APK cannot upgrade an installed TorrentTV. Missing secrets fail the
+        # tag build; other runs fall back to the debug key with a warning.
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TORRENTTV_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.TORRENTTV_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TORRENTTV_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TORRENTTV_KEY_PASSWORD }}
+        run: |
+          if [[ -z "${KEYSTORE_BASE64}" || -z "${KEYSTORE_PASSWORD}" || -z "${KEY_ALIAS}" || -z "${KEY_PASSWORD}" ]]; then
+            msg="Android signing secrets are not all set (TORRENTTV_KEYSTORE_BASE64, TORRENTTV_KEYSTORE_PASSWORD, TORRENTTV_KEY_ALIAS, TORRENTTV_KEY_PASSWORD). See docs/ANDROIDTV.md."
+            if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+              echo "::error::${msg} Refusing to publish a debug-signed APK from a release tag."
+              exit 1
+            fi
+            echo "::warning::${msg} Signing this non-release build with the debug key."
+            exit 0
+          fi
+          keystore="${RUNNER_TEMP}/torrenttv-release.jks"
+          printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${keystore}"
+          echo "::add-mask::${KEYSTORE_PASSWORD}"
+          echo "::add-mask::${KEY_PASSWORD}"
+          {
+            echo "TORRENTTV_KEYSTORE_PATH=${keystore}"
+            echo "TORRENTTV_KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}"
+            echo "TORRENTTV_KEY_ALIAS=${KEY_ALIAS}"
+            echo "TORRENTTV_KEY_PASSWORD=${KEY_PASSWORD}"
+          } >> "${GITHUB_ENV}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "TORRENTTV_REQUIRE_RELEASE_KEY=true" >> "${GITHUB_ENV}"
+          fi
       - name: Package TorrentTV APK
         run: make torrenttv-apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

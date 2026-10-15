@@ -18,8 +18,14 @@ fi
 if [ -z "${ANDROID_HOME:-}" ] && [ -d /opt/homebrew/share/android-commandlinetools ]; then
     export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 fi
-./gradlew --no-daemon :app:syncWebApp :app:assembleRelease
+./gradlew --no-daemon :app:syncWebApp :app:testDebugUnitTest :app:assembleRelease
 mkdir -p "$root/.build/artifacts"
 cp "$root/app/build/outputs/apk/release/app-release.apk" "$root/.build/artifacts/torrent-tv-$version-android-tv.apk"
-(cd "$root/.build/artifacts" && sha256sum "torrent-tv-$version-android-tv.apk" > "torrent-tv-$version-android-tv.apk.sha256")
+# Stock macOS has no sha256sum; shasum -a 256 prints the same format.
+if command -v sha256sum >/dev/null 2>&1; then
+    sha256_cmd="sha256sum"
+else
+    sha256_cmd="shasum -a 256"
+fi
+(cd "$root/.build/artifacts" && $sha256_cmd "torrent-tv-$version-android-tv.apk" > "torrent-tv-$version-android-tv.apk.sha256")
 echo "$root/.build/artifacts/torrent-tv-$version-android-tv.apk"

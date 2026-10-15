@@ -20,7 +20,7 @@ another release (see `docs/adr/0009`).
 make torrenttv-apk
 ```
 
-The build syncs `clients/tv/dist` into the APK assets (replacing only
+Build the web bundle first (`npm run build -w @torrent-tv/tv`); the Gradle sync fails when `clients/tv/dist` is missing. The build syncs it into the APK assets (deleting stale files and replacing only
 `index.html` with the Android page variant), runs the Kotlin unit tests
 inside the Gradle build, and produces:
 
@@ -57,18 +57,32 @@ Moving from the old hardcoded `versionCode = 1` to 908 is one-way for
 installed builds; any future scheme must stay monotonic.
 
 Release builds are signed with one fixed keystore read from environment
-variables (CI supplies them from secrets); the keystore is never committed:
+variables; the keystore is never committed:
 
 ```text
 TORRENTTV_KEYSTORE_PATH, TORRENTTV_KEYSTORE_PASSWORD,
 TORRENTTV_KEY_ALIAS, TORRENTTV_KEY_PASSWORD
 ```
 
-If any is unset the build prints a warning and signs with the debug key.
-Such an APK installs fresh but cannot update a keystore-signed install (and
-vice versa); uninstall first. Keep the one keystore: losing it breaks the
-update path for every installed device. Upgrade installs over a previous
-build are unverified on hardware.
+The release workflow (`.github/workflows/release.yml`) builds those from four
+repository secrets. Configure them under Settings > Secrets and variables >
+Actions:
+
+| Secret | Content |
+|---|---|
+| `TORRENTTV_KEYSTORE_BASE64` | the keystore file, base64 encoded (`base64 -w0 release.jks`) |
+| `TORRENTTV_KEYSTORE_PASSWORD` | keystore password |
+| `TORRENTTV_KEY_ALIAS` | key alias |
+| `TORRENTTV_KEY_PASSWORD` | key password |
+
+On a `v*` tag build a missing secret fails the job ("Prepare the Android
+release signing key") and the build sets `TORRENTTV_REQUIRE_RELEASE_KEY=true`,
+so Gradle also refuses to fall back to the debug key. Other builds (manual
+dispatch, local) with any variable unset print a warning and sign with the
+debug key. Such an APK installs fresh but cannot update a keystore-signed
+install (and vice versa); uninstall first. Keep the one keystore: losing it
+breaks the update path for every installed device. Upgrade installs over a
+previous build are unverified on hardware.
 
 ## Physical-TV verification log
 
