@@ -182,8 +182,9 @@ func TestGuardAdminTier(t *testing.T) {
 	run("default", nil, []originCase{
 		{"", 200},
 		{"http://192.168.1.20:8097", 200},
-		{"http://192.168.1.99:8097", 200},
-		{"http://torrenttv.local", 200},
+		{"http://192.168.1.99:8097", 403}, // another LAN page is not the admin UI
+		{"http://torrenttv.local", 403},
+		{"http://localhost:5173", 403},
 		{"null", 403},
 		{"https://appassets.androidplatform.net", 403},
 		{"https://evil.example", 403},
@@ -214,5 +215,38 @@ func TestGuardPreflight(t *testing.T) {
 	}
 	if rec := do(h, "OPTIONS", "/api/v1/playback/x", host, "https://evil.example", pf); rec.Code != 403 {
 		t.Fatalf("foreign preflight = %d, want 403", rec.Code)
+	}
+}
+
+func TestGuardAdminTierRequiresLANShapedHost(t *testing.T) {
+	adminPaths := []string{"/api/v1/settings", "/api/v1/dependencies/tmdb/test", "/api/v1/updates/check"}
+	allowed := []string{"192.168.1.20:8097", "203.0.113.9", "[::1]:8097", "localhost:8097", "torrenttv", "torrenttv.local", "tv.lan:8097", "tv.home.arpa"}
+	rebound := []string{"evil.example.com:8097", "attacker.com", "tv.local.evil.com", "lan.evil.com", ""}
+	h := guardWith(nil)
+	for _, path := range adminPaths {
+		for _, host := range allowed {
+			if got := do(h, "GET", path, host, "", nil).Code; got != 200 {
+				t.Errorf("admin %s host %q = %d, want 200", path, host, got)
+			}
+		}
+		for _, host := range rebound {
+			if got := do(h, "GET", path, host, "", nil).Code; got != 403 {
+				t.Errorf("admin %s host %q = %d, want 403", path, host, got)
+			}
+		}
+	}
+	// The client tier keeps accepting any Host.
+	for _, host := range rebound {
+		if got := do(h, "GET", "/api/v1/downloads", host, "", nil).Code; got != 200 {
+			t.Errorf("client tier host %q = %d, want 200", host, got)
+		}
+	}
+	// A name in TORRENT_TV_ALLOWED_HOSTS is accepted on the admin tier too.
+	listed := guardWith(map[string]string{"TORRENT_TV_ALLOWED_HOSTS": "tv.example.com"})
+	if got := do(listed, "GET", "/api/v1/settings", "tv.example.com", "", nil).Code; got != 200 {
+		t.Errorf("listed host on admin tier = %d, want 200", got)
+	}
+	if got := do(listed, "GET", "/api/v1/settings", "other.example.com", "", nil).Code; got != 403 {
+		t.Errorf("unlisted host on admin tier = %d, want 403", got)
 	}
 }

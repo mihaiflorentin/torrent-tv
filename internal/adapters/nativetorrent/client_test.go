@@ -833,6 +833,14 @@ func TestRemoveAcrossClientsWithDeleteFiles(t *testing.T) {
 func TestProgressiveServeMidFileOnPartialPublicDownload(t *testing.T) {
 	root := seedContentFill(t, 'p', 'q')
 	pubMI, pubRaw := buildPublicTestMetainfo(t, root)
+	// The metainfo is built from the full pack; the seeder then loses E02, so
+	// its pieces can never be served. Status describes the selected set, and
+	// a local seeder would otherwise finish all 8 MiB within milliseconds,
+	// racing the "still partial" assertions below. With E02 unobtainable the
+	// selection stays incomplete no matter how fast the transfer runs.
+	if err := os.Remove(filepath.Join(root, "Pack.S01E02.mkv")); err != nil {
+		t.Fatal(err)
+	}
 
 	seedCfg := torrent.TestingConfig(t)
 	seedCfg.DataDir = filepath.Dir(root)
@@ -865,8 +873,9 @@ func TestProgressiveServeMidFileOnPartialPublicDownload(t *testing.T) {
 		t.Fatalf("expected at least 2 files, got %d", len(files))
 	}
 
-	// Select both files so the selected set is 8 MiB, leaving the torrent as
-	// a whole in StateDownloading (partial) even after the 256 KiB mid-range finishes.
+	// Select both files: the 8 MiB selected set cannot complete because the
+	// seeder holds no E02 data, so the torrent stays in StateDownloading even
+	// after the 256 KiB mid-range finishes.
 	e01, e02 := files[0].Index, files[1].Index
 	if err := c.PrepareFiles(t.Context(), hash, []int{e01, e02}, nil); err != nil {
 		t.Fatal(err)
@@ -899,7 +908,7 @@ func TestProgressiveServeMidFileOnPartialPublicDownload(t *testing.T) {
 	// Wait for the pieces covering the mid-file range to complete
 	waitForPieceStates(t, c, hash, firstPiece, lastPiece, 2, 60*time.Second)
 
-	// Verify the torrent as a whole is partial (deselected E02 never downloaded)
+	// Verify the torrent as a whole is partial (E02 is unavailable from the seeder)
 	status, err := c.Status(t.Context(), hash)
 	if err != nil {
 		t.Fatal(err)

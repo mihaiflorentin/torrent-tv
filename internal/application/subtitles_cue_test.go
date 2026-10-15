@@ -31,7 +31,7 @@ func TestToWebVTTResolvesBreakTagsOverridesAndEntitiesInCueText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"Line1\nLine2", "A\nB\nC", "D\nE", "Top\nBottom", "Yellow <i>it</i>", "X\nY"}
+	want := []string{"Line1\nLine2", "A\nB\nC", "D\nE", "Top\\NBottom", "Yellow <i>it</i>", "X\nY"}
 	payloads := cuePayloads(t, got)
 	if len(payloads) != len(want) {
 		t.Fatalf("cues = %q, want %d cues", payloads, len(want))

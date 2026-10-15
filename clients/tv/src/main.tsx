@@ -118,18 +118,20 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  // Channel Up / Down: save progress, ask the server for the sibling episode, and hand it to the app. A result that
  // arrives after the player closed or suspended (session changed) is dropped, like a stale stream-completed event.
  async function skipEpisode(direction: 'next' | 'previous') {
-  if (!onEpisode || episodeBusy.current) return;
+  if (!onEpisode || episodeBusy.current) return false;
   episodeBusy.current = true;
   const token = session.current;
   try {
    await save();
    showTransientMessage(direction === 'next' ? 'Loading next episode…' : 'Loading previous episode…', 10_000);
    const target = await (direction === 'next' ? api.nextEpisode(download.id) : api.previousEpisode(download.id));
-   if (token !== session.current) return;
-   if (!target) { showTransientMessage(direction === 'next' ? 'No next episode' : 'No previous episode'); return; }
+   if (token !== session.current) return true;
+   if (!target) { showTransientMessage(direction === 'next' ? 'No next episode' : 'No previous episode'); return false; }
    onEpisode(target, preferenceRef.current);
+   return true;
   } catch (error) {
    if (token === session.current) showTransientMessage(`Could not start the ${direction} episode: ${(error as Error).message}`, 5000);
+   return false;
   } finally { episodeBusy.current = false; }
  }
 
@@ -362,7 +364,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
    navigate: direction => { const active = document.activeElement as HTMLElement | null; const target = active ? chooseStructuredTarget(active, controlElements(), direction) : null; if (target) focusElement(target); },
    togglePlayback: force => togglePlayback(force),
    back: () => { if (menuRef.current) closeMenu(); else { save(); onClose(); } },
-   skipEpisode: direction => { void skipEpisode(direction); },
+   skipEpisode: direction => skipEpisode(direction),
   });
   keysRef.current = keys;
   const key = (event: KeyboardEvent) => {

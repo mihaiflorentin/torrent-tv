@@ -10,9 +10,13 @@ describe('cueDisplayText', () => {
     expect(cueDisplayText('Line1&lt;br&gt;Line2')).toBe('Line1\nLine2');
     expect(cueDisplayText('Line1&lt;/br&gt;Line2')).toBe('Line1\nLine2');
   });
-  it('handles ASS override tags and literal \\N / \\n breaks', () => {
+  it('handles ASS override blocks and literal \\N breaks', () => {
     expect(cueDisplayText('{\\an8}Top\\NBottom')).toBe('Top\nBottom');
-    expect(cueDisplayText('{\\i1}Hi{\\i0}\\nthere')).toBe('Hi\nthere');
+    expect(cueDisplayText('{\\i1}Hi{\\i0}\\Nthere')).toBe('Hi\nthere');
+  });
+  it('keeps plain braces and lowercase \\n as dialogue', () => {
+    expect(cueDisplayText('He typed {admin} then C:\\new')).toBe('He typed {admin} then C:\\new');
+    expect(cueDisplayText('{music}')).toBe('{music}');
   });
   it('strips safe formatting tags and decodes entities as text', () => {
     expect(cueDisplayText('<i>Hello</i> <b>there</b> <font color="#fff">you</font> <u>x</u>')).toBe('Hello there you x');

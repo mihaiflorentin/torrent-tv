@@ -78,4 +78,19 @@ describe('BackdropLayer', () => {
     expect(host.querySelector('.backdrop')!.getAttribute('data-art')).toBe('false');
     expect(shown(host)).toEqual([]);
   });
+
+  it('keeps the previous artwork when the incoming image fails to load', () => {
+    const host = mount(<BackdropLayer fallback="/featured.jpg" />);
+    act(() => { setBackdropArt('/dead.jpg') });
+    act(() => { imgs(host).find(img => img.getAttribute('src') === '/dead.jpg')!.dispatchEvent(new Event('error')) });
+    expect(shown(host)).toEqual(['/featured.jpg']);
+    expect(imgs(host).map(img => img.getAttribute('src'))).not.toContain('/dead.jpg');
+  });
+
+  it('falls back to the designed state when the only artwork is dead', () => {
+    const host = mount(<BackdropLayer fallback="/dead.jpg" />);
+    act(() => { imgs(host)[0].dispatchEvent(new Event('error')) });
+    expect(host.querySelector('.backdrop')!.getAttribute('data-art')).toBe('false');
+    expect(imgs(host)).toHaveLength(0);
+  });
 });

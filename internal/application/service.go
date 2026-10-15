@@ -49,6 +49,7 @@ type Service struct {
 	admissionMu      sync.Mutex
 	reservedBytes    atomic.Int64
 	leaseMu          sync.Mutex
+	leaseWriteMu     sync.Mutex // serialises persisted lease writes
 	leases           map[string]int
 	mediaInfoMu      sync.Mutex
 	mediaInfoCache   map[string]cachedMediaInfo
@@ -2848,12 +2849,23 @@ func (s *Service) Acquire(ctx context.Context, id string) (domain.Download, erro
 	s.leaseMu.Lock()
 	s.leases[id]++
 	s.leaseMu.Unlock()
-	if err = s.repo.SetLease(ctx, id, true); err != nil {
+	if err = s.persistLease(ctx, id); err != nil {
 		s.dropLease(id)
+		// Reconcile in case another stream's write was skipped meanwhile.
+		_ = s.persistLease(ctx, id)
 		return d, err
 	}
 	d.Leased = true
 	return d, nil
+}
+
+// persistLease writes the lease flag derived from the in-memory count at the
+// moment of the write. Writes are serialised, so a stale value from an
+// earlier Acquire or Release can never land after a newer one.
+func (s *Service) persistLease(ctx context.Context, id string) error {
+	s.leaseWriteMu.Lock()
+	defer s.leaseWriteMu.Unlock()
+	return s.repo.SetLease(ctx, id, s.leaseHeld(id))
 }
 
 // dropLease decrements the in-memory count and reports whether it reached
@@ -2888,7 +2900,13 @@ func (s *Service) Release(id string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if err := s.repo.SetLease(ctx, id, false); err != nil {
+	err := s.persistLease(ctx, id)
+	if err != nil {
+		// One retry: a stuck flag would block eviction and removal until
+		// the next restart.
+		err = s.persistLease(ctx, id)
+	}
+	if err != nil {
 		if log := s.log; log != nil {
 			log.Warn("clear stream lease failed", "download", id, "error", err)
 		}

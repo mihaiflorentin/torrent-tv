@@ -55,8 +55,15 @@ export function BackdropLayer({ fallback = '' }: { fallback?: string }) {
   }, [art]);
   const shown = slots.urls[slots.active];
   const reveal = (slot: 0 | 1) => setSlots(current => current.urls[slot] === wanted.current && current.active !== slot ? { ...current, active: slot } : current);
+  // A dead URL is never shown: empty its slot so the other slot (or the designed tinted state) stays on screen.
+  const fail = (slot: 0 | 1) => setSlots(current => {
+    if (!current.urls[slot]) return current;
+    const urls: [string, string] = [current.urls[0], current.urls[1]];
+    urls[slot] = '';
+    return { urls, active: current.active === slot ? (slot === 0 ? 1 : 0) : current.active };
+  });
   return <div class="backdrop" aria-hidden="true" data-art={shown ? 'true' : 'false'}>
-    {slots.urls.map((url, slot) => url ? <img key={slot} class="backdrop-art" data-active={slots.active === slot ? 'true' : 'false'} src={url} alt="" decoding="async" onLoad={() => reveal(slot as 0 | 1)} /> : null)}
+    {slots.urls.map((url, slot) => url ? <img key={slot} class="backdrop-art" data-active={slots.active === slot ? 'true' : 'false'} src={url} alt="" decoding="async" onLoad={() => reveal(slot as 0 | 1)} onError={() => fail(slot as 0 | 1)} /> : null)}
     <div class="backdrop-scrim" />
   </div>;
 }

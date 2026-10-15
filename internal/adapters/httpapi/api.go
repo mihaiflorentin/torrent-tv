@@ -207,7 +207,7 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request) {
 	// example a flag added after the client was built) keeps its value
 	// instead of silently turning false.
 	old := a.settings.Get()
-	v := old
+	v := old.Clone()
 	if err := decode(r, &v); err != nil {
 		problem(w, 400, err)
 		return

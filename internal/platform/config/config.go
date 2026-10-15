@@ -267,7 +267,17 @@ func (s *Store) EnsureNativePathsWritableFor(v Settings) error {
 	return EnsureNativePathsWritable(v.DownloadEngine, v.DownloadRoot, v.TorrentSessionDir)
 }
 
-func (s *Store) Get() Settings { s.mu.RLock(); defer s.mu.RUnlock(); return s.value }
+// Clone returns a copy that shares no slice storage with v, so decoding into
+// it cannot write through to the original.
+func (v Settings) Clone() Settings {
+	v.TrustedCIDRs = slices.Clone(v.TrustedCIDRs)
+	v.EvictionRules = slices.Clone(v.EvictionRules)
+	v.MetadataProviders = slices.Clone(v.MetadataProviders)
+	return v
+}
+
+// Get returns a snapshot the caller may modify freely.
+func (s *Store) Get() Settings { s.mu.RLock(); defer s.mu.RUnlock(); return s.value.Clone() }
 func (s *Store) Path() string  { return s.path }
 func (s *Store) EnvironmentManaged(key string) bool {
 	s.mu.RLock()
