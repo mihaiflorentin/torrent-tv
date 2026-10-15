@@ -31,6 +31,7 @@ type Service struct {
 	settings         *config.Store
 	subtitles        []SubtitleProvider
 	locks            sync.Map
+	probeCache       sync.Map // probeCacheKey -> []domain.MediaSubtitleTrack
 	metadata         MetadataProvider
 	mediaProbe       MediaProbe
 	freeSpace        func(string) (int64, error)

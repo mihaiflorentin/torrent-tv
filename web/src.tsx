@@ -451,12 +451,14 @@ export function BrowserPlayer({ active, onClose, onStateChanged, onAdvance, onSk
 
   async function chooseSubtitle(candidate: SubtitleCandidate, automatic = false, persist = true) {
     try {
-      setMessage(automatic ? 'Selecting subtitles…' : 'Preparing subtitle…');
+      setMessage(candidate.provider === 'embedded' ? 'Extracting the embedded subtitle… the first time can take a few minutes' : automatic ? 'Selecting subtitles…' : 'Preparing subtitle…');
       const asset = await api.prepareSubtitle(active.download.id, candidate.provider, candidate.id, 'vtt');
       const element = document.createElement('track');
       element.kind = 'subtitles'; element.label = subtitleItemLabel(candidate, 1); element.srclang = candidate.language || 'und'; element.src = api.streamURL(asset.url); element.default = true; element.dataset.filelist = 'true';
       video.current?.querySelectorAll('track[data-filelist]').forEach(track => track.remove()); video.current?.appendChild(element);
       element.addEventListener('load', () => { if (element.track) { syncSubtitleOffset(offsetRef.current); element.track.mode = 'showing' } setSelectedSubtitle(`${candidate.provider}:${candidate.id}`); setMessage('') }, { once: true });
+      // The asset is ready: drop the progress text now, and show the track so the browser actually fetches it (a track left disabled never fires load).
+      setMessage(''); setSelectedSubtitle(`${candidate.provider}:${candidate.id}`); if (element.track) element.track.mode = 'showing';
       element.addEventListener('error', () => setMessage('The subtitle is cached, but this browser could not load it.'), { once: true });
       setSubtitleOpen(false); root.current?.focus();
       if (persist) await savePreferences({ ...preferenceRef.current, subtitleLanguage: subtitlePreferenceLanguage(candidate.language, preferenceRef.current.subtitleLanguage), subtitleProvider: candidate.provider, subtitleCandidateId: candidate.id, subtitleMode: 'selected' });

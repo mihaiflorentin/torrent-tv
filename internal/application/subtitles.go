@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mihaiflorentin/torrent-tv/internal/domain"
@@ -96,7 +97,7 @@ func (s *Service) SearchSubtitles(ctx context.Context, downloadID, language stri
 		if !completedLocalFile(d) {
 			warnings = append(warnings, domain.SubtitleProviderWarning{Provider: "embedded", Message: "Embedded subtitles are available after the download completes"})
 		} else {
-			tracks, probeErr := s.mediaProbe.ProbeSubtitles(ctx, d.AbsolutePath)
+			tracks, probeErr := s.probeSubtitles(ctx, d.AbsolutePath)
 			if probeErr != nil {
 				warnings = append(warnings, domain.SubtitleProviderWarning{Provider: "embedded", Message: probeErr.Error()})
 			} else {
@@ -176,6 +177,13 @@ func (s *Service) PrepareSubtitle(ctx context.Context, downloadID, providerName,
 			embeddedStale = info.ModTime()
 		}
 	}
+	// One preparation per subtitle at a time: a repeated click or a second
+	// player would otherwise start another full-file ffmpeg read on a busy disk
+	// and then find the cache filled by the first.
+	lockAny, _ := s.locks.LoadOrStore("subtitle:"+downloadID+"\x00"+providerName+"\x00"+candidateID+"\x00"+target, &sync.Mutex{})
+	prepLock := lockAny.(*sync.Mutex)
+	prepLock.Lock()
+	defer prepLock.Unlock()
 	if cached, cacheErr := s.repo.GetSubtitleAsset(ctx, downloadID, providerName, candidateID, target); cacheErr == nil && !cached.CreatedAt.Add(time.Second).Before(embeddedStale) {
 		if _, statErr := os.Stat(cached.Path); statErr == nil {
 			if target == "vtt" {
@@ -242,7 +250,7 @@ func (s *Service) PrepareSubtitle(ctx context.Context, downloadID, providerName,
 		if parseErr != nil || index < 0 {
 			return domain.SubtitleAsset{}, fmt.Errorf("invalid embedded subtitle id")
 		}
-		tracks, probeErr := s.mediaProbe.ProbeSubtitles(ctx, d.AbsolutePath)
+		tracks, probeErr := s.probeSubtitles(ctx, d.AbsolutePath)
 		if probeErr != nil {
 			return domain.SubtitleAsset{}, fmt.Errorf("probe embedded subtitles: %w", probeErr)
 		}
@@ -861,4 +869,28 @@ func pruneSubtitleCache(dir string, maximum int64, keep string) {
 			total -= file.size
 		}
 	}
+}
+
+type probeCacheKey struct {
+	path string
+	size int64
+	mod  int64
+}
+
+// probeSubtitles lists a file's subtitle streams. Listing reads the whole file
+// (see SearchSubtitles), so the answer is remembered per file version: opening
+// the subtitle panel and then choosing a track no longer reads it twice.
+func (s *Service) probeSubtitles(ctx context.Context, path string) ([]domain.MediaSubtitleTrack, error) {
+	var key probeCacheKey
+	if info, err := os.Stat(path); err == nil {
+		key = probeCacheKey{path, info.Size(), info.ModTime().UnixNano()}
+		if cached, ok := s.probeCache.Load(key); ok {
+			return cached.([]domain.MediaSubtitleTrack), nil
+		}
+	}
+	tracks, err := s.mediaProbe.ProbeSubtitles(ctx, path)
+	if err == nil && key.path != "" {
+		s.probeCache.Store(key, tracks)
+	}
+	return tracks, err
 }

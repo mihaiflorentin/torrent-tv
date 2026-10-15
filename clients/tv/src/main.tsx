@@ -430,7 +430,7 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
   } catch (error) { setMessage(`Subtitle search failed: ${(error as Error).message}`); }
  }
  async function installSubtitle(candidate: SubtitleCandidate, persist = true): Promise<boolean> {
-  setMessage(`Preparing ${candidate.title}…`); if (menuRef.current) closeMenu(); else revealControls(true);
+  setMessage(candidate.provider === 'embedded' ? `Extracting ${candidate.title}… the first time can take a few minutes` : `Preparing ${candidate.title}…`); if (menuRef.current) closeMenu(); else revealControls(true);
   try {
    const asset = await api.prepareSubtitle(download.id, candidate.provider, candidate.id, 'vtt');
    const response = await fetch(api.streamURL(asset.url)); if (!response.ok) throw new Error(`server returned ${response.status}`); const cues = parseVTT(await response.text()); if (!cues.length) throw new Error('the downloaded subtitle contained no readable cues'); subtitleCues.current = cues; try { window.webapis?.avplay.setSilentSubtitle(true); } catch { } setExternalSubtitle(subtitleAt(cues, current.current, subtitleDelayRef.current)); if (persist) await savePreferences({ ...preferenceRef.current, subtitleLanguage: subtitlePreferenceLanguage(candidate.language, preferenceRef.current.subtitleLanguage), subtitleProvider: candidate.provider, subtitleCandidateId: candidate.id, subtitleMode: 'selected' }); showTransientMessage(`${subtitleItemLabel(candidate, 1)} selected`); revealControls(); return true;
