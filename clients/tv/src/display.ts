@@ -1,4 +1,4 @@
-import { canonicalLanguage, formatBytes, languageDisplayName, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
+import { canonicalLanguage, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, languageDisplayName, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
 import { formatTime } from './player';
 
 // Display decisions for the TV screens (DESIGN.md "Information priorities"), kept as pure text
@@ -60,16 +60,8 @@ export function resumeLine(item: HouseholdItem, kind: MediaKind): string {
   return joined([kind === 'series' ? episodeCode(item.seasonNumber, item.episodeNumber) : '', `Continue at ${formatTime(item.positionMs)}`]);
 }
 
-export function formatEta(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return '';
-  const total = Math.round(seconds);
-  if (total < 60) return `${total} s left`;
-  const minutes = Math.round(total / 60);
-  if (minutes < 60) return `${minutes} min left`;
-  const hours = Math.floor(total / 3600);
-  const rest = Math.round(total % 3600 / 60);
-  return rest ? `${hours} h ${rest} min left` : `${hours} h left`;
-}
+// The getting-ready wording lives in the shared package so the web client says the same thing.
+export { formatEta, prepareHint, readyLine, readyPercent };
 
 export type DownloadTone = 'active' | 'paused' | 'queued' | 'done' | 'error' | 'idle';
 
@@ -97,23 +89,6 @@ export function downloadProgressLine(download: Download): string {
   if (status.tone === 'error') return joined([status.label, download.error]);
   if (status.tone !== 'active') return status.label;
   return joined([status.label, download.speedBytesPerSecond > 0 ? `${formatBytes(download.speedBytesPerSecond)}/s` : '', formatEta(download.etaSeconds)]);
-}
-
-/** "Getting ready" panel: percent of the download, 0 to 100. */
-export function readyPercent(download: Download | undefined): number {
-  return download ? Math.round(Math.max(0, Math.min(1, download.progress || 0)) * 100) : 0;
-}
-
-/** "Getting ready" panel facts: peers, speed, time left. A part that is not known yet is left out. */
-export function readyLine(download: Download): string {
-  const peers = download.peers > 0 ? `${download.peers} peer${download.peers === 1 ? '' : 's'}` : '';
-  return joined([peers, download.speedBytesPerSecond > 0 ? `${formatBytes(download.speedBytesPerSecond)}/s` : '', formatEta(download.etaSeconds)]);
-}
-
-/** One calm sentence once Prepare has taken 15 seconds; nothing before that. */
-export function prepareHint(elapsedSeconds: number, seeders?: number): string {
-  if (elapsedSeconds < 15) return '';
-  return seeders && seeders > 0 ? `Still looking for peers. This release has ${seeders} seeder${seeders === 1 ? '' : 's'}, so it can take a little longer.` : 'Still looking for peers. It can take a little longer.';
 }
 
 /** Secondary facts of a download row. Release name, path, index, peers and the engine route are details. */

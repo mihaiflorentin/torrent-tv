@@ -39,8 +39,12 @@ export interface PlayerKeyPorts {
   togglePlayback(force?: boolean): void;
   /** Close the open Player panel, else save and leave the player. */
   back(): void;
-  /** Channel Up / Down: save progress and switch to the next or previous episode. Absent where the player has no queue. */
-  skipEpisode?(direction: 'next' | 'previous'): void;
+  /**
+   * Channel Up / Down: save progress and switch to the next or previous episode. Absent where the player has no queue.
+   * Return `false` (or a promise of `false`) when no switch happens, so the pending seek survives; anything else
+   * means the switch was accepted.
+   */
+  skipEpisode?(direction: 'next' | 'previous'): boolean | void | Promise<boolean | void>;
 }
 
 /** Seek step: the fixed amount one seek input moves the playback position (GLOSSARY.md). */
@@ -88,9 +92,13 @@ export class PlayerKeyController {
     if (action === 'play-pause') return p.togglePlayback();
     if (action === 'next-episode' || action === 'previous-episode') {
       if (!p.skipEpisode) return;
-      // The pending seek belongs to the episode being left: drop it so it cannot land on the new one.
-      this.dispose();
-      return p.skipEpisode(action === 'next-episode' ? 'next' : 'previous');
+      // The pending seek belongs to the episode being left, but only once the switch is accepted: with no sibling
+      // episode or a failed lookup the viewer keeps watching this one and the seek must still land.
+      const outcome = p.skipEpisode(action === 'next-episode' ? 'next' : 'previous');
+      if (outcome && typeof (outcome as Promise<unknown>).then === 'function') {
+        void (outcome as Promise<boolean | void>).then(accepted => { if (accepted !== false) this.dispose(); }, () => {});
+      } else if (outcome !== false) this.dispose();
+      return;
     }
 
     const menu = p.menuOpen();

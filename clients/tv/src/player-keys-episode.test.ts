@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlayerKeyController, SEEK_COMMIT_MS, SKIP_STEP_MS } from './player-keys';
 
-function setup(withPort = true) {
+function setup(withPort = true, skip?: (direction: 'next' | 'previous') => boolean | void | Promise<boolean | void>) {
   const calls: string[] = [];
   const state = { position: 60_000 };
   const keys = new PlayerKeyController({
@@ -24,7 +24,7 @@ function setup(withPort = true) {
     navigate: () => {},
     togglePlayback: () => {},
     back: () => {},
-    ...(withPort ? { skipEpisode: (direction: 'next' | 'previous') => { calls.push(`episode(${direction})`); } } : {}),
+    ...(withPort ? { skipEpisode: (direction: 'next' | 'previous') => { calls.push(`episode(${direction})`); return skip?.(direction); } } : {}),
   });
   return { calls, keys };
 }
@@ -59,5 +59,33 @@ describe('Channel keys skip episodes', () => {
     const { calls, keys } = setup();
     keys.handle('next');
     expect(calls).toContain(`show(${60_000 + SKIP_STEP_MS})`);
+  });
+
+  it('keeps the pending seek when there is no sibling episode to switch to', async () => {
+    const { calls, keys } = setup(true, () => Promise.resolve(false));
+    keys.handle('fast-forward');
+    keys.handle('next-episode');
+    await Promise.resolve();
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls).toContain('seekTo(70000)');
+  });
+
+  it('keeps the pending seek when the port refuses synchronously', () => {
+    const { calls, keys } = setup(true, () => false);
+    keys.handle('fast-forward');
+    keys.handle('next-episode');
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls).toContain('seekTo(70000)');
+  });
+
+  it('drops the pending seek once an asynchronous switch is accepted', async () => {
+    const { calls, keys } = setup(true, () => Promise.resolve(true));
+    keys.handle('fast-forward');
+    keys.handle('next-episode');
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.advanceTimersByTime(SEEK_COMMIT_MS * 2);
+    expect(calls.some(call => call.startsWith('seekTo'))).toBe(false);
+    expect(keys.playtime(1234)).toBe(true);
   });
 });

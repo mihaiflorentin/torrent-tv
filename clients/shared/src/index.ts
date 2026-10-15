@@ -276,3 +276,4 @@ export { SEEDERS_BIG_SWARM, SEEDERS_HEALTHY, bestSourceForDetail, playActionLabe
 export type { RankOptions } from './sources';
 export { buildPath, parsePath } from './routes';
 export type { Route, View } from './routes';
+export { formatEtaLeft, prepareHint, readyLine, readyPercent } from './getting-ready';

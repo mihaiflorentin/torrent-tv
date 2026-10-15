@@ -3002,6 +3002,75 @@ dl .tracker-badge,
  transform: translateX(-50%);
 }
 
+/* Getting ready: a calm centred panel while the stream opens or buffers. Static and never focusable; every line keeps
+   its space so text arriving later moves nothing. */
+.player-ready {
+ position: absolute;
+ left: 50%;
+ top: 34%;
+ z-index: 5;
+ width: min(560px, calc(100% - var(--tt-space-6)));
+ padding: var(--tt-space-5);
+ border: 1px solid var(--tt-line-strong);
+ border-radius: var(--tt-radius-lg);
+ background: var(--tt-controls-surface);
+ transform: translateX(-50%);
+ pointer-events: none;
+}
+
+.player-ready-title {
+ display: block;
+ overflow: hidden;
+ font-size: var(--tt-text-lg);
+ font-weight: var(--tt-weight-bold);
+ text-overflow: ellipsis;
+ white-space: nowrap;
+}
+
+.player-ready-bar {
+ height: 6px;
+ margin-top: var(--tt-space-4);
+ overflow: hidden;
+ border-radius: var(--tt-radius-pill);
+ background: var(--tt-line-strong);
+}
+
+.player-ready-fill {
+ display: block;
+ height: 100%;
+ background: var(--tt-accent);
+}
+
+.player-ready-facts {
+ display: flex;
+ gap: var(--tt-space-4);
+ min-height: 1.5em;
+ margin-top: var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-text-sm);
+}
+
+.player-ready-facts b {
+ color: var(--tt-text);
+}
+
+/* Prepare dialog: elapsed seconds, and a hint that arrives after 15 s into space that is already reserved. */
+.prepare-wait {
+ margin-top: var(--tt-space-4);
+}
+
+.prepare-elapsed {
+ display: block;
+ font-size: var(--tt-text-lg);
+ font-weight: var(--tt-weight-bold);
+ font-variant-numeric: tabular-nums;
+}
+
+.prepare-hint {
+ min-height: 3em;
+ margin: var(--tt-space-3) 0 0;
+}
+
 /* OSD: transient Player command feedback; one instance, hidden by the component. */
 .osd {
  position: absolute;
