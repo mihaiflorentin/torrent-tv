@@ -84,6 +84,7 @@ describe('BackdropLayer', () => {
     act(() => { setBackdropArt('/dead.jpg') });
     act(() => { imgs(host).find(img => img.getAttribute('src') === '/dead.jpg')!.dispatchEvent(new Event('error')) });
     expect(shown(host)).toEqual(['/featured.jpg']);
+    expect(host.querySelector('.backdrop')!.getAttribute('data-art')).toBe('true'); // never the empty state while art remains
     expect(imgs(host).map(img => img.getAttribute('src'))).not.toContain('/dead.jpg');
   });
 

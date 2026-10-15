@@ -55,7 +55,9 @@ export function BackdropLayer({ fallback = '' }: { fallback?: string }) {
   }, [art]);
   const shown = slots.urls[slots.active];
   const reveal = (slot: 0 | 1) => setSlots(current => current.urls[slot] === wanted.current && current.active !== slot ? { ...current, active: slot } : current);
-  // A dead URL is never shown: empty its slot so the other slot (or the designed tinted state) stays on screen.
+  // A dead URL is never shown: empty its slot. When another slot still holds loaded art it stays on screen, so a
+  // failed incoming image keeps the previous artwork (the TV does the same); only when no art is left does the
+  // designed tinted state appear.
   const fail = (slot: 0 | 1) => setSlots(current => {
     if (!current.urls[slot]) return current;
     const urls: [string, string] = [current.urls[0], current.urls[1]];
