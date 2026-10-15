@@ -169,3 +169,7 @@ _Avoid_: target TV, test device
 **Error panel**:
 The full-screen, readable explanation the TV client shows when the application hits an unhandled error, reported to the server's client-diagnostics channel. The client never fails silently.
 _Avoid_: black screen (as a state name), crash overlay
+
+**Info panel**:
+The extended description of a title (tagline, overview, release date, runtime, rating, genres, director or creator, top-billed cast, and fine print such as country and status), opened from the Info button on the title page and the Home hero. A side sheet on the TV with its own focus region, an accessible dialog on the web; both render the same server answer, `GET /catalog/titles/{id}/info`, and say "No extra details available" when a provider has nothing.
+_Avoid_: details page, metadata screen
