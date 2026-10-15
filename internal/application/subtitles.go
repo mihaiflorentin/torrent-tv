@@ -460,7 +460,7 @@ func toWebVTT(data []byte, format string) ([]byte, error) {
 			if m == nil {
 				continue
 			}
-			fmt.Fprintf(&out, "%d\n%s --> %s\n%s\n\n", index, vttTime(assMS(m[1:5])), vttTime(assMS(m[5:9])), normalizeCueText(escapeCueMarkup(m[9]), true))
+			fmt.Fprintf(&out, "%d\n%s --> %s\n%s\n\n", index, vttTime(assMS(m[1:5])), vttTime(assMS(m[5:9])), normalizeCueText(escapeCueMarkup(m[9]), true, true))
 			index++
 		}
 		if index == 1 {
@@ -615,7 +615,7 @@ func toSAMI(data []byte, format string) ([]byte, error) {
 	if format == ".ass" || format == ".ssa" {
 		for _, line := range strings.Split(text, "\n") {
 			if m := assLine.FindStringSubmatch(line); m != nil {
-				cues = append(cues, cue{assMS(m[1:5]), assMS(m[5:9]), cleanCue(m[9])})
+				cues = append(cues, cue{assMS(m[1:5]), assMS(m[5:9]), cleanCue(m[9], true)})
 			}
 		}
 	} else {
@@ -629,7 +629,7 @@ func toSAMI(data []byte, format string) ([]byte, error) {
 			for i++; i < len(lines) && strings.TrimSpace(lines[i]) != ""; i++ {
 				body = append(body, lines[i])
 			}
-			cues = append(cues, cue{vttClockMS(m[1:5]), vttClockMS(m[5:9]), cleanCue(strings.Join(body, "\n"))})
+			cues = append(cues, cue{vttClockMS(m[1:5]), vttClockMS(m[5:9]), cleanCue(strings.Join(body, "\n"), false)})
 		}
 	}
 	if len(cues) == 0 {
@@ -668,14 +668,15 @@ func assMS(parts []string) int64 {
 
 // cleanCue prepares cue text for SAMI: line breaks of every spelling become
 // <br>, formatting is dropped and the rest is HTML-escaped.
-func cleanCue(value string) string {
-	escaped := html.EscapeString(normalizeCueText(value, false))
+func cleanCue(value string, ass bool) string {
+	escaped := html.EscapeString(normalizeCueText(value, false, ass))
 	return strings.ReplaceAll(escaped, "\n", "<br>")
 }
 
 var (
-	cueBreakTag    = regexp.MustCompile(`(?i)(?:<|&lt;)\s*/?\s*br\s*/?\s*(?:>|&gt;)|\\[Nn]`)
-	cueOverride    = regexp.MustCompile(`\{[^}]*\}`)
+	cueBreakTag    = regexp.MustCompile(`(?i)(?:<|&lt;)\s*/?\s*br\s*/?\s*(?:>|&gt;)`)
+	cueASSBreak    = regexp.MustCompile(`\\[Nn]`)
+	cueOverride    = regexp.MustCompile(`\{\\[^}]*\}`)
 	cueFontTag     = regexp.MustCompile(`(?i)(?:<|&lt;)/?font(?:[\s](?:(?:&gt;)?[^>&]|&(?:[^g]|g(?:[^t]|t[^;])))*)?(?:>|&gt;)`)
 	cueEscapedTag  = regexp.MustCompile(`(?i)&lt;(/?[ibu])&gt;`)
 	cueFormatTag   = regexp.MustCompile(`(?i)</?[ibu]>`)
@@ -689,13 +690,17 @@ func escapeCueMarkup(value string) string {
 }
 
 // normalizeCueText resolves every <br> spelling (literal or entity-escaped,
-// "</br>" included) and the ASS \N / \n breaks into real newlines, maps ASS
-// {\i1} style overrides to <i>/<b>/<u> and drops every other override block
+// "</br>" included) and, when ass is set, the ASS \N / \n breaks into real
+// newlines (in SRT and WebVTT they are dialogue), maps ASS
+// {\i1} style overrides to <i>/<b>/<u> and drops every other {\...} override block
 // and <font> tag. Empty lines are removed, since a blank line would end the
 // cue. keepFormatting=false also drops <i>/<b>/<u>.
-func normalizeCueText(value string, keepFormatting bool) string {
+func normalizeCueText(value string, keepFormatting, ass bool) string {
 	value = strings.ReplaceAll(value, "\r", "")
 	value = cueBreakTag.ReplaceAllString(value, "\n")
+	if ass {
+		value = cueASSBreak.ReplaceAllString(value, "\n")
+	}
 	value = assFormatBlock.ReplaceAllStringFunc(value, func(block string) string {
 		m := assFormatBlock.FindStringSubmatch(block)
 		if m[2] == "1" {
@@ -735,7 +740,7 @@ func sanitizeVTTCues(text string) string {
 			i++
 			payload = append(payload, lines[i])
 		}
-		if cleaned := normalizeCueText(strings.Join(payload, "\n"), true); cleaned != "" {
+		if cleaned := normalizeCueText(strings.Join(payload, "\n"), true, false); cleaned != "" {
 			out = append(out, cleaned)
 		}
 	}
