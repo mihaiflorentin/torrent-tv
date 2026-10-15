@@ -87,6 +87,10 @@
    try { return JSON.parse(native.getTotalTrackInfo()); } catch (error) { return []; }
   },
   setSelectTrack: function(type, index) {
+   // Native text tracks are not listed and cannot be rendered on Android, so a
+   // saved native subtitle preference falls back to the server-provided
+   // subtitles instead of raising an error.
+   if (String(type) === 'TEXT') return;
    if (!native || typeof native.setSelectTrack !== 'function') {
     throw new RangeError('Native track selection unavailable');
    }

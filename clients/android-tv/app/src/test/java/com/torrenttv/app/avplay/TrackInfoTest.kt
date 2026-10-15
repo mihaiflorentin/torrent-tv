@@ -8,7 +8,7 @@ class TrackInfoTest {
     @Test fun `serializes to the AVPlay total-track-info shape`() {
         val json = TrackInfo.toJson(listOf(
             TrackInfo.Track(type = "AUDIO", language = "eng", codec = "audio/eac3"),
-            TrackInfo.Track(type = "TEXT", language = "ron", codec = "text/vtt"),
+            TrackInfo.Track(type = "VIDEO", language = "", codec = "video/avc"),
         ))
         val parsed = org.json.JSONArray(json)
         assertEquals(2, parsed.length())
@@ -18,10 +18,19 @@ class TrackInfoTest {
         val extra = org.json.JSONObject(audio.getString("extra_info"))
         assertEquals("eng", extra.getString("track_lang"))
         assertEquals("audio/eac3", extra.optString("codec"))
-        val text = parsed.getJSONObject(1)
-        assertEquals("TEXT", text.getString("type"))
-        assertEquals(1, text.getInt("index"))
-        assertTrue(text.getString("extra_info").contains("ron"))
+        val video = parsed.getJSONObject(1)
+        assertEquals("VIDEO", video.getString("type"))
+        assertEquals(0, video.getInt("index"))
+        assertTrue(video.getString("extra_info").contains("video/avc"))
+    }
+    @Test fun `native text tracks are not exported`() {
+        val json = TrackInfo.toJson(listOf(
+            TrackInfo.Track(type = "AUDIO", language = "eng", codec = "audio/eac3"),
+            TrackInfo.Track(type = "TEXT", language = "ron", codec = "text/vtt"),
+        ))
+        val parsed = org.json.JSONArray(json)
+        assertEquals(1, parsed.length())
+        assertEquals("AUDIO", parsed.getJSONObject(0).getString("type"))
     }
     @Test fun `empty track list serializes to an empty array`() = assertEquals("[]", TrackInfo.toJson(emptyList()))
     @Test fun `indices are numbered per type across mixed groups`() {
@@ -30,10 +39,10 @@ class TrackInfoTest {
             TrackInfo.Track(type = "AUDIO", language = "eng", codec = "audio/eac3"),
             TrackInfo.Track(type = "AUDIO", language = "ron", codec = "audio/ac3"),
             TrackInfo.Track(type = "TEXT", language = "eng", codec = "text/vtt"),
-            TrackInfo.Track(type = "TEXT", language = "ron", codec = "text/vtt"),
+            TrackInfo.Track(type = "AUDIO", language = "fra", codec = "audio/ac3"),
         ))
         val parsed = org.json.JSONArray(json)
         val indices = (0 until parsed.length()).map { parsed.getJSONObject(it).let { t -> t.getString("type") to t.getInt("index") } }
-        assertEquals(listOf("VIDEO" to 0, "AUDIO" to 0, "AUDIO" to 1, "TEXT" to 0, "TEXT" to 1), indices)
+        assertEquals(listOf("VIDEO" to 0, "AUDIO" to 0, "AUDIO" to 1, "AUDIO" to 2), indices)
     }
 }

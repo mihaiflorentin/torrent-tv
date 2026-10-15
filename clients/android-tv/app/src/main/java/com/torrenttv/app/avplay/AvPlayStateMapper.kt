@@ -10,4 +10,7 @@ object AvPlayStateMapper {
         Player.STATE_ENDED -> "onstreamcompleted"
         else -> null
     }
+
+    /** ExoPlayer's bufferedPercentage is already 0..100; AVPlay reports the same scale. */
+    fun bufferingPercent(bufferedPercentage: Int): Int = bufferedPercentage.coerceIn(0, 100)
 }

@@ -25,7 +25,8 @@ import java.util.concurrent.atomic.AtomicReference
  * Everything stateful runs on the main thread; @JavascriptInterface calls
  * arrive on the WebView's binder thread and are posted. Subtitles render in
  * the page's HTML overlay from server-prepared VTT, so text tracks stay
- * disabled and the subtitle-path/position calls are accepted as no-ops.
+ * disabled, are not listed to the page, and the subtitle calls are accepted
+ * as no-ops.
  */
 class AvPlayBridge(private val surface: SurfaceView, private val dispatch: (String) -> Unit) {
     private val main = Handler(Looper.getMainLooper())
@@ -64,6 +65,11 @@ class AvPlayBridge(private val surface: SurfaceView, private val dispatch: (Stri
             val exo = ExoPlayer.Builder(surface.context).build()
             player = exo
             exo.setVideoSurfaceView(surface)
+            // Nothing renders ExoPlayer text output, so native text tracks can
+            // neither be shown nor listed; subtitles come from the server as VTT.
+            exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
             exo.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
                     AvPlayStateMapper.bufferingCallback(state)?.let { name ->
@@ -150,14 +156,8 @@ class AvPlayBridge(private val surface: SurfaceView, private val dispatch: (Stri
         return applied.get()
     }
 
-    fun setSilentSubtitle(silent: Boolean) {
-        onMain {
-            val current = player ?: return@onMain
-            current.trackSelectionParameters = current.trackSelectionParameters.buildUpon()
-                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, silent)
-                .build()
-        }
-    }
+    /** Native text tracks stay disabled (nothing renders them); server VTT is the subtitle path. */
+    fun setSilentSubtitle(silent: Boolean) { /* deliberate no-op, see prepareAsync */ }
 
     // -- internals (main thread) --
     private fun tracksOf(exo: ExoPlayer): List<TrackInfo.Track> {
@@ -165,7 +165,6 @@ class AvPlayBridge(private val surface: SurfaceView, private val dispatch: (Stri
         for (group in exo.currentTracks.groups) {
             val type = when (group.type) {
                 C.TRACK_TYPE_AUDIO -> "AUDIO"
-                C.TRACK_TYPE_TEXT -> "TEXT"
                 C.TRACK_TYPE_VIDEO -> "VIDEO"
                 else -> continue
             }
@@ -185,7 +184,7 @@ class AvPlayBridge(private val surface: SurfaceView, private val dispatch: (Stri
                 val current = player
                 if (current == null || current !== exo) return
                 dispatchEvent("oncurrentplaytime", listOf(current.currentPosition))
-                if (buffering) dispatchEvent("onbufferingprogress", listOf((current.bufferedPercentage * 100).toInt()))
+                if (buffering) dispatchEvent("onbufferingprogress", listOf(AvPlayStateMapper.bufferingPercent(current.bufferedPercentage)))
                 main.postDelayed(this, 500)
             }
         }

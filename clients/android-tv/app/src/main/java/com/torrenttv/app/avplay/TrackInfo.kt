@@ -13,10 +13,17 @@ import org.json.JSONObject
 object TrackInfo {
     data class Track(val type: String, val language: String, val codec: String)
 
+    /**
+     * Native text tracks are never exported: nothing renders them and
+     * `setSelectTrack` only selects audio, so listing them would offer a
+     * choice that cannot work. Server-provided subtitles are the supported path.
+     */
+    fun isExported(type: String) = type != "TEXT"
+
     fun toJson(tracks: List<Track>): String {
         val array = JSONArray()
         val nextIndex = mutableMapOf<String, Int>()
-        tracks.forEach { track ->
+        tracks.filter { isExported(it.type) }.forEach { track ->
             val index = nextIndex.getOrDefault(track.type, 0)
             nextIndex[track.type] = index + 1
             val extra = JSONObject()

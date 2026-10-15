@@ -39,6 +39,10 @@ The browser tries ranked candidates in order, prepares the first usable one as W
 
 AVPlay native text tracks remain available as a fallback and are listed under "Built-in tracks" only when the server found no embedded tracks, so one physical track is not offered twice. Native track labels read the codec from `fourCC` (`subtitle_type` is a numeric kind) and accept language names as well as codes. The Tizen client also requests local candidates, prepares the selected item as WebVTT, parses cues in the app, and renders the current cue itself. This path is deliberate: it avoids device-specific instability in AVPlay external subtitle loading. If no local or native track in the preferred or fallback language is usable, the client automatically requests and caches an online result for the preferred language, then the fallback language. Subtitle delay is applied in the cue lookup, while native-track delay uses AVPlay.
 
+## Android TV playback
+
+The Android TV shell uses ExoPlayer with no text renderer output, so native (built-in) text tracks cannot be selected or drawn. The shell does not list them, and the bridge keeps ExoPlayer text decoding disabled. Subtitles come only from the server (prepared WebVTT in the shared overlay). A saved native-track preference finds no matching track on Android and falls back to the server candidates, and a direct native `TEXT` selection is ignored instead of raising an error.
+
 ## webOS playback
 
 The webOS client renders the same pipeline through its platform adapter: prepared server WebVTT stays the primary path and renders in the shared overlay, while AVPlay-shaped native TEXT tracks are mirrored onto hidden HTML text tracks whose cues forward through the same listener the overlay already consumes. Subtitle delay shifts the native cue evaluation instead of relying on a device delay property, and Off disables every native track so the overlay never doubles with device rendering. Native-track presence on real LG firmware is a pending hardware check ([WEBOS-VERIFICATION.md](WEBOS-VERIFICATION.md)).

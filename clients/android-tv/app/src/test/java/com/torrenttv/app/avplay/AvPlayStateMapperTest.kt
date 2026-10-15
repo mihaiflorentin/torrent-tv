@@ -10,4 +10,9 @@ class AvPlayStateMapperTest {
     @Test fun `ready maps to onbufferingcomplete`() = assertEquals("onbufferingcomplete", AvPlayStateMapper.bufferingCallback(Player.STATE_READY))
     @Test fun `ended maps to onstreamcompleted`() = assertEquals("onstreamcompleted", AvPlayStateMapper.bufferingCallback(Player.STATE_ENDED))
     @Test fun `idle maps to nothing`() = assertNull(AvPlayStateMapper.bufferingCallback(Player.STATE_IDLE))
+    @Test fun `buffered percentage is passed through on the 0 to 100 scale`() = assertEquals(35, AvPlayStateMapper.bufferingPercent(35))
+    @Test fun `buffered percentage is clamped to 0 to 100`() {
+        assertEquals(0, AvPlayStateMapper.bufferingPercent(-1))
+        assertEquals(100, AvPlayStateMapper.bufferingPercent(3500))
+    }
 }
