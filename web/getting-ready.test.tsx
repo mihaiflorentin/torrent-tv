@@ -91,3 +91,53 @@ describe('PlayerReady', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+describe('PlayerReady across episodes and failures', () => {
+  const second: Download = { ...live, id: 'dl-2', filePath: 'b.mkv', progress: 0.05, peers: 3, speedBytesPerSecond: 500_000, etaSeconds: 600 };
+
+  it('shows the new download at once when the episode changes, not the previous one', async () => {
+    vi.useFakeTimers();
+    const never = new Promise<never>(() => { });
+    const api = { downloads: vi.fn().mockResolvedValueOnce({ items: [live], nextCursor: null, total: 1 }).mockReturnValue(never) };
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    hosts.push(host);
+    await act(async () => { render(<PlayerReady api={api} download={{ ...live, progress: 0 }} title="E1" />, host) });
+    await act(async () => { });
+    expect(host.textContent).toContain('37%');
+    await act(async () => { render(<PlayerReady api={api} download={second} title="E2" />, host) });
+    await act(async () => { });
+    expect(host.textContent).toContain('E2');
+    expect(host.textContent).toContain('5%');
+    expect(host.textContent).not.toContain('37%');
+  });
+
+  it('does not poll while the page is hidden and resumes when it is visible again', async () => {
+    vi.useFakeTimers();
+    const api = { downloads: vi.fn().mockResolvedValue({ items: [live], nextCursor: null, total: 1 }) };
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    try {
+      await mount(<PlayerReady api={api} download={live} title="Severance" />);
+      await act(async () => { vi.advanceTimersByTime(10_000) });
+      expect(api.downloads).not.toHaveBeenCalled();
+      hidden.mockReturnValue(false);
+      await act(async () => { document.dispatchEvent(new Event('visibilitychange')) });
+      expect(api.downloads).toHaveBeenCalledTimes(1);
+    } finally { hidden.mockRestore() }
+  });
+
+  it('keeps the last progress after a failed poll but says it is no longer updating', async () => {
+    vi.useFakeTimers();
+    const api = { downloads: vi.fn().mockResolvedValueOnce({ items: [live], nextCursor: null, total: 1 }).mockRejectedValue(new Error('offline')) };
+    const host = await mount(<PlayerReady api={api} download={{ ...live, progress: 0 }} title="Severance" />);
+    expect(host.textContent).toContain('37%');
+    expect(host.querySelector('.player-ready-stale')).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(2100) });
+    expect(host.textContent).toContain('37%');
+    expect(host.querySelector('.player-ready-stale')?.textContent).toContain('not updating');
+    api.downloads.mockResolvedValue({ items: [{ ...live, progress: 0.5 }], nextCursor: null, total: 1 });
+    await act(async () => { vi.advanceTimersByTime(2100) });
+    expect(host.textContent).toContain('50%');
+    expect(host.querySelector('.player-ready-stale')).toBeNull();
+  });
+});
