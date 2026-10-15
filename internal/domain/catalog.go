@@ -64,6 +64,7 @@ type CatalogTitle struct {
 	OriginalTitle    string          `json:"originalTitle,omitempty"`
 	Kind             MediaKind       `json:"kind"`
 	Year             int             `json:"year,omitempty"`
+	ReleaseDate      string          `json:"releaseDate,omitempty"`
 	IMDbID           string          `json:"imdbId,omitempty"`
 	Overview         string          `json:"overview,omitempty"`
 	PosterURL        string          `json:"posterUrl,omitempty"`
@@ -119,6 +120,7 @@ type CatalogEpisode struct {
 	Number       int             `json:"number"`
 	Title        string          `json:"title"`
 	Season       int             `json:"season"`
+	AirDate      string          `json:"airDate,omitempty"`
 	SourceCount  int             `json:"sourceCount"`
 	Sources      []CatalogSource `json:"sources,omitempty"`
 	LibraryState MediaState      `json:"libraryState"`
@@ -139,6 +141,11 @@ type CatalogFacets struct {
 	Codecs      []string `json:"codecs"`
 }
 
+// CatalogMetadata is the cached provider match for a title. Kind is the media
+// kind the provider actually matched (it can differ from the kind parsed from
+// release names and selects the provider endpoint for extended details);
+// ReleaseDate is the full YYYY-MM-DD premiere (first air date for series)
+// when the provider published one.
 type CatalogMetadata struct {
 	TitleID        string    `json:"titleId"`
 	Provider       string    `json:"provider"`
@@ -153,11 +160,61 @@ type CatalogMetadata struct {
 	RatingVotes    int       `json:"ratingVotes,omitempty"`
 	RatingProvider string    `json:"ratingProvider,omitempty"`
 	Year           int       `json:"year,omitempty"`
+	ReleaseDate    string    `json:"releaseDate,omitempty"`
+	Kind           MediaKind `json:"-"`
 	Genres         []string  `json:"genres,omitempty"`
 	FetchedAt      time.Time `json:"fetchedAt"`
 	ExpiresAt      time.Time `json:"expiresAt"`
 	LastError      string    `json:"-"`
 }
+
+// TitleInfo is the extended, display-ready description of a title shown by the
+// Info panel: story, dates, credits and a few facts. Every field except
+// TitleID may be empty because providers differ in what they publish; clients
+// render what is present. Cached per (provider, providerId, kind, language).
+type TitleInfo struct {
+	TitleID          string      `json:"titleId"`
+	Provider         string      `json:"provider,omitempty"`
+	ProviderID       string      `json:"providerId,omitempty"`
+	Kind             MediaKind   `json:"kind,omitempty"`
+	Language         string      `json:"language,omitempty"`
+	Tagline          string      `json:"tagline,omitempty"`
+	Overview         string      `json:"overview,omitempty"`
+	ReleaseDate      string      `json:"releaseDate,omitempty"`
+	LastAirDate      string      `json:"lastAirDate,omitempty"`
+	Status           string      `json:"status,omitempty"`
+	RuntimeMinutes   int         `json:"runtimeMinutes,omitempty"`
+	Rating           float64     `json:"rating,omitempty"`
+	RatingVotes      int         `json:"ratingVotes,omitempty"`
+	RatingProvider   string      `json:"ratingProvider,omitempty"`
+	Genres           []string    `json:"genres,omitempty"`
+	Cast             []CastEntry `json:"cast,omitempty"`
+	Directors        []string    `json:"directors,omitempty"`
+	Creators         []string    `json:"creators,omitempty"`
+	Countries        []string    `json:"countries,omitempty"`
+	OriginalLanguage string      `json:"originalLanguage,omitempty"`
+	Seasons          int         `json:"seasons,omitempty"`
+	Episodes         int         `json:"episodes,omitempty"`
+	Certification    string      `json:"certification,omitempty"`
+	// Available is false when no provider could describe the title, which is
+	// a normal state rather than an error.
+	Available bool      `json:"available"`
+	FetchedAt time.Time `json:"fetchedAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+// CastEntry is one top-billed performer. ImagePath is the provider-relative
+// profile image and is never exposed; ImageURL is the local proxy address the
+// service assigns when a photo exists.
+type CastEntry struct {
+	Name      string `json:"name"`
+	Character string `json:"character,omitempty"`
+	ImageURL  string `json:"imageUrl,omitempty"`
+	ImagePath string `json:"imagePath,omitempty"`
+}
+
+// MaxCastEntries bounds the cast list a provider adapter returns.
+const MaxCastEntries = 12
 
 // SeriesSeasons is the provider canonical season/episode structure for a
 // series, cached per (provider, providerId, language).

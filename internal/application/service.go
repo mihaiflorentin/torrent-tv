@@ -236,6 +236,9 @@ func (s *Service) runMetadataRequest(request metadataRequest) {
 	}
 	now := time.Now().UTC()
 	metadata.TitleID = request.TitleID
+	if err == nil && metadata.Kind == "" {
+		metadata.Kind = request.Kind
+	}
 	if err != nil {
 		failure := domain.CatalogMetadata{TitleID: request.TitleID, Provider: "tmdb", FetchedAt: now, ExpiresAt: now.Add(10 * time.Minute), LastError: err.Error()}
 		// A transient failure must not wipe a row that already holds a
@@ -1464,6 +1467,7 @@ func (s *Service) expireTitleSeasons(job domain.Job, titleID string) {
 	if err := s.repo.DeleteSeriesSeasons(context.Background(), metadata.Provider, metadata.ProviderID, s.settings.Get().MetadataLanguage); err != nil {
 		s.jobLog(job, "warn", "metadata-seasons", "Could not expire cached provider seasons", map[string]any{"error": err.Error()})
 	}
+	s.expireTitleInfo(titleID)
 }
 
 // warmTitleManifests caches metainfo file lists for every multi-file

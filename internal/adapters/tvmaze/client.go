@@ -108,6 +108,8 @@ func (c *Client) Lookup(ctx context.Context, imdbID, title string, kind domain.M
 		Rating:         show.Rating.Average,
 		RatingProvider: "tvmaze",
 		Year:           year,
+		ReleaseDate:    validDate(show.Premiered),
+		Kind:           domain.MediaSeries,
 		Language:       language,
 		FetchedAt:      now,
 		ExpiresAt:      now.Add(30 * 24 * time.Hour),

@@ -138,6 +138,8 @@ func (c *Client) Lookup(ctx context.Context, imdbID, title string, kind domain.M
 				Rating:         found.Score,
 				RatingProvider: "jikan",
 				Year:           year,
+				ReleaseDate:    datePart(found.Aired.From),
+				Kind:           kind,
 				Language:       language,
 				FetchedAt:      now,
 				ExpiresAt:      now.Add(30 * 24 * time.Hour),

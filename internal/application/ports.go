@@ -74,6 +74,13 @@ type MetadataProvider interface {
 	SeriesSeasons(ctx context.Context, provider, providerID, language string) (domain.SeriesSeasons, error)
 	OpenArtwork(ctx context.Context, path, kind string) (io.ReadCloser, string, error)
 }
+
+// TitleInfoProvider is the optional extended-details capability of a metadata
+// provider. It is a separate port so providers and fakes that only match
+// titles need not implement it; callers type-assert for it.
+type TitleInfoProvider interface {
+	TitleInfo(ctx context.Context, provider, providerID string, kind domain.MediaKind, language, fallback string) (domain.TitleInfo, error)
+}
 type MediaProbe interface {
 	ProbeMedia(context.Context, string) (domain.MediaInfo, error)
 	ProbeSubtitles(context.Context, string) ([]domain.MediaSubtitleTrack, error)
@@ -94,6 +101,9 @@ type Repository interface {
 	SaveSeriesSeasons(context.Context, domain.SeriesSeasons) error
 	GetSeriesSeasons(context.Context, string, string, string) (domain.SeriesSeasons, error)
 	DeleteSeriesSeasons(context.Context, string, string, string) error
+	SaveTitleInfo(context.Context, domain.TitleInfo) error
+	GetTitleInfo(context.Context, string, string, domain.MediaKind, string) (domain.TitleInfo, error)
+	DeleteTitleInfo(context.Context, string, string, domain.MediaKind, string) error
 	GetRelease(context.Context, string) (domain.TorrentRelease, error)
 	SyncAge(context.Context, string) (int64, error)
 	RecordSync(context.Context, string, int, error) error

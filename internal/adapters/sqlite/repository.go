@@ -110,7 +110,11 @@ CREATE TABLE IF NOT EXISTS playback_preferences(
 CREATE TABLE IF NOT EXISTS series_seasons(
  provider TEXT NOT NULL,provider_id TEXT NOT NULL,language TEXT NOT NULL,
  payload TEXT NOT NULL,fetched_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,
- PRIMARY KEY(provider,provider_id,language));`)
+ PRIMARY KEY(provider,provider_id,language));
+CREATE TABLE IF NOT EXISTS title_info(
+ provider TEXT NOT NULL,provider_id TEXT NOT NULL,media_kind TEXT NOT NULL,language TEXT NOT NULL,
+ payload TEXT NOT NULL,fetched_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,
+ PRIMARY KEY(provider,provider_id,media_kind,language));`)
 	}
 	if err != nil {
 		return err
@@ -129,6 +133,8 @@ CREATE TABLE IF NOT EXISTS series_seasons(
 		"ALTER TABLE catalog_metadata ADD COLUMN rating REAL NOT NULL DEFAULT 0",
 		"ALTER TABLE catalog_metadata ADD COLUMN rating_votes INTEGER NOT NULL DEFAULT 0",
 		"ALTER TABLE catalog_metadata ADD COLUMN rating_provider TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE catalog_metadata ADD COLUMN media_kind TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE catalog_metadata ADD COLUMN release_date TEXT NOT NULL DEFAULT ''",
 	} {
 		if _, e := r.db.ExecContext(ctx, q); e != nil && !strings.Contains(strings.ToLower(e.Error()), "duplicate column") {
 			return e
@@ -637,24 +643,25 @@ func (r *Repository) SaveCatalogMetadata(ctx context.Context, m domain.CatalogMe
 			genresJSON = string(encoded)
 		}
 	}
-	_, err := r.db.ExecContext(ctx, `INSERT INTO catalog_metadata(title_id,provider,provider_id,title,original_title,overview,poster_path,backdrop_path,language,year,genres_json,rating,rating_votes,rating_provider,fetched_at,expires_at,last_error)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(title_id) DO UPDATE SET provider=excluded.provider,provider_id=excluded.provider_id,title=excluded.title,
+	_, err := r.db.ExecContext(ctx, `INSERT INTO catalog_metadata(title_id,provider,provider_id,title,original_title,overview,poster_path,backdrop_path,language,year,genres_json,rating,rating_votes,rating_provider,media_kind,release_date,fetched_at,expires_at,last_error)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(title_id) DO UPDATE SET provider=excluded.provider,provider_id=excluded.provider_id,title=excluded.title,
 original_title=excluded.original_title,overview=excluded.overview,poster_path=excluded.poster_path,backdrop_path=excluded.backdrop_path,language=excluded.language,year=excluded.year,
-genres_json=excluded.genres_json,rating=excluded.rating,rating_votes=excluded.rating_votes,rating_provider=excluded.rating_provider,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at,last_error=excluded.last_error`,
+genres_json=excluded.genres_json,rating=excluded.rating,rating_votes=excluded.rating_votes,rating_provider=excluded.rating_provider,media_kind=excluded.media_kind,release_date=excluded.release_date,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at,last_error=excluded.last_error`,
 		m.TitleID, m.Provider, m.ProviderID, m.Title, m.OriginalTitle, m.Overview, m.PosterPath, m.BackdropPath, m.Language, m.Year, genresJSON,
-		m.Rating, m.RatingVotes, m.RatingProvider, m.FetchedAt.Unix(), m.ExpiresAt.Unix(), m.LastError)
+		m.Rating, m.RatingVotes, m.RatingProvider, string(m.Kind), m.ReleaseDate, m.FetchedAt.Unix(), m.ExpiresAt.Unix(), m.LastError)
 	return err
 }
 
 func (r *Repository) GetCatalogMetadata(ctx context.Context, titleID string) (domain.CatalogMetadata, error) {
 	var m domain.CatalogMetadata
 	var fetched, expires int64
-	var genresJSON string
-	err := r.db.QueryRowContext(ctx, `SELECT title_id,provider,provider_id,title,original_title,overview,poster_path,backdrop_path,language,year,genres_json,rating,rating_votes,rating_provider,fetched_at,expires_at,last_error FROM catalog_metadata WHERE title_id=?`, titleID).
-		Scan(&m.TitleID, &m.Provider, &m.ProviderID, &m.Title, &m.OriginalTitle, &m.Overview, &m.PosterPath, &m.BackdropPath, &m.Language, &m.Year, &genresJSON, &m.Rating, &m.RatingVotes, &m.RatingProvider, &fetched, &expires, &m.LastError)
+	var genresJSON, kind string
+	err := r.db.QueryRowContext(ctx, `SELECT title_id,provider,provider_id,title,original_title,overview,poster_path,backdrop_path,language,year,genres_json,rating,rating_votes,rating_provider,media_kind,release_date,fetched_at,expires_at,last_error FROM catalog_metadata WHERE title_id=?`, titleID).
+		Scan(&m.TitleID, &m.Provider, &m.ProviderID, &m.Title, &m.OriginalTitle, &m.Overview, &m.PosterPath, &m.BackdropPath, &m.Language, &m.Year, &genresJSON, &m.Rating, &m.RatingVotes, &m.RatingProvider, &kind, &m.ReleaseDate, &fetched, &expires, &m.LastError)
 	if err == nil && len(genresJSON) > 0 {
 		_ = json.Unmarshal([]byte(genresJSON), &m.Genres)
 	}
+	m.Kind = domain.MediaKind(kind)
 	m.FetchedAt, m.ExpiresAt = time.Unix(fetched, 0).UTC(), time.Unix(expires, 0).UTC()
 	return m, err
 }
@@ -689,6 +696,39 @@ func (r *Repository) GetSeriesSeasons(ctx context.Context, provider, providerID,
 
 func (r *Repository) DeleteSeriesSeasons(ctx context.Context, provider, providerID, language string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM series_seasons WHERE provider=? AND provider_id=? AND language=?`, provider, providerID, language)
+	return err
+}
+
+func (r *Repository) SaveTitleInfo(ctx context.Context, info domain.TitleInfo) error {
+	payload, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `INSERT INTO title_info(provider,provider_id,media_kind,language,payload,fetched_at,expires_at)
+VALUES(?,?,?,?,?,?,?) ON CONFLICT(provider,provider_id,media_kind,language) DO UPDATE SET payload=excluded.payload,
+fetched_at=excluded.fetched_at,expires_at=excluded.expires_at`,
+		info.Provider, info.ProviderID, string(info.Kind), info.Language, string(payload), info.FetchedAt.Unix(), info.ExpiresAt.Unix())
+	return err
+}
+
+func (r *Repository) GetTitleInfo(ctx context.Context, provider, providerID string, kind domain.MediaKind, language string) (domain.TitleInfo, error) {
+	var info domain.TitleInfo
+	var payload string
+	var fetched, expires int64
+	err := r.db.QueryRowContext(ctx, `SELECT payload,fetched_at,expires_at FROM title_info WHERE provider=? AND provider_id=? AND media_kind=? AND language=?`, provider, providerID, string(kind), language).
+		Scan(&payload, &fetched, &expires)
+	if err != nil {
+		return domain.TitleInfo{}, err
+	}
+	if err := json.Unmarshal([]byte(payload), &info); err != nil {
+		return domain.TitleInfo{}, err
+	}
+	info.FetchedAt, info.ExpiresAt = time.Unix(fetched, 0).UTC(), time.Unix(expires, 0).UTC()
+	return info, nil
+}
+
+func (r *Repository) DeleteTitleInfo(ctx context.Context, provider, providerID string, kind domain.MediaKind, language string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM title_info WHERE provider=? AND provider_id=? AND media_kind=? AND language=?`, provider, providerID, string(kind), language)
 	return err
 }
 
