@@ -529,6 +529,10 @@ func (m *Manager) install(ctx context.Context, cancel context.CancelFunc, sel Se
 			payload, err = staged.Extract(m.deps.InstallDir, m.deps.Identity.Target(), DefaultLimits())
 			if err != nil {
 				failure = fmt.Errorf("verify staged release: %w", err)
+				// A rejected archive is never reused; leaving it behind
+				// leaked one release-sized file per failed attempt.
+				os.Remove(staged.Path)
+				stagedPath = ""
 			}
 		}
 		if err == nil {
