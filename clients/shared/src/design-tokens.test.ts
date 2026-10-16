@@ -58,7 +58,7 @@ describe('shared design tokens', () => {
       '--tt-radius-sm', '--tt-radius-md', '--tt-radius-lg', '--tt-radius-pill',
       '--tt-dur-fast', '--tt-dur-base', '--tt-dur-slow', '--tt-ease-out',
       '--tt-scrim-top', '--tt-scrim-text', '--tt-backdrop-blur-web', '--tt-backdrop-blur-tv',
-      '--tt-controls-surface', '--tt-menu-surface', '--tt-tv-timeline-height', '--tt-controls-fade',
+      '--tt-card-surface', '--tt-controls-surface', '--tt-menu-surface', '--tt-tv-timeline-height', '--tt-controls-fade',
     ];
     expect(required.filter(name => !t.has(name))).toEqual([]);
   });
@@ -70,6 +70,25 @@ describe('shared design tokens', () => {
     }
     expect(contrast(color('--tt-on-accent'), color('--tt-accent'))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(color('--tt-on-accent'), color('--tt-accent-hover'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Translucent card surfaces let the title's sharp backdrop show on the series page. The backdrop is any picture, so
+  // the guarantee is checked against the brightest one there is (white), with the selected-row tint on top.
+  it('keeps text at WCAG AA on the translucent card surface over the brightest possible backdrop', () => {
+    const rgba = (name: string) => {
+      const match = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(t.get(name) ?? '');
+      expect(match, `${name} is an rgba() color`).not.toBeNull();
+      return { rgb: [Number(match![1]), Number(match![2]), Number(match![3])], alpha: Number(match![4]) };
+    };
+    const over = (top: { rgb: number[]; alpha: number }, under: number[]) => top.rgb.map((channel, i) => channel * top.alpha + under[i] * (1 - top.alpha));
+    const hex = (channels: number[]) => '#' + channels.map(channel => Math.round(channel).toString(16).padStart(2, '0')).join('');
+    const card = rgba('--tt-card-surface');
+    expect(card.alpha, 'translucent enough for the art to show').toBeLessThanOrEqual(0.85);
+    expect(card.alpha, 'not so clear that text loses its ground').toBeGreaterThanOrEqual(0.6);
+    const panel = over(card, [255, 255, 255]);
+    for (const name of ['--tt-text', '--tt-text-muted']) expect(contrast(color(name), hex(panel)), `${name} on the card over white`).toBeGreaterThanOrEqual(4.5);
+    const selected = over(rgba('--tt-accent-soft'), panel);
+    expect(contrast(color('--tt-text'), hex(selected)), 'text on the selected row over white').toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps the focus ring and control boundaries at 3:1 against every surface', () => {

@@ -161,3 +161,30 @@ describe('title overlay art', () => {
     expect(rule('.detail-scrim')).toMatch(/linear-gradient\(90deg,\s*var\(--tt-scrim-text\)[^;]*transparent\s+100%\)/);
   });
 });
+
+// The series page: translucent token cards over the title's sharp backdrop, and one centred column sized to its rows.
+// Contrast of the card token over the brightest possible picture is checked in clients/shared/src/design-tokens.test.ts.
+describe('series page surfaces', () => {
+  const css = sheets[0][1];
+  const rule = (selector: string) => rules(css).filter(item => item.selector === selector).map(item => item.body).join('\n');
+  const prop = (selector: string, property: string) => new RegExp(`(?:^|[;\\s])${property}\\s*:\\s*([^;]+)`).exec(rule(selector))?.[1].trim();
+
+  it('puts the cards on the translucent card token', () => {
+    for (const selector of ['.season-tabs', '.episode-column', '.versions-view']) expect(prop(selector, 'background'), selector).toBe('var(--tt-card-surface)');
+  });
+
+  it('leaves episode rows transparent inside their card, never a second solid layer', () => {
+    expect(prop('.episode-list article', 'background')).toBe('transparent');
+  });
+
+  it('keeps the selected row\'s facts at full text colour on its saffron tint', () => {
+    expect(prop('.episode-list article.selected .info-row-copy small', 'color')).toBe('var(--tt-text)');
+  });
+
+  it('centres one column that is sized to its content, and draws the carried art sharp', () => {
+    expect(prop('.season-panes', 'justify-content')).toBe('center');
+    expect(prop('.episode-column', 'flex')).toBe('0 1 auto');
+    expect(prop('.episode-column', 'max-width')).toMatch(/^\d+px$/);
+    expect(rule('.series-art img')).not.toMatch(/blur\(|filter\s*:|opacity\s*:/);
+  });
+});

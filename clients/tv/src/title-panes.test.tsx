@@ -137,6 +137,44 @@ describe('TV series page: episode list, then full-screen Versions', () => {
       expect(container.querySelector('.episode-pane .source-button')).toBeNull();
     });
 
+    it('heads the list "Episodes" with the season it belongs to, and follows the season bar', async () => {
+      await open(() => detail({}));
+      key('season-2').click();
+      await wait();
+      const heading = container.querySelector('.season-browser .episode-heading')!;
+      expect(heading.tagName).toBe('H3');
+      expect(heading.textContent).toBe('Episodes · Season 2');
+      expect(heading.nextElementSibling).toBe(container.querySelector('.episode-pane'));
+      key('season-3').click();
+      await wait();
+      expect(container.querySelector('.episode-heading')!.textContent).toBe('Episodes · Season 3');
+    });
+
+    it('keeps the heading while the episode list is still being prepared', async () => {
+      await open(() => detail({ s2: [] }));
+      key('season-2').click();
+      await wait();
+      expect(container.querySelector('.episode-heading')!.textContent).toBe('Episodes · Season 2');
+      expect(container.querySelector('.episode-pane .episode-loading')).not.toBeNull();
+    });
+
+    it('is one column, one level: the list is the only pane under the season bar, with no side preview', async () => {
+      await open(() => detail({}));
+      key('season-2').click();
+      await wait();
+      const panes = container.querySelector('.season-panes')!;
+      expect(panes.children).toHaveLength(1);
+      expect(panes.children[0].classList.contains('episode-column')).toBe(true);
+      expect(container.querySelector('.episode-preview, .preview-pane')).toBeNull();
+    });
+
+    it('swaps the heading for the Versions view and brings it back with the list', async () => {
+      await openVersions('episode-2:4');
+      expect(container.querySelector('.episode-heading')).toBeNull();
+      await press('GoBack');
+      expect(container.querySelector('.episode-heading')!.textContent).toBe('Episodes · Season 2');
+    });
+
     it('focusing another episode moves the selection after a short pause, not on every pass', async () => {
       await open(() => detail({}));
       key('season-2').click();

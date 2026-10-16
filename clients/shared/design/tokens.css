@@ -113,6 +113,10 @@
  --tt-backdrop-blur-tv: 18px;
  --tt-backdrop-art-opacity: 0.55;
 
+ /* Card surface: the series page's panels over the title's sharp backdrop, so the picture shows through.
+    Rgba only (no backdrop-filter). Clears 4.5:1 for --tt-text and --tt-text-muted even over a pure white picture. */
+ --tt-card-surface: rgba(23, 17, 31, 0.8);
+
  /* Player controls: a solid-enough bar and menus (no backdrop-filter), sized for 3 m, faded in and out as one layer. */
  --tt-controls-surface: rgba(23, 17, 31, 0.92);
  --tt-menu-surface: #221a2e;

@@ -82,6 +82,37 @@ describe('Title detail: the episode list', () => {
     expect(document.querySelector('.detail .episode-list .source-row')).toBeNull();
   });
 
+  it('heads the list "Episodes" with its season, in one column with no side preview', async () => {
+    await openSeason2();
+    const column = document.querySelector('.detail .season-panes > .episode-column')!;
+    expect(document.querySelector('.detail .season-panes')!.children).toHaveLength(1);
+    const heading = column.querySelector('.episode-heading')!;
+    expect(heading.tagName).toBe('H3');
+    expect(heading.textContent).toBe('Episodes · Season 2');
+    expect(heading.nextElementSibling).toBe(column.querySelector('.episode-pane'));
+    await click(document.querySelectorAll('.detail .season-tabs button')[0]);
+    expect(document.querySelector('.detail .episode-heading')!.textContent).toBe('Episodes · Season 1');
+  });
+
+  it('drops the heading with the list when an episode opens its Versions view', async () => {
+    await openVersions();
+    expect(document.querySelector('.detail .episode-heading')).toBeNull();
+    await click(back());
+    expect(document.querySelector('.detail .episode-heading')!.textContent).toBe('Episodes · Season 2');
+  });
+
+  it('carries the title\'s backdrop on under the series body so the translucent cards show it', async () => {
+    await openSeason2();
+    expect(document.querySelector('.detail .series-body > .series-art img')!.getAttribute('src')).toBe('/art/backdrop.jpg');
+  });
+
+  it('adds no art layer under the series body when the title has no backdrop', async () => {
+    vi.spyOn(API.prototype, 'title').mockResolvedValue({ ...data(), title: { ...show, backdropUrl: undefined } });
+    await openSeason2();
+    expect(document.querySelector('.detail .series-body')).not.toBeNull();
+    expect(document.querySelector('.detail .series-art')).toBeNull();
+  });
+
   it('keeps Unknown episodes as the last item of the list', async () => {
     await openSeason2();
     const items = episodes();
