@@ -1,8 +1,8 @@
 import { Fragment, render, type JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
+import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, rankSources, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSeason, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
 import { castInitials, episodeAirLabel, infoView, type TitleInfo } from '@torrent-tv/shared';
-import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation } from './navigation';
+import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation, visibleFocusables } from './navigation';
 import { LANDING_REQUEST_EVENT, landingTarget, requestLanding, useLanding } from './landing';
 import { PROJECTS_MENU_ROW, REBUILD_DIALOG_REGION, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_DIAGNOSTICS_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_REBUILD_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, UPDATE_RELEASE_LINK_ROW, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
 import { AVTrack, clampSeek, formatTime, isDownloadComplete, isEditableTarget, normalizeTrack, parseVTT, playerAction, preferredAudio, preferredSubtitle, SubtitleCue, subtitleAt } from './player';
@@ -1166,30 +1166,31 @@ const TitleCard = memo(function TitleCard({ api, title, row, col, focusKey, seed
  return <button ref={focusRef} class="poster-card" data-landing="card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey || `title-${title.id}`} data-art={artURL(api, title)} onClick={() => onOpen(title)}>{title.posterUrl ? <PosterArt src={api.streamURL(title.posterUrl)} load={loadArt} /> : <div class="poster-fallback">{title.title.slice(0, 1)}</div>}<TVStateBadges state={title.libraryState} /><div class="poster-copy"><strong>{title.title}</strong><span>{cardMeta(title, { seeders })}</span></div></button>;
 });
 function sourceActionLabel(source: CatalogSource) { return source.libraryState?.downloadState && source.libraryState.downloadState !== 'none' ? 'Play' : 'Play and download' }
-function SourceButton({ source, row, onPlay, focusKey }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void; focusKey?: string }) {
+function SourceButton({ source, row, onPlay, focusKey, region = 'content', best }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void; focusKey?: string; region?: string; best?: boolean }) {
  const name = source.filePath || source.release.name;
  const secondary = [source.release.trackerName, source.parsed.audio].filter(Boolean).join(' · ');
  // The decision point: resolution, chips, size and seeders lead. Tracker and audio are secondary; the release and file name is evidence and shows only while the row has focus.
- return <button class="source-button" data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={focusKey || `source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}>
-  <span class="source-main"><b class="source-resolution">{sourceHeadline(source.parsed)}</b>{sourceChips(source.parsed, source.release.category).map(chip => <span class="source-chip">{chip}</span>)}<span class="source-facts">{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b></span></span>
+ return <button class={`source-button ${best ? 'best' : ''}`} data-focus-region={region} data-focus-row={row} data-focus-col="0" data-focus-key={focusKey || `source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}>
+  <span class="source-main"><b class="source-resolution">{sourceHeadline(source.parsed)}</b>{best && <span class="source-best">Best match</span>}{sourceChips(source.parsed, source.release.category).map(chip => <span class="source-chip">{chip}</span>)}<span class="source-facts">{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b></span></span>
   {secondary && <span class="source-secondary">{secondary}</span>}
   <span class="source-filename" title={name}>{name}</span>
  </button>;
 }
 
 type SeasonPackAction = 'download' | 'pause' | 'resume' | 'retry' | 'delete';
-function TVSeasonPackCard({ source, season, index, baseRow, open, onToggle, onAction, onDelete }: { source: CatalogSource; season: number; index: number; baseRow: number; open: boolean; onToggle: () => void; onAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onDelete: () => void }) {
+// A complete-season pack in the versions pane: always open, one row of actions, no disclosure to step through.
+function TVSeasonPackCard({ source, season, row, onAction, onDelete }: { source: CatalogSource; season: number; row: number; onAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onDelete: () => void }) {
  const state = source.libraryState; const [busy, setBusy] = useState(''); const managed = Boolean(state?.downloadId); const paused = state?.transferState === 'paused'; const complete = state?.downloadState === 'downloaded'; const error = state?.downloadState === 'error';
  const run = async (action: SeasonPackAction) => { if (busy) return; setBusy(action); try { await onAction(source, season, action) } catch { /* the detail area already shows the message */ } finally { setBusy('') } };
- // Unique structured row band per pack card: shared rows collided across
- // cards, so D-pad movement crossed into sibling headers and controls.
- const row = baseRow + index * 4;
- return <article class={`season-pack-card ${open ? 'expanded' : ''}`}>
-  <button class="season-pack-button" data-focus-region="content" data-focus-row={row} data-focus-col={index} data-focus-key={`season-pack-${source.release.id}`} aria-expanded={open} aria-controls={`tv-pack-${source.release.id}`} onClick={onToggle} aria-label={`${source.parsed.resolution || 'Season pack'} · ${seasonPackActionLabel(state)} · ${open ? 'hide' : 'show'} controls`}>
+ const base = `season-pack-${source.release.id}`;
+ return <article class="season-pack-card">
+  <div class="season-pack-head">
    <span class="season-pack-copy"><strong>{source.parsed.resolution ? sourceHeadline(source.parsed) : 'Season pack'}</strong>{sourceChips(source.parsed).length > 0 && <small>{sourceChips(source.parsed).join(' · ')}</small>}<small>{formatBytes(source.release.sizeBytes)} · {source.release.seeders} seeders</small><small>{[source.release.trackerName, source.parsed.audio].filter(Boolean).join(' · ')}</small></span>
    <span class="season-pack-action"><TVStateBadges state={state} /><b>{seasonPackActionLabel(state)}</b></span>
-  </button>
-  {open && <div id={`tv-pack-${source.release.id}`} class="season-pack-controls"><p class="source-filename">{source.release.name}</p><progress value={state?.progress || 0} max="1" aria-label="Season download progress" />{!managed && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="0" data-focus-key={`season-pack-${source.release.id}-download`} onClick={() => void run('download')}>{busy ? 'Starting…' : 'Download season'}</button>}{managed && !complete && !error && <button aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="1" data-focus-key={`season-pack-${source.release.id}-toggle`} onClick={() => void run(paused ? 'resume' : 'pause')}>{busy ? `${paused ? 'Resuming' : 'Pausing'}…` : paused ? 'Resume' : 'Pause'}</button>}{error && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="2" data-focus-key={`season-pack-${source.release.id}-retry`} onClick={() => void run('retry')}>{busy ? 'Retrying…' : 'Retry'}</button>}{managed && <button class="danger-button" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="3" data-focus-key={`season-pack-${source.release.id}-delete`} onClick={() => { if (!busy) onDelete() }}>Delete download</button>}</div>}
+  </div>
+  <p class="source-filename">{source.release.name}</p>
+  {managed && <progress value={state?.progress || 0} max="1" aria-label="Season download progress" />}
+  <div class="season-pack-controls">{!managed && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="versions" data-focus-row={row} data-focus-col="0" data-focus-key={`${base}-download`} onClick={() => void run('download')}>{busy ? 'Starting…' : 'Download season'}</button>}{managed && !complete && !error && <button aria-disabled={busy ? 'true' : undefined} data-focus-region="versions" data-focus-row={row} data-focus-col="1" data-focus-key={`${base}-toggle`} onClick={() => void run(paused ? 'resume' : 'pause')}>{busy ? `${paused ? 'Resuming' : 'Pausing'}…` : paused ? 'Resume' : 'Pause'}</button>}{error && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="versions" data-focus-row={row} data-focus-col="2" data-focus-key={`${base}-retry`} onClick={() => void run('retry')}>{busy ? 'Retrying…' : 'Retry'}</button>}{managed && <button class="danger-button" aria-disabled={busy ? 'true' : undefined} data-focus-region="versions" data-focus-row={row} data-focus-col="3" data-focus-key={`${base}-delete`} onClick={() => { if (!busy) onDelete() }}>Delete download</button>}</div>
  </article>;
 }
 // Info panel: the extended description of a title in its own focus region, so the D-pad cannot leave it.
@@ -1238,35 +1239,80 @@ function TitleInfoPanel({ api, title, onClose }: { api: API; title: CatalogTitle
  </section>;
 }
 
+const episodeKeyOf = (episode: { season: number; number: number }) => `${episode.season}:${episode.number}`;
+// The episode that opens selected in the versions pane: the link's target, the saved progress, else the first one not yet watched.
+function defaultEpisodeOf(season: CatalogSeason | undefined, target: DetailTarget, resume?: HouseholdItem): CatalogEpisode | undefined {
+ if (!season) return undefined;
+ const targeted = target.episode && target.season === season.number ? season.episodes.find(item => item.number === target.episode) : undefined;
+ const saved = resume?.seasonNumber === season.number && resume.episodeNumber ? season.episodes.find(item => item.number === resume.episodeNumber) : undefined;
+ return targeted || saved || season.episodes.find(item => item.libraryState?.watchState !== 'watched') || season.episodes[0];
+}
+const paneFocusable = (selector: string) => document.querySelector<HTMLElement>(selector);
+
 function TitleDetail({ api, detail, target, message, resume, favorite, onClose, onFavorite, onResume, onPlay, onPackAction }: { api: API; detail: CatalogDetail; target: DetailTarget; message: string; resume?: HouseholdItem; favorite: boolean; onClose: () => void; onFavorite: (title: CatalogTitle, value: boolean) => void; onResume: (item: HouseholdItem) => void; onPlay: (release: Release, fileIndex?: number) => void; onPackAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean> }) {
  // Season to open: the link's target, else the season of the saved progress, else the first.
  const [season, setSeason] = useState(() => target.season || (resume?.seasonNumber && detail.seasons.some(item => item.number === resume.seasonNumber) ? resume.seasonNumber : 0) || detail.seasons[0]?.number || 0);
- const [expanded, setExpanded] = useState(target.episode ? `${target.season}:${target.episode}` : '');
- const [expandedPack, setExpandedPack] = useState('');
+ // The episode whose versions show on the right; '' follows the default. Focus selects it after a short pause.
+ const [picked, setPicked] = useState('');
  const [pendingPack, setPendingPack] = useState<CatalogSource | null>(null);
  const [deleting, setDeleting] = useState(false);
  const [refreshing, setRefreshing] = useState(false);
  const [refreshNote, setRefreshNote] = useState('');
- const [packsOpen, setPacksOpen] = useState(false);
  const [infoOpen, setInfoOpen] = useState(false);
  const selected = detail.seasons.find(item => item.number === season);
- // The packs toggle owns row 3. Expanded pack cards occupy 4-row bands
- // from row 4 (4 + index * 4); collapsed packs render no cards at all, so
- // episode rows start right after the toggle and the bands stay disjoint
- // for any pack count.
- const packCount = selected?.packSources?.length || 0;
- const episodeRowBase = packsOpen && packCount > 0 ? 5 + packCount * 4 : 4;
- // Best version: the primary Play prepares the top-ranked source of the selected season's target episode (movies: of the title). The full list stays below and behind Choose version.
+ // Best version: the primary Play prepares the top-ranked source of the selected season's target episode (movies: of the title).
  const playEpisode = selected && (target.episode && target.season === selected.number ? selected.episodes.find(item => item.number === target.episode) : undefined) || selected?.episodes[0];
  const firstSource = bestSourceForDetail(detail, { season: selected?.number, episode: playEpisode?.number });
- const chooseVersion = () => {
-  const episodeKey = playEpisode ? `${playEpisode.season}:${playEpisode.number}` : '';
-  if (episodeKey && expanded !== episodeKey) setExpanded(episodeKey);
-  window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('.source-button')), 0);
+ const defaultEpisode = defaultEpisodeOf(selected, target, resume);
+ const unknownKey = selected?.unknown && selected.unknown.length > 0 ? `unknown-${selected.number}` : '';
+ // A pick that vanished in a data refresh falls back to the default; one that is still there never moves.
+ const pickedValid = picked !== '' && (picked === unknownKey || Boolean(selected?.episodes.some(item => episodeKeyOf(item) === picked)));
+ const selectedKey = pickedValid ? picked : defaultEpisode ? episodeKeyOf(defaultEpisode) : unknownKey;
+ const selectedEpisode = selected?.episodes.find(item => episodeKeyOf(item) === selectedKey);
+ const timer = useRef(0);
+ const enterFor = useRef('');
+ const focusVersions = () => { const first = paneFocusable('[data-focus-region="versions"]'); if (first) focusElement(first); return Boolean(first) };
+ // Move into the versions pane for an episode; a not-yet-committed pick is committed first and focus follows its render.
+ const enterVersions = (key: string) => {
+  window.clearTimeout(timer.current);
+  if (key === selectedKey) { focusVersions(); return }
+  enterFor.current = key; setPicked(key);
  };
- useEffect(() => { const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(timer); }, []);
- useEffect(() => { if (!pendingPack) return; const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(timer) }, [pendingPack]);
- useEffect(() => { if (infoOpen || (!expanded && !expandedPack && !pendingPack)) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (pendingPack && !deleting) setPendingPack(null); else if (expandedPack) setExpandedPack(''); else setExpanded('') }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [expanded, expandedPack, pendingPack, deleting, infoOpen]);
+ useEffect(() => { if (enterFor.current && enterFor.current === selectedKey) { enterFor.current = ''; focusVersions() } });
+ useEffect(() => () => window.clearTimeout(timer.current), []);
+ const scheduleSelect = (key: string) => { window.clearTimeout(timer.current); if (key === selectedKey) return; timer.current = window.setTimeout(() => setPicked(key), 150) };
+ const chooseVersion = () => { if (detail.seasons.length === 0) { focusElement(document.querySelector<HTMLElement>('.source-button')); return } const key = playEpisode ? episodeKeyOf(playEpisode) : selectedKey; if (key) enterVersions(key); else focusVersions() };
+ useEffect(() => { const t = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(t); }, []);
+ useEffect(() => { if (!pendingPack) return; const t = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(t) }, [pendingPack]);
+ const closePackDialog = () => { const pack = pendingPack; setPendingPack(null); if (pack) window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="season-pack-${pack.release.id}-delete"]`)), 0) };
+ useEffect(() => { if (!pendingPack) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (!deleting) closePackDialog() }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [pendingPack, deleting]);
+ // Pane movement. Up, Down and in-row moves inside a pane use the structured attributes; this only adds the moves between the panes and the season bar.
+ const latest = useRef({ season, selectedKey, enterVersions });
+ latest.current = { season, selectedKey, enterVersions };
+ useEffect(() => {
+  const handle = (event: KeyboardEvent) => {
+   const action = remoteAction(event.key, event.keyCode);
+   const active = document.activeElement as HTMLElement | null;
+   if (!action || !active || !active.dataset) return;
+   const region = active.dataset.focusRegion;
+   const now = latest.current;
+   const go = (element: HTMLElement | null) => { event.preventDefault(); event.stopImmediatePropagation(); focusElement(element) };
+   const episodeButton = () => paneFocusable(`[data-focus-region="episodes"][data-episode-key="${now.selectedKey}"]`) || paneFocusable('[data-focus-region="episodes"]');
+   if (region === 'episodes') {
+    if (action === 'right') { event.preventDefault(); event.stopImmediatePropagation(); now.enterVersions(active.dataset.episodeKey || now.selectedKey) }
+    else if (action === 'up' && active.dataset.focusRow === '0') go(paneFocusable(`[data-focus-key="season-${now.season}"]`));
+    else if (action === 'left') go(active);
+   } else if (region === 'versions') {
+    if (action === 'up' && active.dataset.focusRow === '0') go(paneFocusable(`[data-focus-key="season-${now.season}"]`));
+    else if (action === 'back') go(episodeButton());
+    else if (action === 'left' && !chooseStructuredTarget(active, visibleFocusables(), 'left')) go(episodeButton() || active);
+   } else if (region === 'content' && action === 'down' && (active.dataset.focusKey || '').indexOf('season-') === 0 && active.dataset.focusRow === '2') {
+    go(episodeButton() || paneFocusable('[data-focus-region="versions"]') || active);
+   }
+  };
+  document.addEventListener('keydown', handle, true);
+  return () => document.removeEventListener('keydown', handle, true);
+ }, []);
  const confirmDelete = async () => { if (!pendingPack || !selected || deleting) return; setDeleting(true); try { await onPackAction(pendingPack, selected.number, 'delete'); setPendingPack(null) } catch { /* the detail area already shows the message; the dialog stays open */ } finally { setDeleting(false) } };
  const refresh = async () => {
   if (refreshing) return;
@@ -1274,6 +1320,13 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
   setRefreshNote('');
   try { await api.refreshTitle(detail.title.id, detail.title.title, true) } catch (e) { setRefreshNote((e as Error).message) } finally { setRefreshing(false) }
  };
+ const packs = selected?.packSources || [];
+ const paneSources = selectedEpisode ? rankSources(selectedEpisode.sources, { season: selectedEpisode.season, episode: selectedEpisode.number }) : [];
+ const unknownSources: CatalogSource[] = [];
+ if (unknownKey && selectedKey === unknownKey && selected?.unknown) selected.unknown.forEach(episode => episode.sources.forEach(source => unknownSources.push(source)));
+ const code = (value: number) => (value < 10 ? '0' : '') + value;
+ const paneTitle = selectedEpisode ? `S${code(selectedEpisode.season)} · E${code(selectedEpisode.number)} · ${selectedEpisode.title}` : unknownSources.length > 0 && selected ? `S${code(selected.number)} · Unknown episodes` : selected ? `Season ${selected.number}` : '';
+ const packBase = Math.max(paneSources.length, unknownSources.length);
  return <main class="detail-screen">
   <Backdrop initial={artURL(api, detail.title)} follow={false} sharp posterOnly={!detail.title.backdropUrl && !!detail.title.posterUrl} />
   <button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}>Back</button>
@@ -1296,53 +1349,43 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
   {refreshNote && <p class="detail-message" role="alert">{refreshNote}</p>}
   {detail.seasons.length > 0 && <section class="season-browser">
    <h2>Seasons</h2>
-   <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { setSeason(item.number); setExpanded(''); setExpandedPack('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
-   {selected?.packSources && selected.packSources.length > 0 && <div class="season-pack-downloads">
-    <button class="episode-tile packs-toggle" aria-expanded={packsOpen} data-focus-region="content" data-focus-row="3" data-focus-col="0" data-focus-key={`packs-toggle-${selected.number}`} onClick={() => setPacksOpen(current => !current)}>
-     <span><b>Complete season versions ({selected.packSources.length})</b><small>Download every episode of this season at once. Open a version to review it first.</small></span>
-     <b>{packsOpen ? 'Hide' : 'Show'}</b>
-    </button>
-    {packsOpen && <div class="season-pack-grid">{selected.packSources.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected.number} index={index} baseRow={4} open={expandedPack === source.release.id} onToggle={() => setExpandedPack(current => current === source.release.id ? '' : source.release.id)} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>}
-   </div>}
-   {selected && selected.episodes.length === 0 ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates by itself when it is ready.</p> : selected?.episodes.map((episode, index) => {
-    const key = `${episode.season}:${episode.number}`;
-    const open = expanded === key;
-    const row = episodeRowBase + index * 20;
-    const episodeState = episode.libraryState;
-    const progress = episodeState && episodeState.watchState !== 'watched' && episodeState.positionMs ? watchProgress({ positionMs: episodeState.positionMs, durationMs: episodeState.durationMs || 0 }) : 0;
-    return <article key={key} class={`episode-row ${open ? 'expanded' : ''}`}>
-     <button class="episode-tile" aria-expanded={open} data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={`episode-${key}`} onClick={() => setExpanded(current => current === key ? '' : key)}>
-      <span><b>{episode.number ? `${episode.number}. ` : ''}{episode.title}</b><small>{episodeMeta(episode, progress)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
-      <TVStateBadges state={episode.libraryState} />
-     </button>
-     {open && episode.sources.map((source, sourceIndex) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={row + 1 + sourceIndex} onPlay={onPlay} />)}
-    </article>;
-   })}
-   {selected && selected.unknown && selected.unknown.length > 0 && (() => {
-    const groupKey = `unknown-${selected.number}`;
-    const groupOpen = expanded === groupKey;
-    const groupRow = episodeRowBase + selected.episodes.length * 20;
-    // Built with forEach+push: flatMap/flat are absent from the Tizen 5.0
-    // engine floor and the pack validator rejects them.
-    const children: JSX.Element[] = [];
-    selected.unknown.forEach((episode, episodeIndex) => {
-     const key = `unknown-episode-${episode.season}:${episode.number}`;
-     episode.sources.forEach((source, sourceIndex) => {
-      children.push(<SourceButton key={`${key}-${sourceIndex}`} source={source} row={groupRow + 1 + episodeIndex * 2 + sourceIndex} focusKey={`${key}-${sourceIndex}`} onPlay={onPlay} />);
-     });
-    });
-    return <article key={groupKey} class="episode-row unknown-group">
-     <button class="episode-tile" aria-expanded={groupOpen} data-focus-region="content" data-focus-row={groupRow} data-focus-col="0" data-focus-key={groupKey} onClick={() => setExpanded(current => current === groupKey ? '' : groupKey)}>
-      <span><b>Unknown episodes ({selected.unknown.length})</b><small>Files without episode information</small></span>
-     </button>
-     {groupOpen && children}
-    </article>;
-   })()}
+   <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { window.clearTimeout(timer.current); setSeason(item.number); setPicked('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
+   <div class="season-panes">
+    <div class="episode-pane" role="list" aria-label={`Season ${season} episodes`}>
+     {selected && selected.episodes.length === 0 && !unknownKey ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates by itself when it is ready.</p> : selected?.episodes.map((episode, index) => {
+      const key = episodeKeyOf(episode);
+      const chosen = selectedKey === key;
+      const episodeState = episode.libraryState;
+      const progress = episodeState && episodeState.watchState !== 'watched' && episodeState.positionMs ? watchProgress({ positionMs: episodeState.positionMs, durationMs: episodeState.durationMs || 0 }) : 0;
+      return <article key={key} role="listitem" class="episode-row">
+       <button class={`episode-tile ${chosen ? 'selected' : ''}`} aria-current={chosen ? 'true' : undefined} data-episode-key={key} data-focus-region="episodes" data-focus-row={index} data-focus-col="0" data-focus-key={`episode-${key}`} onFocus={() => scheduleSelect(key)} onClick={() => enterVersions(key)}>
+        <span><b>{episode.number ? `${episode.number}. ` : ''}{episode.title}</b><small>{episodeMeta(episode, progress)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
+        <TVStateBadges state={episode.libraryState} />
+       </button>
+      </article>;
+     })}
+     {selected && unknownKey && <article key={unknownKey} role="listitem" class="episode-row unknown-group">
+      <button class={`episode-tile ${selectedKey === unknownKey ? 'selected' : ''}`} aria-current={selectedKey === unknownKey ? 'true' : undefined} data-episode-key={unknownKey} data-focus-region="episodes" data-focus-row={selected.episodes.length} data-focus-col="0" data-focus-key={unknownKey} onFocus={() => scheduleSelect(unknownKey)} onClick={() => enterVersions(unknownKey)}>
+       <span><b>Unknown episodes ({selected.unknown!.length})</b><small>Files without episode information</small></span>
+      </button>
+     </article>}
+    </div>
+    <section class="versions-pane" aria-label="Versions">
+     <header class="versions-head"><small>Versions</small><h3>{paneTitle}</h3></header>
+     <div class="versions-scroll">
+      {paneSources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} region="versions" row={index} best={index === 0} onPlay={onPlay} />)}
+      {unknownSources.map((source, index) => <SourceButton key={`unknown-${source.release.id}:${source.fileIndex ?? -1}:${index}`} source={source} region="versions" row={index} focusKey={`unknown-source-${index}`} onPlay={onPlay} />)}
+      {selectedEpisode && paneSources.length === 0 && <p class="versions-empty" role="status">No versions of this episode yet.</p>}
+      {packs.length > 0 && <div class="season-pack-downloads"><h4>Complete season</h4><p class="supporting">Download every episode of season {selected!.number} at once.</p>{packs.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected!.number} row={packBase + index} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>}
+      {!selectedEpisode && unknownSources.length === 0 && packs.length === 0 && <p class="versions-empty" role="status">Pick an episode to see its versions.</p>}
+     </div>
+    </section>
+   </div>
   </section>}
   {detail.seasons.length === 0 && detail.sources.length === 0 && <section class="source-list"><EmptyState title="No versions yet">The trackers have no release for this title right now. Press Refresh data to search them again.</EmptyState></section>}
   {detail.seasons.length === 0 && detail.sources.length > 0 && <section class="source-list"><h2>Versions</h2>{detail.sources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={2 + index} onPlay={onPlay} />)}</section>}
   {infoOpen && <TitleInfoPanel api={api} title={detail.title} onClose={() => { setInfoOpen(false); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="detail-info"]')), 0) }} />}
-  {pendingPack && <section role="dialog" aria-modal="true" aria-labelledby="tv-season-pack-delete-heading" class="tv-settings tv-removal-confirm tv-season-pack-confirm"><h2 id="tv-season-pack-delete-heading">Delete season download?</h2><strong>Season {selected?.number}</strong><p>{pendingPack.release.name} · {pendingPack.release.trackerName}</p><p>This permanently deletes the season download and every episode file in it. You can download the season again later.</p><button aria-disabled={deleting ? 'true' : undefined} data-focus-region="season-pack-dialog" data-focus-row="0" data-focus-col="0" data-focus-key="season-pack-delete-cancel" onClick={() => { if (!deleting) setPendingPack(null) }}>Cancel</button><button aria-disabled={deleting ? 'true' : undefined} class="danger-button" data-focus-region="season-pack-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="season-pack-delete-confirm" onClick={() => void confirmDelete()}>{deleting ? 'Deleting…' : 'Delete download'}</button></section>}
+  {pendingPack && <section role="dialog" aria-modal="true" aria-labelledby="tv-season-pack-delete-heading" class="tv-settings tv-removal-confirm tv-season-pack-confirm"><h2 id="tv-season-pack-delete-heading">Delete season download?</h2><strong>Season {selected?.number}</strong><p>{pendingPack.release.name} · {pendingPack.release.trackerName}</p><p>This permanently deletes the season download and every episode file in it. You can download the season again later.</p><button aria-disabled={deleting ? 'true' : undefined} data-focus-region="season-pack-dialog" data-focus-row="0" data-focus-col="0" data-focus-key="season-pack-delete-cancel" onClick={() => { if (!deleting) closePackDialog() }}>Cancel</button><button aria-disabled={deleting ? 'true' : undefined} class="danger-button" data-focus-region="season-pack-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="season-pack-delete-confirm" onClick={() => void confirmDelete()}>{deleting ? 'Deleting…' : 'Delete download'}</button></section>}
  </main>;
 }
 

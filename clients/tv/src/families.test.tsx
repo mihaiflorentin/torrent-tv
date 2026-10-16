@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 
 // The Categories pages show Category families as wide image tiles. Opening one lists its titles with
 // a chip per raw tracker category; Back returns to the tile that opened it.
@@ -23,7 +24,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { App } = await import('./main');
 
-const wait = (ms = 60) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 60) => sleep(ms);
 function respond(body: unknown) { return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) }; }
 // Back is a short press: the catalog treats a held Back as exit, so the action runs on key up.
 const back = () => { for (const type of ['keydown', 'keyup']) document.dispatchEvent(new KeyboardEvent(type, { key: 'XF86Back', keyCode: 10009, bubbles: true, cancelable: true })) };

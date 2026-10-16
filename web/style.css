@@ -1443,74 +1443,38 @@ dl .tracker-badge,
  display: none;
 }
 
+/* Complete-season packs: a section under the episode's versions, controls always visible. */
 .season-pack-actions {
- margin: var(--tt-space-4) var(--tt-space-6) 0;
+ margin-top: var(--tt-space-5);
+ padding-top: var(--tt-space-4);
+ border-top: 1px solid var(--tt-line);
+}
+
+.season-pack-actions > h4 {
+ font-size: var(--tt-text-lg);
+}
+
+.season-pack-actions > p {
+ margin: var(--tt-space-1) 0 var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-text-sm);
+}
+
+.season-pack-source {
+ min-width: 0;
+ margin-top: var(--tt-space-3);
  border: 1px solid var(--tt-line);
  border-radius: var(--tt-radius-md);
  background: var(--tt-raised);
  overflow: hidden;
 }
 
-.packs-toggle {
- display: grid;
- grid-template-columns: minmax(0, 1fr) auto;
- gap: var(--tt-space-3);
- width: 100%;
- min-height: var(--tt-target-web);
- padding: var(--tt-space-3) var(--tt-space-4);
- border: 0;
- border-radius: 0;
- background: transparent;
- text-align: left;
-}
-
-.packs-toggle-copy {
- display: grid;
- gap: 2px;
-}
-
-.packs-toggle-copy small {
- color: var(--tt-text-muted);
- font-size: var(--tt-text-sm);
- font-weight: var(--tt-weight-regular);
-}
-
-.packs-toggle b {
- color: var(--tt-accent);
-}
-
-.season-pack-actions > div {
- display: grid;
- grid-template-columns: repeat(2, minmax(0, 1fr));
- align-items: start;
- gap: var(--tt-space-3);
- padding: 0 var(--tt-space-3) var(--tt-space-3);
-}
-
-.season-pack-source {
- min-width: 0;
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
- background: var(--tt-surface);
- overflow: hidden;
-}
-
-.season-pack-source.expanded {
- border-color: var(--tt-accent-line);
-}
-
 .season-pack-header {
  display: grid;
  grid-template-columns: minmax(0, 1fr) auto;
  align-items: stretch;
- justify-content: stretch;
  gap: var(--tt-space-4);
- width: 100%;
  padding: var(--tt-space-3) var(--tt-space-4);
- border: 0;
- border-radius: 0;
- background: transparent;
- text-align: left;
 }
 
 .season-pack-copy,
@@ -1577,13 +1541,85 @@ dl .tracker-badge,
  overflow: hidden;
 }
 
-.episode-list article.expanded {
+.episode-list article.selected {
  border-color: var(--tt-accent-line);
+ background: var(--tt-accent-soft);
+ box-shadow: inset 4px 0 0 var(--tt-accent);
+}
+
+/* Two panes under the season tabs: episodes left, the selected episode's versions right. */
+.season-panes {
+ display: flex;
+ align-items: flex-start;
+ gap: var(--tt-space-5);
+ padding: var(--tt-space-4) var(--tt-space-6) var(--tt-space-6);
+}
+
+.season-panes .episode-list,
+.season-panes .source-rows.compact,
+.season-panes .episode-loading {
+ padding: 0;
+ margin: 0;
+}
+
+.episode-pane {
+ flex: 0 0 min(42%, 420px);
+ min-width: 0;
+ max-height: 560px;
+ overflow-y: auto;
+ padding: 2px 2px var(--tt-space-2) 0;
+}
+
+.unknown-list {
+ margin-top: var(--tt-space-3);
+}
+
+.versions-pane {
+ flex: 1 1 0;
+ min-width: 0;
+ max-height: 560px;
+ overflow-y: auto;
+ padding: 2px 2px var(--tt-space-2) var(--tt-space-5);
+ border-left: 1px solid var(--tt-line);
+}
+
+.versions-head {
+ margin-bottom: var(--tt-space-3);
+}
+
+.versions-head small {
+ color: var(--tt-text-muted);
+ font-size: var(--tt-text-xs);
+ font-weight: var(--tt-weight-bold);
+ letter-spacing: 0.08em;
+ text-transform: uppercase;
+}
+
+.versions-head h3 {
+ margin: var(--tt-space-1) 0 0;
+ font-size: var(--tt-text-lg);
+}
+
+.versions-empty {
+ color: var(--tt-text-muted);
+}
+
+.best-match {
+ display: inline-flex;
+ align-items: center;
+ min-height: 24px;
+ padding: 0 var(--tt-space-2);
+ border-radius: var(--tt-radius-pill);
+ background: var(--tt-accent);
+ color: var(--tt-on-accent);
+ font-size: var(--tt-text-xs);
+ font-weight: var(--tt-weight-black);
+ white-space: nowrap;
 }
 
 .episode-select {
  display: grid;
- grid-template-columns: minmax(0, 1fr) auto auto;
+ grid-template-columns: minmax(0, 1fr) auto;
  align-items: center;
  justify-content: stretch;
  gap: var(--tt-space-3);
@@ -1613,42 +1649,12 @@ dl .tracker-badge,
  font-weight: var(--tt-weight-regular);
 }
 
-.episode-select > b {
- color: var(--tt-accent);
- font-size: var(--tt-text-sm);
-}
-
 .episode-loading {
  margin: var(--tt-space-5) var(--tt-space-6) var(--tt-space-6);
  padding: var(--tt-space-4);
  border: 1px dashed var(--tt-line-strong);
  border-radius: var(--tt-radius-md);
  color: var(--tt-text-muted);
-}
-
-.unknown-group {
- margin: 0 var(--tt-space-6) var(--tt-space-5);
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
-}
-
-.unknown-group .episode-list {
- padding: 0 var(--tt-space-3) var(--tt-space-3);
-}
-
-.unknown-header {
- display: grid;
- grid-template-columns: auto minmax(0, 1fr) auto;
- align-items: baseline;
- justify-content: stretch;
- gap: var(--tt-space-3);
- width: 100%;
- padding: var(--tt-space-3) var(--tt-space-4);
- border: 0;
- border-radius: 0;
- background: transparent;
- color: var(--tt-text-muted);
- text-align: left;
 }
 
 /* ---------- Versions: the decision point ---------- */
@@ -3270,9 +3276,30 @@ dl .tracker-badge,
   padding: var(--tt-space-5);
  }
 
- .fields,
- .season-pack-actions > div {
+ .fields {
   grid-template-columns: minmax(0, 1fr);
+ }
+}
+
+/* Narrow windows: the versions of the selected episode stack under the episode list. */
+@media (max-width: 959px) {
+ .season-panes {
+  flex-direction: column;
+  align-items: stretch;
+ }
+
+ .episode-pane,
+ .versions-pane {
+  flex: 0 0 auto;
+  max-height: none;
+  overflow: visible;
+  padding-left: 0;
+  border-left: 0;
+ }
+
+ .versions-pane {
+  padding-top: var(--tt-space-4);
+  border-top: 1px solid var(--tt-line);
  }
 }
 
@@ -3473,39 +3500,23 @@ dl .tracker-badge,
   grid-column: 1 / -1;
  }
 
- .season-tabs,
- .episode-list,
- .source-rows,
- .unknown-group {
+ .season-tabs {
   padding-left: var(--tt-space-4);
   padding-right: var(--tt-space-4);
  }
 
- .season-pack-actions,
- .episode-loading,
- .unknown-group {
+ .season-panes {
+  padding-left: var(--tt-space-4);
+  padding-right: var(--tt-space-4);
+ }
+
+ .episode-loading {
   margin-left: var(--tt-space-4);
   margin-right: var(--tt-space-4);
  }
 
- .unknown-group {
-  padding-left: 0;
-  padding-right: 0;
- }
-
- .source-rows.compact {
-  padding-left: var(--tt-space-2);
-  padding-right: var(--tt-space-2);
- }
-
  .source-row {
   grid-template-columns: minmax(0, 1fr);
- }
-
- .episode-select {
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: start;
-  gap: var(--tt-space-1);
  }
 
  .source-details > div,

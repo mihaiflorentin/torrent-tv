@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 
 // App-seam tests for the Catalog maintenance controls in TV Settings: the
 // Events page is gone from the menu, and the Rebuild catalog confirmation
@@ -26,7 +27,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { App } = await import('./main');
 
-const wait = (ms = 60) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 60) => sleep(ms);
 const respond = (body: unknown) => ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) });
 // Back arrives as keydown then keyup: a five-second hold exits the app, a short press runs onBack on release.
 const back = () => { const init = { key: 'XF86Back', keyCode: 10009, bubbles: true, cancelable: true }; document.dispatchEvent(new KeyboardEvent('keydown', init)); document.dispatchEvent(new KeyboardEvent('keyup', init)) };
