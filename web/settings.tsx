@@ -1,6 +1,5 @@
 // The Settings surface: a tabbed editor for server configuration plus the
-// catalog sync maintenance actions and observed catalog coverage. The app
-// renders these on both the Settings and Events views.
+// catalog sync maintenance actions and observed catalog coverage.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChild } from 'preact';
 import { formatBytes, SettingsField, TrackerStatus } from '@torrent-tv/shared';
@@ -11,14 +10,44 @@ import { StatusBadge } from './status-badge';
 import { connectionStatus } from './presentation';
 import { Icon } from './icons';
 
-export function Events({ onError, confirmRebuild = false }: { onError: (value: string) => void; confirmRebuild?: boolean }) {
-  const [message, setMessage] = useState('');
+// The Catalog block (Fetch latest) and the Danger zone (Rebuild catalog) are
+// siblings so the Maintenance tab can end on the danger zone. Rebuild sweeps
+// every category, so it only runs from the confirmation dialog.
+export function CatalogMaintenance({ onError }: { onError: (value: string) => void }) {
+  const [fetchMessage, setFetchMessage] = useState('');
+  const [rebuildMessage, setRebuildMessage] = useState('');
   const [pendingRebuild, setPendingRebuild] = useState(false);
-  async function run(mode: 'latest' | 'rebuild') { try { const job = await sharedApi().syncCatalog(mode); setMessage(`${job.label} queued. Follow progress on Jobs.`) } catch (e) { onError((e as Error).message) } finally { setPendingRebuild(false) } }
-  // The standalone Events page keeps the one-click behavior; the Settings
-  // Maintenance tab asks first because the rebuild sweeps every category.
-  const requestRebuild = () => { if (confirmRebuild) setPendingRebuild(true); else void run('rebuild') };
-  return <section class="events-page"><p class="supporting">Run catalog maintenance now instead of waiting for the schedule. Both are safe to repeat and never remove titles.</p><div class="event-actions"><article><h2>Fetch latest</h2><p>Add the newest releases from every enabled tracker to the catalog.</p><button type="button" class="primary" onClick={() => void run('latest')}>Fetch latest</button></article><article><h2>Rebuild catalog</h2><p>Refresh every enabled category in full. Titles already in the catalog are kept.</p><button type="button" onClick={requestRebuild}>Rebuild catalog</button></article></div>{message && <p role="status" class="success">{message}</p>}{pendingRebuild && <div class="overlay" role="dialog" aria-modal="true" aria-label="Rebuild catalog"><section class="help-modal"><h2>Rebuild catalog?</h2><p>Refreshes every enabled category's latest window and rebuilds local projections. Nothing is removed; the work runs as a background job you can follow on the Jobs page.</p><div class="confirm-actions"><button type="button" onClick={() => setPendingRebuild(false)}>Cancel</button><button type="button" class="primary" onClick={() => void run('rebuild')}>Rebuild now</button></div></section></div>}</section>
+  async function fetchLatest() { try { const job = await sharedApi().syncCatalog('latest'); setFetchMessage(`${job.label} queued. Follow progress on Jobs.`) } catch (e) { onError((e as Error).message) } }
+  async function rebuild() { try { const job = await sharedApi().syncCatalog('rebuild'); setRebuildMessage(`${job.label} queued. Follow progress on Jobs.`) } catch (e) { onError((e as Error).message) } finally { setPendingRebuild(false) } }
+  return <>
+    <section class="catalog-actions"><h2>Catalog</h2><p class="supporting">Pull the newest releases from every enabled tracker now instead of waiting for the hourly run. Safe to repeat; nothing is removed.</p><button type="button" class="primary" onClick={() => void fetchLatest()}>Fetch latest</button>{fetchMessage && <p role="status" class="success">{fetchMessage}</p>}</section>
+    <section class="danger-zone"><h2>Danger zone</h2><p>Troubleshooting only. Rebuild catalog refreshes every enabled category's window and rebuilds the local projections. It is slow and heavy on your trackers and the server, so use it only when something is broken.</p><button type="button" class="danger-button" onClick={() => setPendingRebuild(true)}>Rebuild catalog</button>{rebuildMessage && <p role="status" class="success">{rebuildMessage}</p>}</section>
+    {pendingRebuild && <RebuildDialog onCancel={() => setPendingRebuild(false)} onConfirm={() => void rebuild()} />}
+  </>
+}
+
+// Cancel takes focus first so a stray Enter never starts the rebuild. Escape
+// cancels, Tab cycles inside the dialog, and focus returns to the opener.
+function RebuildDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const root = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const cancelLatest = useRef(onCancel);
+  cancelLatest.current = onCancel;
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    cancelRef.current?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); cancelLatest.current(); return }
+      if (event.key !== 'Tab') return;
+      const items = Array.from(root.current?.querySelectorAll<HTMLElement>('button:not([disabled])') || []);
+      if (!items.length) return;
+      event.preventDefault();
+      items[(items.indexOf(document.activeElement as HTMLElement) + (event.shiftKey ? -1 : 1) + items.length) % items.length].focus();
+    };
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('keydown', key); opener?.focus() };
+  }, []);
+  return <div ref={root} class="overlay" role="dialog" aria-modal="true" aria-label="Rebuild catalog"><section class="help-modal"><h2>Rebuild catalog?</h2><p>This refreshes every enabled category's latest window and rebuilds the local projections over everything ever observed. It is slow and puts heavy load on your trackers and the server, so run it only when something is broken. Nothing is removed, and the work runs as a background job you can follow on the Jobs page.</p><div class="confirm-actions"><button type="button" ref={cancelRef} onClick={onCancel}>Cancel</button><button type="button" class="danger-button" onClick={onConfirm}>Rebuild now</button></div></section></div>
 }
 
 export function CacheCoverage() { const [status, setStatus] = useState<Record<string, unknown> | null>(null); useEffect(() => { sharedApi().call<Record<string, unknown>>('/catalog/status').then(setStatus).catch(() => { }) }, []); if (!status) return null; return <section class="cache-coverage"><h2>Observed catalog coverage</h2><p><strong>{Number(status.observedReleases).toLocaleString()}</strong> releases retained · <strong>{Number(status.discoverableReleases).toLocaleString()}</strong> currently seeded · {Number(status.hiddenDiscovery).toLocaleString()} releases hidden</p><p class="supporting">Trackers expose a bounded recent-release window per request (FileList: {String(status.fileListLatestWindowLimit)}). Searches and future syncs continue growing this append-only cache.</p></section> }
@@ -303,7 +332,7 @@ export function Settings({ value, fields, onSaved, onError, onDirtyChange, accou
   const diagnostics = (connections: typeof CONNECTIONS) => <section class="diagnostics"><h2>Connection checks</h2>{connections.map(connection => { const status = connectionStatus(connState[connection.name]); return <div key={connection.name} class="check-row"><button type="button" onClick={() => void test(connection.name)}>Test {connection.label}</button>{status && <StatusBadge tone={status.tone} label={status.label} />}<span role="status">{tests[connection.name]}</span>{connection.name === 'storage' && storageFolders && <ul class="storage-folders">{storageFolders.map(folder => <li key={folder.path} class={folder.ok ? 'ok' : 'failed'}><span class="folder-name">{folder.label}</span><code>{folder.path}</code><span class="folder-status">{folder.ok ? `writable${folder.freeBytes ? ` · ${formatBytes(folder.freeBytes)} free` : ''}` : folder.detail}</span></li>)}</ul>}</div> })}</section>;
   const panelContent = () => {
     const liveNote = serverLive === false && <p class="supporting" role="note">Start the server to run these — they talk to the live server.</p>;
-    if (activeTab === 'maintenance') return <>{liveNote}<CacheCoverage /><Events onError={onError} confirmRebuild /></>;
+    if (activeTab === 'maintenance') return <>{liveNote}<CacheCoverage /><CatalogMaintenance onError={onError} /></>;
     if (activeTab === 'test') return <>{liveNote}{diagnostics(CONNECTIONS)}</>;
     const visibleGroups = () => (TAB_GROUPS[activeTab] || []).filter(group => !group.when || group.when(current));
     const groupStatus = connectionStatus(tabLed(activeTab));

@@ -42,6 +42,9 @@ describe('Categories pages show Category families', () => {
   let container: HTMLDivElement;
   let requests: string[] = [];
   beforeEach(() => {
+    // happy-dom lays nothing out; landing and D-pad targeting only consider elements with a size.
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(40);
     requests = [];
     globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -67,6 +70,7 @@ describe('Categories pages show Category families', () => {
     render(null, container);
     container.remove();
     localStorage.clear();
+    vi.restoreAllMocks();
   });
 
   const openRoute = async (menuKey: string) => {
@@ -87,12 +91,12 @@ describe('Categories pages show Category families', () => {
     expect(requests.some(url => url.includes('/catalog/families'))).toBe(true);
   });
 
-  it('lays the tiles out for the D-pad and marks the first as the landing card', async () => {
+  it('lays the tiles out for the D-pad and tags them as landing cards', async () => {
     await openRoute('categories');
     const tiles = Array.from(container.querySelectorAll<HTMLButtonElement>('.family-tile'));
     expect(tiles.every(t => t.classList.contains('poster-card') && t.dataset.focusRegion === 'content')).toBe(true);
     expect(tiles.map(t => [t.dataset.focusRow, t.dataset.focusCol])).toEqual([['1', '0'], ['1', '1'], ['1', '2'], ['2', '0']]);
-    expect(tiles.map(t => t.dataset.landing)).toEqual(['true', undefined, undefined, undefined]);
+    expect(tiles.map(t => t.dataset.landing)).toEqual(['card', 'card', 'card', 'card']);
   });
 
   it('loads tile art through the server and keeps the tile when a family has only bundled art', async () => {
@@ -113,6 +117,7 @@ describe('Categories pages show Category families', () => {
     const chips = Array.from(container.querySelectorAll<HTMLButtonElement>('[data-focus-key^="family-chip-"]')).map(c => c.textContent);
     expect(chips).toEqual(['All', 'TV-Series HD']);
     expect(container.querySelectorAll('.poster-card').length).toBe(2);
+    expect((document.activeElement as HTMLElement | null)?.dataset.focusKey).toBe('family-title-a');
     back();
     await wait();
     expect(container.querySelectorAll('.family-tile').length).toBe(4);
@@ -147,7 +152,7 @@ describe('Categories pages show Category families', () => {
     tile('movies').click();
     await wait();
     const cards = Array.from(container.querySelectorAll<HTMLButtonElement>('.poster-card'));
-    expect(cards.map(c => c.dataset.landing)).toEqual(['true', undefined]);
+    expect(cards.map(c => c.dataset.landing)).toEqual(['card', 'card']);
     expect(Number(cards[0].dataset.focusRow)).toBeGreaterThan(3);
     cards[0].focus();
     cards[0].click();

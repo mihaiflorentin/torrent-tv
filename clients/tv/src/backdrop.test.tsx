@@ -112,6 +112,26 @@ describe('Backdrop', () => {
     expect(host.querySelector('.tv-backdrop')!.classList.contains('lean')).toBe(false);
   });
 
+  it('draws the title page art sharp, on its own class, and never takes the blurred follow behaviour', async () => {
+    await act(async () => { render(<Backdrop initial="http://s/a.jpg" follow={false} sharp />, host); });
+    const root = host.querySelector('.tv-backdrop')!;
+    expect(root.classList.contains('sharp')).toBe(true);
+    expect(root.classList.contains('poster-only')).toBe(false);
+    expect(front()?.style.backgroundImage).toContain('a.jpg');
+  });
+
+  it('marks a poster standing in for a missing backdrop so it is placed, not stretched', async () => {
+    await act(async () => { render(<Backdrop initial="http://s/p.jpg" follow={false} sharp posterOnly />, host); });
+    expect(host.querySelector('.tv-backdrop')!.classList.contains('poster-only')).toBe(true);
+  });
+
+  it('stays the blurred follow-focus layer by default', async () => {
+    await mount('http://s/a.jpg');
+    const root = host.querySelector('.tv-backdrop')!;
+    expect(root.classList.contains('sharp')).toBe(false);
+    expect(root.classList.contains('poster-only')).toBe(false);
+  });
+
   it('falls back to the designed backdrop on a title without art', async () => {
     const { card } = await mount('http://s/a.jpg');
     focusOn(card(''));

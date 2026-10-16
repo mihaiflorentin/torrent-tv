@@ -6,7 +6,9 @@ import { detectLeanGraphics } from './capability';
 // of opacity only. The blur is static and the layers are half-resolution, scaled up by the
 // stylesheet, so the cost on an old TV is one decode and one fade per change. Nothing loops.
 // A card opts in with data-art="<url>"; an empty value means "no artwork" and brings the
-// designed fallback back. On an old TV engine (capability.ts) the blur is dropped, since the half-resolution
+// designed fallback back. The title page opts out of all that with `sharp`: its own art at full resolution,
+// no blur and no scale, under a left and bottom scrim (a poster standing in for a missing backdrop is
+// marked `posterOnly` so the stylesheet places it at the right edge instead of cropping it). On an old TV engine (capability.ts) the blur is dropped, since the half-resolution
 // layer scaled up is already soft, and the settle is longer. Controls without data-art leave the current art alone.
 
 /** Settle time before the art follows focus, so a held D-pad key loads only where it stops. */
@@ -32,7 +34,7 @@ export function nextBackdrop(state: BackdropState, url: string): BackdropState {
   return { layers, front: back };
 }
 
-export function Backdrop({ initial = '', follow = true, lean = detectLeanGraphics() }: { initial?: string; follow?: boolean; lean?: boolean }) {
+export function Backdrop({ initial = '', follow = true, lean = detectLeanGraphics(), sharp = false, posterOnly = false }: { initial?: string; follow?: boolean; lean?: boolean; sharp?: boolean; posterOnly?: boolean }) {
   const [state, setState] = useState<BackdropState>({ layers: [initial, ''], front: 0 });
   const wanted = useRef(initial);
 
@@ -70,7 +72,7 @@ export function Backdrop({ initial = '', follow = true, lean = detectLeanGraphic
     return () => { generation++; window.clearTimeout(settle); window.clearTimeout(guard); document.removeEventListener('focusin', onFocus); };
   }, [follow, lean]);
 
-  return <div class={`tv-backdrop${lean ? ' lean' : ''}`} aria-hidden="true">
+  return <div class={`tv-backdrop${lean ? ' lean' : ''}${sharp ? ' sharp' : ''}${sharp && posterOnly ? ' poster-only' : ''}`} aria-hidden="true">
     {state.layers.map((url, index) => <div key={index} class={`tv-backdrop-art${state.front === index ? ' on' : ''}`} style={url ? { backgroundImage: cssURL(url) } : undefined} />)}
     <div class="tv-backdrop-scrim" />
   </div>;

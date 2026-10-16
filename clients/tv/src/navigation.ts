@@ -51,7 +51,7 @@ export function chooseDirectionalTarget<T>(current: RectLike, candidates: Naviga
 
 const focusableSelector = 'button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-function visibleFocusables(): HTMLElement[] {
+export function visibleFocusables(): HTMLElement[] {
   return Array.from(document.querySelectorAll<HTMLElement>(focusableSelector)).filter(element => element.offsetWidth > 0 && element.offsetHeight > 0);
 }
 

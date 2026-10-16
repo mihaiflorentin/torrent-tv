@@ -4,7 +4,7 @@ import { useRef } from 'preact/hooks';
 import { describe, expect, it, vi } from 'vitest';
 import { chooseDirectionalTarget, chooseStructuredTarget, RectLike, remoteAction, useTVNavigation } from './navigation';
 import type { TVPlatformHooks } from './platform';
-import { PROJECTS_MENU_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION } from './portal';
+import { PROJECTS_MENU_ROW, REBUILD_DIALOG_REGION, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_REBUILD_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION } from './portal';
 
 const rect = (left: number, top: number, width = 100, height = 100): RectLike => ({ left, top, right: left + width, bottom: top + height, width, height });
 
@@ -150,6 +150,37 @@ describe('modal dialog focus traps', () => {
       expect(chooseStructuredTarget(cancel, elements, direction)).toBeNull();
       expect(chooseStructuredTarget(confirm, elements, direction)).toBeNull();
     }
+  });
+});
+
+describe('Catalog rows and the rebuild dialog', () => {
+  const dialogItem = (row: number, col: number) => ({ dataset: { focusRegion: REBUILD_DIALOG_REGION, focusRow: String(row), focusCol: String(col) } } as unknown as HTMLElement);
+  const contentItem = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
+  it('walks down from the connection tests through Fetch latest and the server actions to Rebuild catalog', () => {
+    const lastTest = contentItem(SETTINGS_TEST_FIRST_ROW + 1);
+    const fetchLatest = contentItem(SETTINGS_CATALOG_FETCH_ROW);
+    const change = contentItem(SETTINGS_CHANGE_SERVER_ROW);
+    const apply = contentItem(UPDATE_APPLY_ROW);
+    const rebuild = contentItem(SETTINGS_REBUILD_ROW);
+    const all = [lastTest, fetchLatest, change, apply, rebuild];
+    expect(chooseStructuredTarget(lastTest, all, 'down')).toBe(fetchLatest);
+    expect(chooseStructuredTarget(fetchLatest, all, 'down')).toBe(change);
+    expect(chooseStructuredTarget(apply, all, 'down')).toBe(rebuild);
+    expect(chooseStructuredTarget(rebuild, all, 'up')).toBe(apply);
+    expect(chooseStructuredTarget(rebuild, all, 'down')).toBeNull();
+  });
+  it('keeps focus inside the rebuild dialog between Cancel and Rebuild', () => {
+    const cancel = dialogItem(0, 0);
+    const confirm = dialogItem(0, 1);
+    const rebuild = contentItem(SETTINGS_REBUILD_ROW);
+    const elements = [cancel, confirm, rebuild, contentItem(UPDATE_APPLY_ROW)];
+    expect(chooseStructuredTarget(cancel, elements, 'right')).toBe(confirm);
+    expect(chooseStructuredTarget(confirm, elements, 'left')).toBe(cancel);
+    for (const direction of ['up', 'down'] as const) {
+      expect(chooseStructuredTarget(cancel, elements, direction)).toBeNull();
+      expect(chooseStructuredTarget(confirm, elements, direction)).toBeNull();
+    }
+    expect(chooseStructuredTarget(rebuild, [cancel, rebuild], 'up')).toBeNull();
   });
 });
 

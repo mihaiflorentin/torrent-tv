@@ -158,37 +158,80 @@ describe('settings tabs', () => {
   expect(panel().textContent).toContain('FileList URL');
  });
 
- it('shows catalog coverage and canonical maintenance actions on the Maintenance tab', async () => {
+ it('shows coverage and Fetch latest under Catalog, with Rebuild catalog alone in a danger zone below', async () => {
   await openSettings();
   await act(async () => { settingsTabs().find(button => button.textContent === 'Maintenance')!.click() });
   await settle();
   expect(panel().textContent).toContain('releases retained');
-  const labels = panel().querySelectorAll('article h2');
-  expect(Array.from(labels).map(node => node.textContent)).toEqual(['Fetch latest', 'Rebuild catalog']);
-  const buttons = Array.from(panel().querySelectorAll<HTMLButtonElement>('article button'));
-  expect(buttons.map(button => button.textContent)).toEqual(['Fetch latest', 'Rebuild catalog']);
+  const catalog = panel().querySelector('.catalog-actions')!;
+  expect(catalog.querySelector('h2')!.textContent).toBe('Catalog');
+  expect(Array.from(catalog.querySelectorAll('button')).map(button => button.textContent)).toEqual(['Fetch latest']);
+  const danger = panel().querySelector('.danger-zone')!;
+  expect(danger.querySelector('h2')!.textContent).toBe('Danger zone');
+  expect(Array.from(danger.querySelectorAll('button')).map(button => button.textContent)).toEqual(['Rebuild catalog']);
+  expect(danger.textContent).toContain('only when something is broken');
+  // The danger zone is the last block of the tab, after the Catalog section.
+  expect(catalog.compareDocumentPosition(danger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(panel().lastElementChild).toBe(danger);
  });
 
- it('queues Fetch latest immediately and gates Rebuild catalog behind confirmation', async () => {
+ it('queues Fetch latest immediately and reports the queued job', async () => {
   const sync = vi.spyOn(API.prototype, 'syncCatalog').mockResolvedValue(syncJob);
   await openSettings();
   await act(async () => { settingsTabs().find(button => button.textContent === 'Maintenance')!.click() });
   await settle();
-  const buttons = Array.from(panel().querySelectorAll<HTMLButtonElement>('article button'));
-  await act(async () => { buttons[0].click() });
+  await act(async () => { panel().querySelector<HTMLButtonElement>('.catalog-actions button')!.click() });
   await settle();
   expect(sync).toHaveBeenCalledWith('latest');
-  expect(panel().textContent).toContain('queued');
-  await act(async () => { Array.from(panel().querySelectorAll<HTMLButtonElement>('article button'))[1].click() });
+  expect(panel().querySelector('.catalog-actions [role="status"]')!.textContent).toContain('queued');
+ });
+
+ it('gates Rebuild catalog behind a dialog that focuses Cancel and returns focus to the Rebuild button', async () => {
+  const sync = vi.spyOn(API.prototype, 'syncCatalog').mockResolvedValue({ ...syncJob, label: 'Rebuild catalog' });
+  await openSettings();
+  await act(async () => { settingsTabs().find(button => button.textContent === 'Maintenance')!.click() });
   await settle();
-  expect(sync).not.toHaveBeenCalledWith('rebuild');
-  const dialog = document.querySelector('.overlay[role="dialog"][aria-label="Rebuild catalog"]')!;
+  const rebuild = panel().querySelector<HTMLButtonElement>('.danger-zone button')!;
+  rebuild.focus();
+  await act(async () => { rebuild.click() });
+  await settle();
+  expect(sync).not.toHaveBeenCalled();
+  const dialog = document.querySelector<HTMLElement>('.overlay[role="dialog"][aria-label="Rebuild catalog"]')!;
   expect(dialog).not.toBeNull();
+  expect(dialog.textContent).toContain('every enabled category');
+  expect(dialog.textContent).toContain('slow');
+  const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button'));
+  expect(buttons.map(button => button.textContent)).toEqual(['Cancel', 'Rebuild now']);
+  expect(document.activeElement).toBe(buttons[0]);
+  // Escape cancels without running anything and focus lands back on the opener.
+  await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) });
+  await settle();
+  expect(document.querySelector('.overlay[aria-label="Rebuild catalog"]')).toBeNull();
+  expect(sync).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(rebuild);
+ });
+
+ it('runs the rebuild only after the explicit confirmation', async () => {
+  const sync = vi.spyOn(API.prototype, 'syncCatalog').mockResolvedValue({ ...syncJob, label: 'Rebuild catalog' });
+  await openSettings();
+  await act(async () => { settingsTabs().find(button => button.textContent === 'Maintenance')!.click() });
+  await settle();
+  await act(async () => { panel().querySelector<HTMLButtonElement>('.danger-zone button')!.click() });
+  await settle();
+  const dialog = document.querySelector('.overlay[role="dialog"][aria-label="Rebuild catalog"]')!;
   const confirmButton = Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Rebuild now')!;
   await act(async () => { confirmButton.click() });
   await settle();
   expect(sync).toHaveBeenCalledWith('rebuild');
   expect(document.querySelector('.overlay[aria-label="Rebuild catalog"]')).toBeNull();
+  expect(panel().querySelector('.danger-zone [role="status"]')!.textContent).toContain('queued');
+ });
+
+ it('no longer offers an Events page', async () => {
+  window.history.replaceState(null, '', '/events');
+  await mountApp();
+  expect(Array.from(document.querySelectorAll('.sidebar nav button')).some(button => button.textContent?.includes('Events'))).toBe(false);
+  expect(document.querySelector('.events-page')).toBeNull();
  });
  it('runs all connection tests from the Test tab', async () => {
   await openSettings();

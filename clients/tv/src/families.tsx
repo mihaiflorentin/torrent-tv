@@ -16,7 +16,7 @@ export function FamilyTiles({ api, families, unit, onOpen }: { api: API; familie
       const row = FAMILY_FIRST_ROW + Math.floor(index / FAMILY_COLUMNS);
       const art = api.streamURL(family.art.url);
       const newest = familyNewestLine(family);
-      return <button key={family.key} class="poster-card family-tile" data-focus-region="content" data-focus-row={row} data-focus-col={index % FAMILY_COLUMNS} data-focus-key={`family-${family.key}`} data-landing={index === 0 ? 'true' : undefined} data-art={art} aria-label={familyTileLabel(family, unit)} onClick={() => onOpen(family.key)}>
+      return <button key={family.key} class="poster-card family-tile" data-focus-region="content" data-focus-row={row} data-focus-col={index % FAMILY_COLUMNS} data-focus-key={`family-${family.key}`} data-landing="card" data-art={art} aria-label={familyTileLabel(family, unit)} onClick={() => onOpen(family.key)}>
         {inRowReach(reach, row) ? <img src={art} alt="" decoding="async" /> : <div class="poster-pending" />}
         <span class="family-copy"><strong>{family.name}</strong><span>{familyCountLabel(family, unit)}{newest ? ` · ${newest}` : ''}</span></span>
       </button>;

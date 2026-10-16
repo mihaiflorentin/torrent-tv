@@ -143,7 +143,7 @@ SubDL could not be exercised against the live provider during this pass because 
 
 ## 2026-08-14 Tizen data and managed-playback repair
 
-- Tizen Tracker Categories now uses the complete cache-backed facet response; Home and My Library use the browser-equivalent household sections, Recently Added always requests newest order, and Events shows cache coverage.
+- Tizen Tracker Categories now uses the complete cache-backed facet response; Home and My Library use the browser-equivalent household sections, Recently Added always requests newest order, and Settings shows cache coverage.
 - Release preparation resolves an existing managed release/file before opening FileList torrent metadata. Canonical favorites prefer their still-managed playback source or a completed/newest managed source for the title.
 - Go tests/vet, nine Python package tests, 19 Tizen tests, browser/Tizen TypeScript and Vite builds, and Apps2Samsung WGT validation passed without installing workstation packages. The generated `torrent-tv-0.2.1.wgt` SHA-256 is `744967059d1536b77e8109aa064e7b9d3008663d27928876093d6c68edb7c0c7`.
 - The ARM64 `0.2.1` daemon was deployed with the package-free upgrade script. It remained active with zero restarts; the live cache reported 20 facet categories versus 5 represented by the 12-card startup page, and preparing an existing managed release/file returned the same source in 2 ms.

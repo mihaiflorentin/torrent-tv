@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { UpdateStatus } from '@torrent-tv/shared';
 import {
   PROJECTS_MENU_ROW,
+  REBUILD_DIALOG_REGION,
+  SETTINGS_CATALOG_FETCH_ROW,
+  SETTINGS_CHANGE_SERVER_ROW,
   SETTINGS_DIAGNOSTICS_ROW,
   SETTINGS_FORGET_SERVER_ROW,
+  SETTINGS_REBUILD_ROW,
   SETTINGS_SAVE_ROW,
   SETTINGS_TEST_FIRST_ROW,
   UPDATE_APPLY_ROW,
@@ -116,6 +120,14 @@ describe('focus identities', () => {
     expect(UPDATE_APPLY_ROW).toBe(UPDATE_CHECK_ROW + 1);
     expect(PROJECTS_MENU_ROW).toBe(33);
     expect(UPDATE_DIALOG_REGION).toBe('update-dialog');
+  });
+
+  it('places Fetch latest after the connection tests and Rebuild catalog below every other control', () => {
+    expect(SETTINGS_CATALOG_FETCH_ROW).toBeGreaterThan(SETTINGS_TEST_FIRST_ROW + 1);
+    expect(SETTINGS_CATALOG_FETCH_ROW).toBeLessThan(SETTINGS_CHANGE_SERVER_ROW);
+    expect(SETTINGS_REBUILD_ROW).toBeGreaterThan(UPDATE_APPLY_ROW);
+    expect(REBUILD_DIALOG_REGION).toBe('rebuild-dialog');
+    expect(REBUILD_DIALOG_REGION).not.toBe(UPDATE_DIALOG_REGION);
   });
 });
 

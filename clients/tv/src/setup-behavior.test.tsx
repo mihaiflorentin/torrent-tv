@@ -251,6 +251,9 @@ describe('Setup and link handoff behavioral regressions', () => {
         confirmOpen={false}
         onConfirmOpen={() => { }}
         onConfirmClose={() => { }}
+        rebuildConfirmOpen={false}
+        onRebuildConfirmOpen={() => { }}
+        onRebuildConfirmClose={() => { }}
       />,
       container
     );

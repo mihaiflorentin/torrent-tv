@@ -144,3 +144,20 @@ describe('backdrop scrim contrast', () => {
     expect(contrast(hex('--tt-text-muted'), over(text.rgb, text.alpha, withArt))).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+// The title overlay shows the title's backdrop as the picture it is: sharp, at full
+// opacity, with a scrim that darkens the text side and fades out over the rest.
+describe('title overlay art', () => {
+  const css = sheets[0][1];
+  const rule = (selector: string) => rules(css).filter(item => item.selector === selector).map(item => item.body).join('\n');
+
+  it('draws the backdrop sharp and undimmed', () => {
+    const art = rule('.detail-art') + rule('.detail-art img');
+    expect(art).not.toMatch(/blur\(|filter\s*:/);
+    expect(art).not.toMatch(/opacity\s*:/);
+  });
+
+  it('fades the scrim out toward the right instead of veiling the whole picture', () => {
+    expect(rule('.detail-scrim')).toMatch(/linear-gradient\(90deg,\s*var\(--tt-scrim-text\)[^;]*transparent\s+100%\)/);
+  });
+});
