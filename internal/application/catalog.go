@@ -28,6 +28,16 @@ func (s *Service) CatalogTitles(ctx context.Context, q domain.CatalogQuery) (dom
 	if len(q.TrackerIDs) == 0 {
 		q.TrackerIDs = s.eligibleTrackerIDs()
 	}
+	if q.Family != "" {
+		categories, err := s.familyCategories(ctx, q.Family)
+		if err != nil {
+			return domain.Page[domain.CatalogTitle]{}, err
+		}
+		if len(categories) == 0 {
+			return domain.Page[domain.CatalogTitle]{Items: []domain.CatalogTitle{}}, nil
+		}
+		q.Categories = categories
+	}
 	ids, err := s.repo.QueryCatalogTitleIDs(ctx, q)
 	if err != nil {
 		return domain.Page[domain.CatalogTitle]{}, err
@@ -876,6 +886,9 @@ func filterCatalogSources(items []domain.CatalogSource, q domain.CatalogQuery) [
 		if q.Category != "" && !strings.EqualFold(r.Category, q.Category) {
 			continue
 		}
+		if len(q.Categories) > 0 && !containsFold(q.Categories, r.Category) {
+			continue
+		}
 		if q.Kind != "" && p.Kind != q.Kind {
 			continue
 		}
@@ -1022,4 +1035,13 @@ func sortedKeys(set map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func containsFold(values []string, target string) bool {
+	for _, value := range values {
+		if strings.EqualFold(value, target) {
+			return true
+		}
+	}
+	return false
 }

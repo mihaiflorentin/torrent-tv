@@ -51,6 +51,7 @@ describe('landing focus through the app', () => {
       if (url.includes('/catalog/search')) return respond({ items: [titleRow('s1'), titleRow('s2')], nextCursor: null, total: 2 });
       if (/\/catalog\/titles\/[^?]/.test(url)) return respond(detailBody);
       if (url.includes('/catalog/titles')) { if (titlesGate) await titlesGate; return respond({ items: url.includes('search=') ? [titleRow('s1'), titleRow('s2')] : [titleRow('a'), titleRow('b')], nextCursor: null, total: 2 }); }
+      if (url.includes('/catalog/families')) return respond({ items: [{ key: 'movies', name: 'Movies', count: 3, newestTitle: 'Alpha', categories: ['Movies'], art: { url: '/api/v1/catalog/families/movies/art.svg', source: 'bundled' } }], nextCursor: null, total: 1 });
       if (url.includes('/catalog/facets')) return respond({ categories: ['Movies'], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] });
       if (url.includes('/settings/schema')) return respond({ items: [] });
       if (url.includes('/settings')) return respond({});
@@ -113,10 +114,10 @@ describe('landing focus through the app', () => {
     expect(focusKey()).toBe('setting-audio-primary');
   });
 
-  it('lands on the first category tile when Categories opens', async () => {
+  it('lands on the first family tile when Categories opens', async () => {
     await start();
     await open('categories');
-    expect(focusKey()).toBe('category-Movies');
+    expect(focusKey()).toBe('family-movies');
   });
 
   it('lands on the Jobs filters when there are no jobs', async () => {

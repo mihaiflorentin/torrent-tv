@@ -4,7 +4,7 @@ plugins {
 }
 
 // Version identity comes from the repository VERSION file (major.minor.patch).
-// versionCode = major * 10000 + minor * 100 + patch, so 0.10.3 -> 1003. Every
+// versionCode = major * 10000 + minor * 100 + patch, so 0.10.4 -> 1004. Every
 // later release must keep minor and patch below 100 to stay monotonic.
 fun deriveVersionCode(major: Int, minor: Int, patch: Int) =
     major * 10000 + minor * 100 + patch

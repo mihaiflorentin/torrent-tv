@@ -73,6 +73,8 @@ CREATE TABLE IF NOT EXISTS catalog_releases(
  hdr TEXT NOT NULL DEFAULT '',edition TEXT NOT NULL DEFAULT '',release_group TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS catalog_releases_title ON catalog_releases(title_id);
 CREATE INDEX IF NOT EXISTS catalog_releases_browse ON catalog_releases(media_kind,sort_title,year);
+CREATE TABLE IF NOT EXISTS family_art(
+ family_key TEXT NOT NULL,quarter TEXT NOT NULL,title_id TEXT NOT NULL,picked_at INTEGER NOT NULL,PRIMARY KEY(family_key,quarter));
 CREATE TABLE IF NOT EXISTS catalog_metadata(
  title_id TEXT PRIMARY KEY,provider TEXT NOT NULL DEFAULT '',provider_id TEXT NOT NULL DEFAULT '',title TEXT NOT NULL DEFAULT '',
  original_title TEXT NOT NULL DEFAULT '',overview TEXT NOT NULL DEFAULT '',poster_path TEXT NOT NULL DEFAULT '',backdrop_path TEXT NOT NULL DEFAULT '',
@@ -470,6 +472,12 @@ func catalogFilter(q domain.CatalogQuery) (string, []any) {
 		if f.value != "" {
 			where = append(where, f.column+"=? COLLATE NOCASE")
 			args = append(args, f.value)
+		}
+	}
+	if len(q.Categories) > 0 {
+		where = append(where, "r.category COLLATE NOCASE IN ("+strings.TrimRight(strings.Repeat("?,", len(q.Categories)), ",")+")")
+		for _, value := range q.Categories {
+			args = append(args, value)
 		}
 	}
 	if q.MinSeeders > 0 {
@@ -1373,4 +1381,19 @@ func DecodeCursor(v string) (int, error) {
 
 func escapeLike(s string) string {
 	return strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(s)
+}
+
+// FamilyArtPick returns the title chosen for a Category family's art in a calendar
+// quarter, or sql.ErrNoRows when none was chosen yet.
+func (r *Repository) FamilyArtPick(ctx context.Context, familyKey, quarter string) (string, error) {
+	var titleID string
+	err := r.db.QueryRowContext(ctx, `SELECT title_id FROM family_art WHERE family_key=? AND quarter=?`, familyKey, quarter).Scan(&titleID)
+	return titleID, err
+}
+
+// SaveFamilyArtPick remembers (or replaces) the title chosen for a family's art in a quarter.
+func (r *Repository) SaveFamilyArtPick(ctx context.Context, familyKey, quarter, titleID string) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO family_art(family_key,quarter,title_id,picked_at) VALUES(?,?,?,?)
+ON CONFLICT(family_key,quarter) DO UPDATE SET title_id=excluded.title_id,picked_at=excluded.picked_at`, familyKey, quarter, titleID, time.Now().Unix())
+	return err
 }

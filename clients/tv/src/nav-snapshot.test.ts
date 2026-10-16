@@ -33,3 +33,12 @@ describe('navSort', () => {
     expect(navSort('bogus')).toBe('newest');
   });
 });
+
+describe('captureNav family', () => {
+  it('records the open Category family and its chip, and leaves them out otherwise', () => {
+    const open = captureNav({ route: 'categories', detail: null, target: {}, query: '', category: '', sort: 'newest', family: 'movies', familyCategory: 'Movies HD' });
+    expect(open.family).toBe('movies');
+    expect(open.familyCategory).toBe('Movies HD');
+    expect('family' in captureNav({ route: 'categories', detail: null, target: {}, query: '', category: '', sort: 'newest' })).toBe(false);
+  });
+});

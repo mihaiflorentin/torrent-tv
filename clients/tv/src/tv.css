@@ -1767,33 +1767,61 @@ button.primary.active {
  font-size: var(--tt-tv-text-meta)
 }
 
-/* Category cards and projects ------------------------------------------------- */
-.tv-category-grid {
+/* Category families: wide 16:9 image tiles in a wrapped flex grid (no CSS grid on webOS 4). A tile is a poster
+   card in the content focus region, so it takes the shared focus ring and scale. The text sits on a scrim panel
+   so the name and facts clear contrast over any image. */
+.tv-family-grid {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-5) 0 0
+ padding: 28px 24px 0;
+ margin: 0 -24px
 }
 
-.tv-category-grid button {
- flex: 0 0 396px;
- width: 396px;
- height: 140px;
- margin: 0 var(--tt-space-4) var(--tt-space-4) 0;
- flex-direction: column;
- justify-content: center;
- align-items: flex-start;
- text-align: left
+.family-tile {
+ position: relative;
+ width: 512px;
+ height: 288px;
+ margin: 0 var(--tt-space-5) var(--tt-space-5) 0
 }
 
-.tv-category-grid strong {
+.family-tile img,
+.family-tile .poster-pending {
+ display: block;
+ width: 100%;
+ height: 288px;
+ object-fit: cover
+}
+
+.family-copy {
+ position: absolute;
+ left: 0;
+ right: 0;
+ bottom: 0;
+ display: block;
+ padding: var(--tt-space-3) var(--tt-space-4);
+ background: var(--tt-scrim-text)
+}
+
+.family-copy strong {
+ display: block;
  font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ line-height: var(--tt-leading-tight);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
-.tv-category-grid span {
+.family-copy span {
+ display: block;
  margin-top: var(--tt-space-1);
  color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta)
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium);
+ line-height: 1.25;
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
 .tv-projects {

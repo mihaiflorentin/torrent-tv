@@ -1,0 +1,180 @@
+package application
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/mihaiflorentin/torrent-tv/internal/domain"
+)
+
+const (
+	// familyCacheTTL bounds how stale tile counts and art can be; the catalog
+	// grows at most hourly.
+	familyCacheTTL = 10 * time.Minute
+	// familyArtPool is how many of a family's best titles with artwork are
+	// candidates for the quarter's image.
+	familyArtPool = 10
+	// familyArtScan is how many top-rated and most-seeded titles are examined
+	// to fill the pool.
+	familyArtScan = 30
+)
+
+type familyCache struct {
+	at      time.Time
+	quarter string
+	items   []domain.FamilySummary
+}
+
+func (s *Service) familyClock() time.Time {
+	if s.familyNow != nil {
+		return s.familyNow()
+	}
+	return time.Now()
+}
+
+func (s *Service) invalidateFamilies() {
+	s.familyMu.Lock()
+	s.families = familyCache{}
+	s.familyMu.Unlock()
+}
+
+// CatalogFamilies lists the Category families that have titles in the catalog,
+// each with its count, newest title, raw categories and Family art. Results
+// are cached for a few minutes and recomputed when the art quarter turns.
+func (s *Service) CatalogFamilies(ctx context.Context) ([]domain.FamilySummary, error) {
+	s.familyMu.Lock()
+	defer s.familyMu.Unlock()
+	now := s.familyClock()
+	quarter := domain.ArtQuarter(now)
+	if s.families.items != nil && s.families.quarter == quarter && now.Sub(s.families.at) < familyCacheTTL && !now.Before(s.families.at) {
+		return s.families.items, nil
+	}
+	items, err := s.buildFamilies(ctx, quarter)
+	if err != nil {
+		return nil, err
+	}
+	s.families = familyCache{at: now, quarter: quarter, items: items}
+	return items, nil
+}
+
+func (s *Service) buildFamilies(ctx context.Context, quarter string) ([]domain.FamilySummary, error) {
+	facets, err := s.CatalogFacets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byFamily := map[string][]string{}
+	for _, category := range facets.Categories {
+		if key, ok := domain.FamilyForCategory(category); ok {
+			byFamily[key] = append(byFamily[key], category)
+		}
+	}
+	items := []domain.FamilySummary{}
+	for _, family := range domain.CategoryFamilies {
+		categories := byFamily[family.Key]
+		if len(categories) == 0 {
+			continue
+		}
+		page, err := s.CatalogTitles(ctx, domain.CatalogQuery{Categories: categories, Limit: 1})
+		if err != nil {
+			return nil, err
+		}
+		if page.Total == 0 {
+			continue
+		}
+		summary := domain.FamilySummary{Key: family.Key, Name: family.Name, Count: page.Total, Categories: categories}
+		if len(page.Items) > 0 {
+			summary.NewestTitle, summary.NewestID = page.Items[0].Title, page.Items[0].ID
+		}
+		summary.Art = s.familyArt(ctx, family.Key, quarter, categories)
+		items = append(items, summary)
+	}
+	return items, nil
+}
+
+// familyArt returns the family's image for the quarter. The pick is stored per
+// (family, quarter) and reused for the whole quarter while the stored title still
+// has artwork and still belongs to the family, so ranking changes from catalog
+// syncs never move the image. When there is no usable stored pick (a new quarter,
+// or the title lost its art or left the catalog) one is drawn deterministically
+// from the family's best titles with artwork and stored.
+func (s *Service) familyArt(ctx context.Context, key, quarter string, categories []string) domain.FamilyArt {
+	bundled := domain.FamilyArt{URL: domain.BundledFamilyArtURL(key), Source: "bundled"}
+	art := func(id, kind string) domain.FamilyArt {
+		return domain.FamilyArt{URL: fmt.Sprintf("/api/v1/artwork/%s/%s", id, kind), Source: "catalog", TitleID: id}
+	}
+	if stored, err := s.repo.FamilyArtPick(ctx, key, quarter); err == nil {
+		if kind := s.artKind(ctx, stored); kind != "" && s.inFamily(ctx, stored, categories) {
+			return art(stored, kind)
+		}
+	}
+	candidates := []string{}
+	kinds := map[string]string{}
+	for _, order := range []string{"rating", "seeders"} {
+		page, err := s.repo.QueryCatalogTitleIDs(ctx, domain.CatalogQuery{Categories: categories, TrackerIDs: s.eligibleTrackerIDs(), Sort: order, Limit: familyArtScan})
+		if err != nil {
+			continue
+		}
+		for _, id := range page.Items {
+			if _, seen := kinds[id]; seen || len(candidates) >= familyArtPool {
+				continue
+			}
+			kind := s.artKind(ctx, id)
+			if kind == "" {
+				continue
+			}
+			kinds[id] = kind
+			candidates = append(candidates, id)
+		}
+	}
+	id, ok := domain.PickFamilyArt(key, quarter, candidates)
+	if !ok {
+		return bundled
+	}
+	if err := s.repo.SaveFamilyArtPick(ctx, key, quarter, id); err != nil {
+		s.log.Warn("family art pick not stored", "family", key, "error", err)
+	}
+	return art(id, kinds[id])
+}
+
+// artKind is "backdrop" or "poster" for the artwork a title has, or "" when it has none.
+func (s *Service) artKind(ctx context.Context, titleID string) string {
+	metadata, err := s.repo.GetCatalogMetadata(ctx, titleID)
+	switch {
+	case err != nil:
+		return ""
+	case metadata.BackdropPath != "":
+		return "backdrop"
+	case metadata.PosterPath != "":
+		return "poster"
+	}
+	return ""
+}
+
+// inFamily reports whether the title still has a discoverable source in one of the family's categories.
+func (s *Service) inFamily(ctx context.Context, titleID string, categories []string) bool {
+	sources, err := s.repo.ListCatalogSourcesByTitleIDs(ctx, []string{titleID}, s.eligibleTrackerIDs())
+	if err != nil {
+		return false
+	}
+	return len(filterCatalogSources(sources, domain.CatalogQuery{Categories: categories})) > 0
+}
+
+// familyCategories returns the raw tracker categories of a family that exist in
+// the catalog. An unknown family key is an error; a known family with no
+// categories yields none.
+func (s *Service) familyCategories(ctx context.Context, key string) ([]string, error) {
+	if _, ok := domain.CategoryFamilyByKey(key); !ok {
+		return nil, fmt.Errorf("unknown category family %q", key)
+	}
+	items, err := s.CatalogFamilies(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		if item.Key == key {
+			return item.Categories, nil
+		}
+	}
+	return nil, nil
+}
