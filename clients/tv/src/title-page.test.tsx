@@ -72,6 +72,30 @@ describe('TV title page', () => {
     await wait();
   };
 
+  describe('backdrop art', () => {
+    const layer = () => container.querySelector<HTMLElement>('.detail-screen .tv-backdrop-art.on');
+    const root = () => container.querySelector('.detail-screen .tv-backdrop')!;
+
+    it('shows the title backdrop sharp, not the blurred follow-focus layer', async () => {
+      await open({ title: title({ backdropUrl: '/art/back.jpg', posterUrl: '/art/poster.jpg' }), seasons: [], sources: [source('only')] });
+      expect(root().classList.contains('sharp')).toBe(true);
+      expect(root().classList.contains('poster-only')).toBe(false);
+      expect(layer()?.style.backgroundImage).toContain('/art/back.jpg');
+    });
+
+    it('falls back to the poster, placed rather than stretched, when there is no backdrop', async () => {
+      await open({ title: title({ posterUrl: '/art/poster.jpg' }), seasons: [], sources: [source('only')] });
+      expect(root().classList.contains('poster-only')).toBe(true);
+      expect(layer()?.style.backgroundImage).toContain('/art/poster.jpg');
+    });
+
+    it('keeps the designed fallback for a title with no artwork', async () => {
+      await open({ title: title(), seasons: [], sources: [source('only')] });
+      expect(root().classList.contains('sharp')).toBe(true);
+      expect(layer()?.style.backgroundImage ?? '').toBe('');
+    });
+  });
+
   describe('best version Play', () => {
     const movie = (): CatalogDetail => ({ title: title(), seasons: [], sources: [
       source('newest-720p', { resolution: '720p' }, { seeders: 90 }),

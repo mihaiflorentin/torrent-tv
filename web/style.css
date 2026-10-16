@@ -1258,10 +1258,6 @@ dl .tracker-badge,
  background: var(--tt-raised);
 }
 
-.detail-art img {
- opacity: var(--tt-backdrop-art-opacity);
-}
-
 .detail-art .art-fallback {
  background-color: var(--tt-raised);
 }
@@ -1271,10 +1267,11 @@ dl .tracker-badge,
 }
 
 .detail-scrim {
+ /* The art is shown sharp and undimmed; this scrim only holds under the text and lets the right side through. */
  position: absolute;
  inset: 0;
  z-index: -1;
- background: linear-gradient(90deg, var(--tt-scrim-text) 0%, var(--tt-scrim-text) 78%, var(--tt-scrim-top) 100%);
+ background: linear-gradient(90deg, var(--tt-scrim-text) 0%, var(--tt-scrim-text) 62%, transparent 100%);
 }
 
 .detail-poster {

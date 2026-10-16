@@ -75,6 +75,32 @@ describe('TV stylesheets use the Velvet Booth tokens', () => {
     expect(art).not.toMatch(/transition:[^;]*(width|height|filter)/);
   });
 
+  // Title page art (DESIGN.md "Backdrop art"): the picture the viewer opened, shown as it is.
+  it('draws the title page backdrop at full resolution with no blur, no scale and full opacity', () => {
+    const text = css('tv.css');
+    const art = /\.tv-backdrop\.sharp \.tv-backdrop-art\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(art).toMatch(/width:\s*1920px/);
+    expect(art).toMatch(/height:\s*1080px/);
+    expect(art).toMatch(/-webkit-filter:\s*none/);
+    expect(art).toMatch(/\bfilter:\s*none/);
+    expect(art).toMatch(/transform:\s*none/);
+    expect(/\.tv-backdrop\.sharp \.tv-backdrop-art\.on\s*\{([^{}]*)\}/.exec(text)?.[1]).toMatch(/opacity:\s*1\b/);
+    expect(art).not.toMatch(/blur\(/);
+  });
+
+  it('places a poster standing in for a backdrop at the right edge at screen height instead of cropping it', () => {
+    const poster = /\.tv-backdrop\.sharp\.poster-only \.tv-backdrop-art\s*\{([^{}]*)\}/.exec(css('tv.css'))?.[1] ?? '';
+    expect(poster).toMatch(/background-size:\s*auto 100%/);
+    expect(poster).toMatch(/background-position:\s*right center/);
+    expect(poster).toMatch(/background-repeat:\s*no-repeat/);
+  });
+
+  it('darkens the title page art from the left and the bottom with the scrim tokens, not a flat veil', () => {
+    const scrim = /\.tv-backdrop\.sharp \.tv-backdrop-scrim\s*\{([^{}]*)\}/.exec(css('tv.css'))?.[1] ?? '';
+    expect(scrim).toMatch(/linear-gradient\(0deg,[^;]*var\(--tt-scrim-bottom\)/);
+    expect(scrim).toMatch(/linear-gradient\(90deg,[^;]*var\(--tt-scrim-text\)/);
+  });
+
   it('fades the player bar as one layer and hides it after the fade so it cannot take focus', () => {
     const text = css('tv.css');
     const hidden = /\.player-controls\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
