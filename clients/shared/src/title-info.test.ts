@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { API, castInitials, episodeAirLabel, episodeRowView, episodeView, formatRuntime, formatShortDate, infoCrumbs, infoEpisodeCode, infoView, releaseLine, seasonCardView, seasonDetailView, seasonLabel } from '@torrent-tv/shared';
+import { API, castInitials, episodeAirLabel, episodePageView, episodeRowView, episodeView, formatRuntime, formatShortDate, infoCrumbs, infoEpisodeCode, infoView, releaseLine, seasonCardView, seasonDetailView, seasonLabel } from '@torrent-tv/shared';
 import type { TitleInfo } from '@torrent-tv/shared';
 
 // Info panel and listing release-date decisions both clients share. Manual month names: Tizen 5 and webOS 4 ship limited Intl.
@@ -166,5 +166,36 @@ describe('API season endpoints', () => {
       'http://tv.local:8080/api/v1/catalog/titles/a%2Fb/info/seasons/2',
       'http://tv.local:8080/api/v1/catalog/titles/a%2Fb/info/seasons/2/episodes/5',
     ]);
+  });
+});
+
+describe('episodePageView', () => {
+  const now = new Date('2026-10-17T12:00:00Z');
+  const listed = { number: 4, title: 'Among the Lotus Eaters', season: 2, airDate: '2012-04-22', sourceCount: 2 };
+
+  it('without provider info falls back to the title detail: code, air date, the episode name and the series overview', () => {
+    const view = episodePageView(2, listed, undefined, 'A series overview.', now);
+    expect(view.code).toBe('S02E04');
+    expect(view.title).toBe('Among the Lotus Eaters');
+    expect(view.meta).toEqual([episodeAirLabel('2012-04-22', now)]);
+    expect(view.overview).toBe('A series overview.');
+    expect(view.stillUrl).toBeUndefined();
+    expect(view.credits).toEqual([]);
+    expect(view.rowMeta).toBe(episodeAirLabel('2012-04-22', now));
+  });
+
+  it('with provider info adds runtime, rating, the synopsis, the still and the credits', () => {
+    const view = episodePageView(2, listed, { number: 4, name: 'Lotus', runtimeMinutes: 55, rating: 8.5, overview: 'They land.', stillUrl: '/still.jpg', directors: ['D'] }, 'Series.', now);
+    expect(view.meta.slice(1)).toEqual(['55 min', '8.5 / 10']);
+    expect(view.overview).toBe('They land.');
+    expect(view.stillUrl).toBe('/still.jpg');
+    expect(view.credits).toEqual([{ label: 'Director', names: 'D' }]);
+    expect(view.title).toBe('Among the Lotus Eaters');
+  });
+
+  it('an episode with no air date and no info still has a code and a title, and no empty facts', () => {
+    const view = episodePageView(2, { number: 4, title: 'Four' }, undefined, '', now);
+    expect(view.meta).toEqual([]);
+    expect(view.overview).toBe('');
   });
 });

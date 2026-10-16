@@ -1,6 +1,6 @@
 // Shared, framework-free decisions for release dates and the Info panel, so the TV and the browser
 // word dates and order facts identically. Pure, and Intl-free: Tizen 5 / webOS 4 ship limited Intl.
-import type { CatalogTitle, InfoEpisode, InfoSeason, InfoSeasonDetail, TitleInfo } from './index';
+import type { CatalogEpisode, CatalogTitle, InfoEpisode, InfoSeason, InfoSeasonDetail, TitleInfo } from './index';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -216,4 +216,30 @@ export function episodeView(season: number, episode: InfoEpisode | undefined, no
   view.guests = episode.guestStars || [];
   view.hasDetails = Boolean(view.overview || view.credits.length || view.guests.length || episode.stillUrl);
   return view;
+}
+
+export interface EpisodePageView {
+  /** 'S02E04' */
+  code: string;
+  title: string;
+  /** Air date, runtime, rating: only the facts that are known. */
+  meta: string[];
+  /** The same facts as one line, for an episode row. */
+  rowMeta: string;
+  badges: string[];
+  overview: string;
+  credits: EpisodeView['credits'];
+  /** The provider's still; absent without detailed info, and the client then shows the title's own art. */
+  stillUrl?: string;
+}
+
+/**
+ * What the series page shows for an episode, with or without detailed info. The title detail's own episode (name, air date) always
+ * answers; cached Season info adds runtime, rating, synopsis, still and credits; the series overview stands in for a missing synopsis.
+ */
+export function episodePageView(season: number, listed: Pick<CatalogEpisode, 'number' | 'title' | 'airDate'>, info: InfoEpisode | undefined, fallbackOverview: string = '', now: Date = new Date()): EpisodePageView {
+  const merged: InfoEpisode = { ...info, number: listed.number, name: listed.title || info?.name, airDate: info?.airDate || listed.airDate };
+  const view = episodeView(season, merged, now);
+  const meta = view.meta;
+  return { code: view.code, title: view.title, meta, rowMeta: meta.join(' · '), badges: view.badges, overview: view.overview || fallbackOverview, credits: view.credits, stillUrl: info?.stillUrl || undefined };
 }

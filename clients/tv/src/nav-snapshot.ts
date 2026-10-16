@@ -16,13 +16,15 @@ export interface NavSnapshot {
   /** The open Category family on a Categories page, and its raw-category chip. */
   family?: string;
   familyCategory?: string;
+  /** The episode key whose full-screen Versions view is open on a series title page. */
+  versions?: string;
 }
 
 export function navSort(value: string): NavSort {
   return value === 'seeders' || value === 'title' || value === 'rating' ? value : 'newest';
 }
 
-export function captureNav(state: { route: string; detail: { id: string; title: string } | null; target: NavTarget; query: string; category: string; sort: string; family?: string; familyCategory?: string }): NavSnapshot {
+export function captureNav(state: { route: string; detail: { id: string; title: string } | null; target: NavTarget; query: string; category: string; sort: string; family?: string; familyCategory?: string; versions?: string }): NavSnapshot {
   const snapshot: NavSnapshot = {
     route: state.route,
     titleId: state.detail ? state.detail.id : '',
@@ -34,6 +36,7 @@ export function captureNav(state: { route: string; detail: { id: string; title: 
     focusKey: '',
   };
   if (state.family) { snapshot.family = state.family; snapshot.familyCategory = state.familyCategory || '' }
+  if (state.versions) snapshot.versions = state.versions;
   return snapshot;
 }
 

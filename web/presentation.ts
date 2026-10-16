@@ -28,8 +28,9 @@ export function kindLabel(title: Pick<CatalogTitle, 'kind' | 'seasonCount'>): st
 export const titleFacts = (title: CatalogTitle): string[] => [releaseLine(title), kindLabel(title)].filter(Boolean);
 
 // Episode row second line: versions, then the air date ('Upcoming' when it is ahead).
-export function episodeFacts(episode: { sourceCount: number; airDate?: string }, now?: Date): string {
-  return [plural(episode.sourceCount, 'version'), episodeAirLabel(episode.airDate, now)].filter(Boolean).join(' · ');
+// `facts` replaces the air date when cached episode info supplies air date, runtime and rating.
+export function episodeFacts(episode: { sourceCount: number; airDate?: string }, now?: Date, facts?: string): string {
+  return [plural(episode.sourceCount, 'version'), facts === undefined ? episodeAirLabel(episode.airDate, now) : facts].filter(Boolean).join(' · ');
 }
 
 // Poster card caption: release (month and year; a series 'Since <year>'), best resolution, the rating once when it has votes.

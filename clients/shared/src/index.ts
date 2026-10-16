@@ -295,7 +295,7 @@ export { buildPath, parsePath } from './routes';
 export type { Route, View } from './routes';
 export { formatEtaLeft, prepareHint, readyLine, readyPercent } from './getting-ready';
 
-export { castInitials, EPISODE_EMPTY, EPISODE_LOADING, episodeAirLabel, episodeRowView, episodeView, formatRuntime, formatShortDate, infoCrumbs, infoEpisodeCode, infoView, releaseLine, SEASON_EMPTY, SEASON_LOADING, seasonCardView, seasonDetailView, seasonLabel, SEASONS_EMPTY, SEASONS_LOADING } from './title-info';
-export type { EpisodeRowView, EpisodeView, InfoLevel, InfoView, SeasonCardView, SeasonDetailView } from './title-info';
+export { castInitials, EPISODE_EMPTY, EPISODE_LOADING, episodeAirLabel, episodePageView, episodeRowView, episodeView, formatRuntime, formatShortDate, infoCrumbs, infoEpisodeCode, infoView, releaseLine, SEASON_EMPTY, SEASON_LOADING, seasonCardView, seasonDetailView, seasonLabel, SEASONS_EMPTY, SEASONS_LOADING } from './title-info';
+export type { EpisodePageView, EpisodeRowView, EpisodeView, InfoLevel, InfoView, SeasonCardView, SeasonDetailView } from './title-info';
 export { familyCountLabel, familyNewestLine, familyTileLabel } from './families';
 export type { CategoryFamily, FamilyArt } from './families';

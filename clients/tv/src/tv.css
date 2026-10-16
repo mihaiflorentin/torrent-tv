@@ -1129,7 +1129,7 @@ button.primary.active {
  border-top: 1px solid var(--tt-line)
 }
 
-/* Two panes under the season bar: episodes left, the selected episode's versions right. Each scrolls on its own;
+/* The episode list under the season bar scrolls on its own;
    flexbox only (no grid) for Chromium 53. */
 .season-panes {
  display: -webkit-box;
@@ -1147,35 +1147,89 @@ button.primary.active {
  margin-right: var(--tt-space-5)
 }
 
-.versions-pane {
- -webkit-box-flex: 1;
- flex: 1 1 0;
- min-width: 0;
+/* Versions view: after OK on an episode the list steps aside and that episode's versions take the whole width.
+   Flexbox only; the page scrolls, so the view adds no scroll area of its own. */
+.versions-view {
+ display: block;
+ padding: var(--tt-space-1) var(--tt-space-2) var(--tt-space-3)
+}
+
+.versions-head {
  display: -webkit-box;
  display: flex;
- flex-direction: column;
- padding-left: var(--tt-space-5);
- border-left: 1px solid var(--tt-line)
+ align-items: baseline;
+ justify-content: space-between;
+ padding-bottom: var(--tt-space-3);
+ border-bottom: 1px solid var(--tt-line)
 }
 
-.versions-head small {
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-bold);
- letter-spacing: .08em;
- text-transform: uppercase
-}
-
-.versions-head h3 {
- margin: var(--tt-space-1) 0 0;
+.versions-title {
+ min-width: 0;
+ margin: 0;
  font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-black)
+ font-weight: var(--tt-weight-black);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
-.versions-scroll {
- max-height: 520px;
- overflow-y: auto;
- padding: var(--tt-space-1) var(--tt-space-3) var(--tt-space-3) var(--tt-space-2)
+.versions-label {
+ color: var(--tt-accent)
+}
+
+.versions-hint {
+ -webkit-box-flex: 0;
+ flex: 0 0 auto;
+ margin-left: var(--tt-space-5);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta)
+}
+
+.versions-list {
+  padding: var(--tt-space-1) var(--tt-space-3) var(--tt-space-3)
+}
+
+/* The episode block is the Info panel's episode level: its still, facts line, title and synopsis, then the versions below.
+   The still and text styles are the shared .info-* ones; only the arrangement is set here. */
+.versions-view .info-crumbs {
+ margin-top: var(--tt-space-3)
+}
+
+.versions-episode {
+ display: -webkit-box;
+ display: flex;
+ align-items: flex-start;
+ margin-top: var(--tt-space-4)
+}
+
+.versions-episode .info-still {
+ -webkit-box-flex: 0;
+ flex: 0 0 auto;
+ width: 480px;
+ height: 270px;
+ margin: 0 var(--tt-space-6) 0 0
+}
+
+.versions-episode-copy {
+ -webkit-box-flex: 1;
+ flex: 1 1 0;
+ min-width: 0
+}
+
+.versions-episode-copy>span {
+ display: block
+}
+
+.versions-episode .info-overview {
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 5;
+ overflow: hidden
+}
+
+.versions-view .info-subheading {
+ padding: 0;
+ margin-top: var(--tt-space-5)
 }
 
 .versions-empty {
@@ -1183,7 +1237,7 @@ button.primary.active {
  color: var(--tt-text-muted)
 }
 
-/* The selected episode stays marked while focus is in the versions pane: a tint plus a bar, never colour alone. */
+/* The selected episode stays marked in the list: a tint plus a bar, never colour alone. */
 .episode-tile.selected {
  background: var(--tt-accent-soft);
  border-color: var(--tt-accent-line);
@@ -1203,29 +1257,11 @@ button.primary.active {
  text-align: left
 }
 
-.episode-tile>span {
- display: flex;
- flex-direction: column;
- min-width: 0
-}
-
-.episode-tile>span>*+* {
- margin-top: var(--tt-space-1)
-}
-
-.episode-tile b {
- font-weight: var(--tt-weight-bold)
-}
-
-.episode-tile small {
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta)
-}
-
 /* Episode progress: a static bar whose width is set by state, never animated. */
 .episode-tile .episode-progress {
  display: block;
  width: 360px;
+ margin-top: var(--tt-space-2);
  height: 10px;
  background: var(--tt-scrim-text);
  overflow: hidden
@@ -1272,30 +1308,44 @@ button.primary.active {
 
 .source-main {
  display: flex;
- align-items: center
+ align-items: center;
+ min-width: 0;
+ overflow: hidden
 }
 
 .source-main>*+* {
  margin-left: var(--tt-space-4)
 }
 
+/* Fixed columns, so resolutions, chips and numbers line up from one row to the next. */
 .source-resolution {
+ flex: 0 0 auto;
+ min-width: 120px;
  font-size: var(--tt-tv-text-lead);
  font-weight: var(--tt-weight-black)
 }
 
 .source-chip {
+ flex: 0 1 auto;
+ min-width: 0;
  padding: var(--tt-space-1) var(--tt-space-3);
  border: 1px solid var(--tt-line-strong);
  border-radius: var(--tt-radius-sm);
  font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
 .source-facts {
+ flex: 0 0 auto;
+ min-width: 360px;
  margin-left: auto;
  font-size: var(--tt-tv-text-body);
  font-weight: var(--tt-weight-medium);
+ font-variant-numeric: tabular-nums;
+ text-align: right;
  white-space: nowrap
 }
 
@@ -1316,16 +1366,25 @@ button.primary.active {
  font-weight: var(--tt-weight-bold)
 }
 
+/* Tracker and audio, then the release name on the same line; the name truncates with an ellipsis. */
+.source-detail {
+ display: flex;
+ align-items: baseline;
+ min-width: 0;
+ margin-top: var(--tt-space-1)
+}
+
 .source-secondary {
- margin-top: var(--tt-space-1);
+ flex: 0 0 auto;
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
 }
 
 .source-filename {
  display: block;
+ flex: 1 1 0;
+ min-width: 0;
  min-height: 34px;
- margin-top: var(--tt-space-1);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta);
  white-space: nowrap;
@@ -1333,6 +1392,14 @@ button.primary.active {
  text-overflow: ellipsis;
  opacity: 0;
  transition: opacity var(--tt-dur-fast)
+}
+
+.source-best,
+.source-best-slot {
+ flex: 0 0 auto;
+ box-sizing: border-box;
+ width: 150px;
+ text-align: center
 }
 
 .source-best {
@@ -1348,7 +1415,16 @@ button.primary.active {
  opacity: 1
 }
 
-/* Season packs: plain cards in the versions pane, controls always visible. */
+.source-secondary+.source-filename {
+ margin-left: var(--tt-space-4)
+}
+
+/* In the Versions view the name is part of the comparison, so it always shows. */
+.versions-view .source-filename {
+ opacity: 1
+}
+
+/* Season packs: plain cards in the Versions view, controls always visible. */
 .season-pack-downloads {
  margin: var(--tt-space-5) 0 var(--tt-space-3);
  padding-top: var(--tt-space-4);

@@ -23,9 +23,10 @@ export function heroFacts(title: CatalogTitle): string[] {
 }
 
 /** Episode tile second line: versions, the air date ('Upcoming' when ahead), then watch progress. */
-export function episodeMeta(episode: { sourceCount: number; airDate?: string }, progress: number, now?: Date): string {
+export function episodeMeta(episode: { sourceCount: number; airDate?: string }, progress: number, now?: Date, facts?: string): string {
   const versions = `${episode.sourceCount} version${episode.sourceCount === 1 ? '' : 's'}`;
-  return joined([versions, episodeAirLabel(episode.airDate, now), progress > 0 ? `${progress}% watched` : '']);
+  // `facts` replaces the air line when cached episode info supplies air date, runtime and rating.
+  return joined([versions, facts === undefined ? episodeAirLabel(episode.airDate, now) : facts, progress > 0 ? `${progress}% watched` : '']);
 }
 
 /**

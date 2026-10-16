@@ -1574,30 +1574,34 @@ dl .tracker-badge,
  margin-top: var(--tt-space-3);
 }
 
-.versions-pane {
- flex: 1 1 0;
- min-width: 0;
- max-height: 560px;
- overflow-y: auto;
- padding: 2px 2px var(--tt-space-2) var(--tt-space-5);
- border-left: 1px solid var(--tt-line);
+/* Versions view: clicking an episode swaps the list for that episode's versions, full width, with a way back. */
+.versions-view {
+ padding: var(--tt-space-4) var(--tt-space-6) var(--tt-space-6);
+}
+
+.versions-bar {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ gap: var(--tt-space-2) var(--tt-space-4);
+ margin-bottom: var(--tt-space-3);
 }
 
 .versions-head {
  margin-bottom: var(--tt-space-3);
+ padding-bottom: var(--tt-space-3);
+ border-bottom: 1px solid var(--tt-line);
 }
 
-.versions-head small {
- color: var(--tt-text-muted);
- font-size: var(--tt-text-xs);
- font-weight: var(--tt-weight-bold);
- letter-spacing: 0.08em;
- text-transform: uppercase;
-}
-
-.versions-head h3 {
- margin: var(--tt-space-1) 0 0;
+.versions-title {
+ margin: 0;
  font-size: var(--tt-text-lg);
+ font-weight: var(--tt-weight-black);
+ overflow-wrap: anywhere;
+}
+
+.versions-view .source-rows.compact {
+ padding: 0;
 }
 
 .versions-empty {
@@ -1617,11 +1621,11 @@ dl .tracker-badge,
  white-space: nowrap;
 }
 
+/* An episode row is the Info dialog's episode row (.info-still-small, .info-row-copy, .info-chevron); only the button shell is set here. */
 .episode-select {
- display: grid;
- grid-template-columns: minmax(0, 1fr) auto;
+ display: flex;
  align-items: center;
- justify-content: stretch;
+ justify-content: flex-start;
  gap: var(--tt-space-3);
  width: 100%;
  padding: var(--tt-space-2) var(--tt-space-4);
@@ -1631,22 +1635,46 @@ dl .tracker-badge,
  text-align: left;
 }
 
-.episode-copy {
- display: flex;
- flex-direction: column;
- min-width: 0;
+.episode-select .info-still-small {
+ margin-right: var(--tt-space-1);
 }
 
-.episode-copy > strong {
- overflow: hidden;
- text-overflow: ellipsis;
+.episode-select .info-row-copy small {
  white-space: nowrap;
 }
 
-.episode-copy > small {
- color: var(--tt-text-muted);
- font-size: var(--tt-text-sm);
- font-weight: var(--tt-weight-regular);
+/* The episode block of the Versions view: the Info dialog's episode level, still beside its facts. */
+.versions-episode {
+ display: flex;
+ flex-wrap: wrap;
+ gap: var(--tt-space-4) var(--tt-space-5);
+ margin-bottom: var(--tt-space-4);
+}
+
+.versions-episode .info-still {
+ flex: 0 1 360px;
+ min-width: 200px;
+ margin: 0;
+}
+
+.versions-episode-copy {
+ flex: 1 1 280px;
+ min-width: 0;
+}
+
+.versions-episode .info-episode-title {
+ margin: 0 0 var(--tt-space-2);
+ font-size: var(--tt-text-xl);
+ overflow-wrap: anywhere;
+}
+
+.versions-subheading {
+ margin: 0 0 var(--tt-space-3);
+ font-size: var(--tt-text-lg);
+}
+
+.versions-bar .info-crumbs ol {
+ margin: 0;
 }
 
 .episode-loading {
@@ -3281,31 +3309,27 @@ dl .tracker-badge,
  }
 }
 
-/* Narrow windows: the versions of the selected episode stack under the episode list. */
+/* Narrow windows: the episode list takes the full width. */
 @media (max-width: 959px) {
- .season-panes {
-  flex-direction: column;
-  align-items: stretch;
- }
-
- .episode-pane,
- .versions-pane {
-  flex: 0 0 auto;
+ .episode-pane {
+  flex: 1 1 auto;
   max-height: none;
   overflow: visible;
-  padding-left: 0;
-  border-left: 0;
- }
-
- .versions-pane {
-  padding-top: var(--tt-space-4);
-  border-top: 1px solid var(--tt-line);
  }
 }
 
 /* ---------- Phone: the rail becomes a bottom bar, every list is one column ---------- */
 
 @media (max-width: 640px) {
+ .versions-view {
+  padding-left: var(--tt-space-4);
+  padding-right: var(--tt-space-4);
+ }
+
+ .versions-back {
+  width: 100%;
+ }
+
  .sidebar {
   top: auto;
   right: 0;

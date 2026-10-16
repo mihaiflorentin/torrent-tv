@@ -1,7 +1,7 @@
 import { Fragment, render, type JSX } from 'preact';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, rankSources, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSeason, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
-import { episodeAirLabel } from '@torrent-tv/shared';
+import { episodeAirLabel, episodePageView, infoCrumbs, type InfoSeasonDetail } from '@torrent-tv/shared';
 import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation, visibleFocusables } from './navigation';
 import { LANDING_REQUEST_EVENT, landingTarget, requestLanding, useLanding } from './landing';
 import { PROJECTS_MENU_ROW, REBUILD_DIALOG_REGION, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_DIAGNOSTICS_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_REBUILD_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, UPDATE_RELEASE_LINK_ROW, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
@@ -17,7 +17,7 @@ import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL
 import { detectCapabilities } from './capability';
 import { memo, useStableCallback } from './memo';
 import { createStatusStore, useStatus, type StatusStore } from './status-store';
-import { inReach, inRowReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach, useRowReach } from './lazy-art';
+import { inReach, inRowReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach, useListArtReach, useRowReach } from './lazy-art';
 import { FamilyChips, FamilyTiles } from './families';
 import type { CategoryFamily } from '@torrent-tv/shared';
 import { TitleInfoPanel } from './title-info-panel';
@@ -598,6 +598,10 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  const [detail, setDetail] = useState<CatalogDetail | null>(null);
  const [detailTarget, setDetailTarget] = useState<DetailTarget>({});
  const [detailMessage, setDetailMessage] = useState('');
+ // The episode whose Versions view the open title page shows ('' = the episode list). Reported by the page so the navigation snapshot can bring the viewer back to it after playback; restoreVersions hands the saved one to the first page that opens.
+ const [versionsKey, setVersionsKey] = useState('');
+ const restoreVersions = useRef(initialNav?.versions || '');
+ const reportVersions = useCallback((key: string) => { if (!key) restoreVersions.current = ''; setVersionsKey(key) }, []);
  // Home hero Info panel: the title whose details are open, so Back can return focus to the hero button.
  const [heroInfo, setHeroInfo] = useState<CatalogTitle | null>(null);
  // Loading and failure feedback for opening a title: the detail screen is not mounted yet, so its own message cannot show it.
@@ -672,7 +676,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  const openLibraryItem = useStableCallback(async (item: HouseholdItem) => { const id = item.titleId || item.catalog?.id; if (!id) { setDetailMessage('This library item is not linked to a catalog title yet. Refresh the catalog and try again.'); return } const title = item.catalog || { id, title: item.release.name, kind: 'movie', trackers: item.release.trackerId ? [{ id: item.release.trackerId, name: item.release.trackerName }] : [], categories: [], resolutions: [], sourceCount: 1, bestSeeders: item.release.seeders, largestSizeBytes: item.release.sizeBytes } as CatalogTitle; await openTitle(title, { season: item.seasonNumber, episode: item.episodeNumber }) });
  // Rehydrate the open title through the same path as a normal open (fresh fetch, so Resume reflects the new position; failure falls back to the route list with the usual notice), and report the current spot so App can keep it while the Player owns the screen.
  useEffect(() => { if (initialNav && initialNav.titleId) void openTitle({ id: initialNav.titleId, title: initialNav.titleName, kind: 'movie', trackers: [], categories: [], resolutions: [], sourceCount: 0, bestSeeders: 0, largestSizeBytes: 0 } as CatalogTitle, initialNav.target) }, []);
- useEffect(() => { onNav?.(captureNav({ route, detail: detail ? { id: detail.title.id, title: detail.title.title } : null, target: detailTarget, query, category, sort, family: familyKey, familyCategory: familyChip })) }, [route, detail?.title.id, detailTarget, query, category, sort, familyKey, familyChip]);
+ useEffect(() => { onNav?.(captureNav({ route, detail: detail ? { id: detail.title.id, title: detail.title.title } : null, target: detailTarget, query, category, sort, family: familyKey, familyCategory: familyChip, versions: detail ? versionsKey : '' })) }, [route, detail?.title.id, detailTarget, query, category, sort, familyKey, familyChip, versionsKey]);
  const manageSeasonPack = async (source: CatalogSource, season: number, action: SeasonPackAction) => {
   const isAcquire = action === 'download' || (action === 'retry' && !source.libraryState?.downloadId);
   if (!isAcquire) setDetailMessage(`Updating season ${season} download…`);
@@ -809,7 +813,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
    </>}
   </section>
  ) : null;
- if (detail) return <><TitleDetail key={`${detail.title.id}:${detailTarget.season || 0}:${detailTarget.episode || 0}`} api={api} detail={detail} target={detailTarget} message={detailMessage} resume={resumeForTitle(household.continueWatching, detail.title.id)} favorite={favoriteIDs.has(detail.title.id)} onClose={onBack} onFavorite={onFavorite} onResume={item => onPlay(item.release, item.fileIndex, item.positionMs)} onPlay={onPlay} onPackAction={manageSeasonPack} />{preparingModal}</>;
+ if (detail) return <><TitleDetail key={`${detail.title.id}:${detailTarget.season || 0}:${detailTarget.episode || 0}`} api={api} detail={detail} target={detailTarget} message={detailMessage} resume={resumeForTitle(household.continueWatching, detail.title.id)} initialVersions={initialNav?.titleId === detail.title.id ? restoreVersions.current : ''} restoreKey={initialNav?.focusKey || ''} onVersions={reportVersions} favorite={favoriteIDs.has(detail.title.id)} onClose={onBack} onFavorite={onFavorite} onResume={item => onPlay(item.release, item.fileIndex, item.positionMs)} onPlay={onPlay} onPackAction={manageSeasonPack} />{preparingModal}</>;
  return <div class={`tv-app ${menuOpen ? 'menu-open' : ''}`}>
   <Backdrop key={route} initial={initialArt} />
   <aside class="tv-sidebar"><div class="tv-brand"><span>{appIdentity().monogram}</span><b>{appIdentity().name}</b></div>{menuGroups.map((group, groupIndex) => <div class="tv-menu-group">{group.label && <small>{group.label}</small>}{group.items.map((item, index) => <button data-menu-route={item.id} data-focus-region="sidebar" data-focus-row={groupIndex * 10 + index} data-focus-col="0" data-focus-key={`menu-${item.id}`} class={route === item.id ? 'active' : ''} aria-current={route === item.id ? 'page' : undefined} onClick={() => chooseRoute(item.id)}><i>{item.icon}</i><span>{item.label}</span></button>)}</div>)}{portal && portal.links.length > 0 && <button data-menu-route="projects" data-focus-region="sidebar" data-focus-row={PROJECTS_MENU_ROW} data-focus-col="0" data-focus-key="menu-projects" class={route === 'projects' ? 'active' : ''} aria-current={route === 'projects' ? 'page' : undefined} onClick={() => chooseRoute('projects')}><i>↗</i><span>Other projects</span></button>}</aside>
@@ -1172,9 +1176,8 @@ function SourceButton({ source, row, onPlay, focusKey, region = 'content', best 
  const secondary = [source.release.trackerName, source.parsed.audio].filter(Boolean).join(' · ');
  // The decision point: resolution, chips, size and seeders lead. Tracker and audio are secondary; the release and file name is evidence and shows only while the row has focus.
  return <button class={`source-button ${best ? 'best' : ''}`} data-focus-region={region} data-focus-row={row} data-focus-col="0" data-focus-key={focusKey || `source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}>
-  <span class="source-main"><b class="source-resolution">{sourceHeadline(source.parsed)}</b>{best && <span class="source-best">Best match</span>}{sourceChips(source.parsed, source.release.category).map(chip => <span class="source-chip">{chip}</span>)}<span class="source-facts">{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b></span></span>
-  {secondary && <span class="source-secondary">{secondary}</span>}
-  <span class="source-filename" title={name}>{name}</span>
+  <span class="source-main"><b class="source-resolution">{sourceHeadline(source.parsed)}</b>{best ? <span class="source-best">Best match</span> : best === false && <span class="source-best-slot" aria-hidden="true" />}{sourceChips(source.parsed, source.release.category).map(chip => <span class="source-chip">{chip}</span>)}<span class="source-facts">{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b></span></span>
+  <span class="source-detail">{secondary && <span class="source-secondary">{secondary}</span>}<span class="source-filename" title={name}>{name}</span></span>
  </button>;
 }
 
@@ -1195,7 +1198,10 @@ function TVSeasonPackCard({ source, season, row, onAction, onDelete }: { source:
  </article>;
 }
 
+const hideImage = (event: Event) => { (event.currentTarget as HTMLElement).style.display = 'none' };
 const episodeKeyOf = (episode: { season: number; number: number }) => `${episode.season}:${episode.number}`;
+// The season an episode key ("2:4", or "unknown-2" for the loose files) belongs to; 0 for none.
+const versionsSeasonOf = (key: string) => Number(/^(?:unknown-)?(\d+)/.exec(key)?.[1] || 0);
 // The episode that opens selected in the versions pane: the link's target, the saved progress, else the first one not yet watched.
 function defaultEpisodeOf(season: CatalogSeason | undefined, target: DetailTarget, resume?: HouseholdItem): CatalogEpisode | undefined {
  if (!season) return undefined;
@@ -1205,17 +1211,41 @@ function defaultEpisodeOf(season: CatalogSeason | undefined, target: DetailTarge
 }
 const paneFocusable = (selector: string) => document.querySelector<HTMLElement>(selector);
 
-function TitleDetail({ api, detail, target, message, resume, favorite, onClose, onFavorite, onResume, onPlay, onPackAction }: { api: API; detail: CatalogDetail; target: DetailTarget; message: string; resume?: HouseholdItem; favorite: boolean; onClose: () => void; onFavorite: (title: CatalogTitle, value: boolean) => void; onResume: (item: HouseholdItem) => void; onPlay: (release: Release, fileIndex?: number) => void; onPackAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean> }) {
- // Season to open: the link's target, else the season of the saved progress, else the first.
- const [season, setSeason] = useState(() => target.season || (resume?.seasonNumber && detail.seasons.some(item => item.number === resume.seasonNumber) ? resume.seasonNumber : 0) || detail.seasons[0]?.number || 0);
- // The episode whose versions show on the right; '' follows the default. Focus selects it after a short pause.
+function TitleDetail({ api, detail, target, message, resume, initialVersions = '', restoreKey = '', onVersions, favorite, onClose, onFavorite, onResume, onPlay, onPackAction }: { api: API; detail: CatalogDetail; target: DetailTarget; message: string; resume?: HouseholdItem; initialVersions?: string; restoreKey?: string; onVersions?: (key: string) => void; favorite: boolean; onClose: () => void; onFavorite: (title: CatalogTitle, value: boolean) => void; onResume: (item: HouseholdItem) => void; onPlay: (release: Release, fileIndex?: number) => void; onPackAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean> }) {
+ // Season to open: the Versions view being restored, else the link's target, else the season of the saved progress, else the first.
+ const [season, setSeason] = useState(() => { const restored = versionsSeasonOf(initialVersions); return (detail.seasons.some(item => item.number === restored) ? restored : 0) || target.season || (resume?.seasonNumber && detail.seasons.some(item => item.number === resume.seasonNumber) ? resume.seasonNumber : 0) || detail.seasons[0]?.number || 0 });
+ // The focused episode, which the list marks; '' follows the default. Focus selects it after a short pause.
  const [picked, setPicked] = useState('');
+ // The episode whose full-screen Versions view is open; '' shows the episode list.
+ const [opened, setOpened] = useState(initialVersions);
  const [pendingPack, setPendingPack] = useState<CatalogSource | null>(null);
  const [deleting, setDeleting] = useState(false);
  const [refreshing, setRefreshing] = useState(false);
  const [refreshNote, setRefreshNote] = useState('');
  const [infoOpen, setInfoOpen] = useState(false);
  const selected = detail.seasons.find(item => item.number === season);
+ // Season info (stills, runtime, rating, synopsis) is asked once per season, a moment after the season shows, and kept for the page.
+ // The page never waits on it: without an answer every row and block falls back to what the title detail holds.
+ const seasonInfo = useRef(new Map<number, InfoSeasonDetail | null>());
+ const [, setInfoTick] = useState(0);
+ useEffect(() => {
+  if (!season || seasonInfo.current.has(season)) return;
+  const timer = window.setTimeout(() => {
+   if (seasonInfo.current.has(season)) return;
+   seasonInfo.current.set(season, null);
+   try { Promise.resolve(api.seasonInfo(detail.title.id, season)).then(answer => { if (answer && answer.available) { seasonInfo.current.set(season, answer); setInfoTick(count => count + 1) } }, () => { /* no detailed info: the rows keep their basics */ }) } catch { /* an API without season info */ }
+  }, 400);
+  return () => window.clearTimeout(timer);
+ }, [season]);
+ const infoOf = (episode: { season: number; number: number }) => seasonInfo.current.get(episode.season)?.episodes.find(item => item.number === episode.number);
+ const art = useListArtReach();
+ useEffect(() => { art.reset() }, [season, opened]);
+ useEffect(() => {
+  const focused = (event: FocusEvent) => { const row = (event.target as HTMLElement | null)?.closest?.('[data-art-index]') as HTMLElement | null; if (row) art.focus(Number(row.dataset.artIndex)) };
+  document.addEventListener('focusin', focused);
+  return () => document.removeEventListener('focusin', focused);
+ }, []);
+ const titleArt = detail.title.backdropUrl || detail.title.posterUrl || '';
  // Best version: the primary Play prepares the top-ranked source of the selected season's target episode (movies: of the title).
  const playEpisode = selected && (target.episode && target.season === selected.number ? selected.episodes.find(item => item.number === target.episode) : undefined) || selected?.episodes[0];
  const firstSource = bestSourceForDetail(detail, { season: selected?.number, episode: playEpisode?.number });
@@ -1225,45 +1255,58 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
  const pickedValid = picked !== '' && (picked === unknownKey || Boolean(selected?.episodes.some(item => episodeKeyOf(item) === picked)));
  const selectedKey = pickedValid ? picked : defaultEpisode ? episodeKeyOf(defaultEpisode) : unknownKey;
  const selectedEpisode = selected?.episodes.find(item => episodeKeyOf(item) === selectedKey);
+ // A Versions view whose episode vanished in a data refresh falls back to the list; one that is still there never closes.
+ const openedValid = opened !== '' && (opened === unknownKey || Boolean(selected?.episodes.some(item => episodeKeyOf(item) === opened)));
+ const openedEpisode = openedValid ? selected?.episodes.find(item => episodeKeyOf(item) === opened) : undefined;
+ // A season that only has packs (its episode list is still being prepared) shows them in the Versions view straight away.
+ const packsOnly = Boolean(selected && selected.episodes.length === 0 && !unknownKey && (selected.packSources?.length || 0) > 0);
+ const versionsShown = openedValid || packsOnly;
+ const openedPage = openedEpisode ? episodePageView(openedEpisode.season, openedEpisode, infoOf(openedEpisode), detail.title.overview || '') : undefined;
  const timer = useRef(0);
- const enterFor = useRef('');
- const focusVersions = () => { const first = paneFocusable('[data-focus-region="versions"]'); if (first) focusElement(first); return Boolean(first) };
- // Move into the versions pane for an episode; a not-yet-committed pick is committed first and focus follows its render.
- const enterVersions = (key: string) => {
-  window.clearTimeout(timer.current);
-  if (key === selectedKey) { focusVersions(); return }
-  enterFor.current = key; setPicked(key);
- };
- useEffect(() => { if (enterFor.current && enterFor.current === selectedKey) { enterFor.current = ''; focusVersions() } });
- useEffect(() => () => window.clearTimeout(timer.current), []);
+ const focusIntent = useRef<'' | 'versions' | 'list'>('');
+ const returnKey = useRef('');
+ const focusVersions = () => { const first = paneFocusable('[data-focus-region="versions"]') || paneFocusable(`[data-focus-key="season-${season}"]`); if (first) focusElement(first) };
+ // Open the Versions view for an episode; focus follows its render, on the Best match.
+ const openVersions = (key: string) => { window.clearTimeout(timer.current); focusIntent.current = 'versions'; setPicked(key); setOpened(key) };
+ // Back to the episode list, focused on the episode the view was opened from.
+ const closeVersions = () => { if (!openedValid) return; window.clearTimeout(timer.current); returnKey.current = opened; focusIntent.current = 'list'; setOpened('') };
+ useEffect(() => {
+  if (focusIntent.current === 'versions' && openedValid) { focusIntent.current = ''; focusVersions() }
+  else if (focusIntent.current === 'list' && !openedValid) { focusIntent.current = ''; focusElement(paneFocusable(`[data-episode-key="${returnKey.current}"]`) || paneFocusable('[data-focus-region="episodes"]')) }
+ });
+ useEffect(() => { onVersions?.(openedValid ? opened : '') }, [opened, openedValid]);
+ useEffect(() => () => { window.clearTimeout(timer.current); onVersions?.('') }, []);
  const scheduleSelect = (key: string) => { window.clearTimeout(timer.current); if (key === selectedKey) return; timer.current = window.setTimeout(() => setPicked(key), 150) };
- const chooseVersion = () => { if (detail.seasons.length === 0) { focusElement(document.querySelector<HTMLElement>('.source-button')); return } const key = playEpisode ? episodeKeyOf(playEpisode) : selectedKey; if (key) enterVersions(key); else focusVersions() };
- useEffect(() => { const t = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(t); }, []);
+ const chooseVersion = () => { if (detail.seasons.length === 0) { focusElement(document.querySelector<HTMLElement>('.source-button')); return } const key = playEpisode ? episodeKeyOf(playEpisode) : selectedKey; if (key) openVersions(key); else focusVersions() };
+ // A page restored into its Versions view lands on the version the viewer left from, else the Best match, instead of the hero.
+ useEffect(() => { const t = window.setTimeout(() => { const back = initialVersions && restoreKey ? paneFocusable(`[data-focus-region="versions"][data-focus-key="${CSS.escape(restoreKey)}"]`) : null; focusElement(back || (initialVersions ? paneFocusable('[data-focus-region="versions"]') : null) || document.querySelector<HTMLElement>('[data-detail-initial]')) }, 0); return () => window.clearTimeout(t); }, []);
  useEffect(() => { if (!pendingPack) return; const t = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(t) }, [pendingPack]);
  const closePackDialog = () => { const pack = pendingPack; setPendingPack(null); if (pack) window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="season-pack-${pack.release.id}-delete"]`)), 0) };
  useEffect(() => { if (!pendingPack) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (!deleting) closePackDialog() }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [pendingPack, deleting]);
- // Pane movement. Up, Down and in-row moves inside a pane use the structured attributes; this only adds the moves between the panes and the season bar.
- const latest = useRef({ season, selectedKey, enterVersions });
- latest.current = { season, selectedKey, enterVersions };
+ // Moves between the episode list, the Versions view and the season bar. Up, Down and in-row moves inside each use the structured attributes.
+ const latest = useRef({ season, selectedKey, versionsShown, openVersions, closeVersions });
+ latest.current = { season, selectedKey, versionsShown, openVersions, closeVersions };
  useEffect(() => {
   const handle = (event: KeyboardEvent) => {
    const action = remoteAction(event.key, event.keyCode);
    const active = document.activeElement as HTMLElement | null;
+   const now = latest.current;
+   const consume = () => { event.preventDefault(); event.stopImmediatePropagation() };
+   // Back pops the Versions view before the page, from wherever the cursor is, unless a dialog sits on top and handles Back itself.
+   if (action === 'back' && now.versionsShown && !document.querySelector('[role="dialog"]')) { consume(); now.closeVersions(); return }
    if (!action || !active || !active.dataset) return;
    const region = active.dataset.focusRegion;
-   const now = latest.current;
-   const go = (element: HTMLElement | null) => { event.preventDefault(); event.stopImmediatePropagation(); focusElement(element) };
-   const episodeButton = () => paneFocusable(`[data-focus-region="episodes"][data-episode-key="${now.selectedKey}"]`) || paneFocusable('[data-focus-region="episodes"]');
+   const go = (element: HTMLElement | null) => { consume(); focusElement(element) };
+   const seasonTab = () => paneFocusable(`[data-focus-key="season-${now.season}"]`);
    if (region === 'episodes') {
-    if (action === 'right') { event.preventDefault(); event.stopImmediatePropagation(); now.enterVersions(active.dataset.episodeKey || now.selectedKey) }
-    else if (action === 'up' && active.dataset.focusRow === '0') go(paneFocusable(`[data-focus-key="season-${now.season}"]`));
+    if (action === 'right') { consume(); now.openVersions(active.dataset.episodeKey || now.selectedKey) }
+    else if (action === 'up' && active.dataset.focusRow === '0') go(seasonTab());
     else if (action === 'left') go(active);
    } else if (region === 'versions') {
-    if (action === 'up' && active.dataset.focusRow === '0') go(paneFocusable(`[data-focus-key="season-${now.season}"]`));
-    else if (action === 'back') go(episodeButton());
-    else if (action === 'left' && !chooseStructuredTarget(active, visibleFocusables(), 'left')) go(episodeButton() || active);
+    if (action === 'up' && active.dataset.focusRow === '0') go(seasonTab());
+    else if (action === 'left' && !chooseStructuredTarget(active, visibleFocusables(), 'left')) { consume(); now.closeVersions() }
    } else if (region === 'content' && action === 'down' && (active.dataset.focusKey || '').indexOf('season-') === 0 && active.dataset.focusRow === '2') {
-    go(episodeButton() || paneFocusable('[data-focus-region="versions"]') || active);
+    go(now.versionsShown ? paneFocusable('[data-focus-region="versions"]') || active : paneFocusable(`[data-focus-region="episodes"][data-episode-key="${now.selectedKey}"]`) || paneFocusable('[data-focus-region="episodes"]') || active);
    }
   };
   document.addEventListener('keydown', handle, true);
@@ -1277,11 +1320,11 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
   try { await api.refreshTitle(detail.title.id, detail.title.title, true) } catch (e) { setRefreshNote((e as Error).message) } finally { setRefreshing(false) }
  };
  const packs = selected?.packSources || [];
- const paneSources = selectedEpisode ? rankSources(selectedEpisode.sources, { season: selectedEpisode.season, episode: selectedEpisode.number }) : [];
+ const paneSources = openedEpisode ? rankSources(openedEpisode.sources, { season: openedEpisode.season, episode: openedEpisode.number }) : [];
  const unknownSources: CatalogSource[] = [];
- if (unknownKey && selectedKey === unknownKey && selected?.unknown) selected.unknown.forEach(episode => episode.sources.forEach(source => unknownSources.push(source)));
+ if (unknownKey && openedValid && opened === unknownKey && selected?.unknown) selected.unknown.forEach(episode => episode.sources.forEach(source => unknownSources.push(source)));
  const code = (value: number) => (value < 10 ? '0' : '') + value;
- const paneTitle = selectedEpisode ? `S${code(selectedEpisode.season)} · E${code(selectedEpisode.number)} · ${selectedEpisode.title}` : unknownSources.length > 0 && selected ? `S${code(selected.number)} · Unknown episodes` : selected ? `Season ${selected.number}` : '';
+ const paneTitle = openedEpisode ? `S${code(openedEpisode.season)} · E${code(openedEpisode.number)} · ${openedEpisode.title}` : openedValid && selected ? `S${code(selected.number)} · Unknown episodes` : selected ? `Season ${selected.number}` : '';
  const packBase = Math.max(paneSources.length, unknownSources.length);
  return <main class="detail-screen">
   <Backdrop initial={artURL(api, detail.title)} follow={false} sharp posterOnly={!detail.title.backdropUrl && !!detail.title.posterUrl} />
@@ -1305,38 +1348,55 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
   {refreshNote && <p class="detail-message" role="alert">{refreshNote}</p>}
   {detail.seasons.length > 0 && <section class="season-browser">
    <h2>Seasons</h2>
-   <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { window.clearTimeout(timer.current); setSeason(item.number); setPicked('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
-   <div class="season-panes">
+   <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { window.clearTimeout(timer.current); setSeason(item.number); setPicked(''); setOpened('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
+   {versionsShown ? <section class="versions-view" aria-label="Versions">
+    <header class="versions-head"><h3 class="versions-title"><span class="versions-label">Versions</span> · {paneTitle}</h3>{openedValid && <small class="versions-hint">Back returns to the episodes</small>}</header>
+    {openedValid && <p class="info-crumbs" aria-label="You are here">{(openedEpisode ? infoCrumbs(detail.title.title, [{ kind: 'episode', season: openedEpisode.season, episode: openedEpisode.number }]) : [detail.title.title, `Season ${selected!.number}`, 'Unknown episodes']).join(' › ')}</p>}
+    {openedEpisode && <div class="versions-episode">
+     {(openedPage!.stillUrl || titleArt) && <span class="info-still" aria-hidden="true"><img src={api.streamURL(openedPage!.stillUrl || titleArt)} alt="" onError={hideImage} /></span>}
+     <div class="versions-episode-copy">
+      <span class="info-meta">{[openedPage!.code].concat(openedPage!.meta).join(' · ')}</span>
+      <span class="info-episode-title">{openedPage!.title}</span>
+      {openedPage!.badges.length > 0 && <span class="info-genres">{openedPage!.badges.join(' · ')}</span>}
+      {openedPage!.overview && <p class="info-overview">{openedPage!.overview}</p>}
+      {openedPage!.credits.map(credit => <span class="info-credit-line"><b>{credit.label}</b> {credit.names}</span>)}
+     </div>
+    </div>}
+    {openedValid && <h3 class="info-subheading">Choose a version</h3>}
+    {packsOnly && <p class="episode-loading" role="status">Preparing the individual episode list. This page updates by itself when it is ready.</p>}
+    <div class="versions-list">
+     {paneSources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} region="versions" row={index} best={index === 0} onPlay={onPlay} />)}
+     {unknownSources.map((source, index) => <SourceButton key={`unknown-${source.release.id}:${source.fileIndex ?? -1}:${index}`} source={source} region="versions" row={index} focusKey={`unknown-source-${index}`} best={false} onPlay={onPlay} />)}
+     {openedEpisode && paneSources.length === 0 && <p class="versions-empty" role="status">No versions of this episode yet.</p>}
+     {packs.length > 0 && <div class="season-pack-downloads"><h4>Complete season</h4><p class="supporting">Download every episode of season {selected!.number} at once.</p>{packs.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected!.number} row={packBase + index} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>}
+    </div>
+   </section> : <div class="season-panes">
     <div class="episode-pane" role="list" aria-label={`Season ${season} episodes`}>
      {selected && selected.episodes.length === 0 && !unknownKey ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates by itself when it is ready.</p> : selected?.episodes.map((episode, index) => {
       const key = episodeKeyOf(episode);
       const chosen = selectedKey === key;
       const episodeState = episode.libraryState;
       const progress = episodeState && episodeState.watchState !== 'watched' && episodeState.positionMs ? watchProgress({ positionMs: episodeState.positionMs, durationMs: episodeState.durationMs || 0 }) : 0;
+      const page = episodePageView(episode.season, episode, infoOf(episode));
+      const still = page.stillUrl || titleArt;
+      // One row in the Info panel's episode style: still, code and name, facts, and the chevron that says "opens".
       return <article key={key} role="listitem" class="episode-row">
-       <button class={`episode-tile ${chosen ? 'selected' : ''}`} aria-current={chosen ? 'true' : undefined} data-episode-key={key} data-focus-region="episodes" data-focus-row={index} data-focus-col="0" data-focus-key={`episode-${key}`} onFocus={() => scheduleSelect(key)} onClick={() => enterVersions(key)}>
-        <span><b>{episode.number ? `${episode.number}. ` : ''}{episode.title}</b><small>{episodeMeta(episode, progress)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
+       <button class={`info-stop info-row episode-tile ${chosen ? 'selected' : ''}`} aria-current={chosen ? 'true' : undefined} data-episode-key={key} data-art-index={index} data-focus-region="episodes" data-focus-row={index} data-focus-col="0" data-focus-key={`episode-${key}`} onFocus={() => scheduleSelect(key)} onClick={() => openVersions(key)}>
+        <span class="info-still-small" aria-hidden="true">{still && inReach(art.reach, index) && <img src={api.streamURL(still)} alt="" onError={hideImage} />}</span>
+        <span class="info-row-copy"><b>{episode.number ? `E${episode.number < 10 ? '0' : ''}${episode.number} · ` : ''}{episode.title}</b><small>{episodeMeta(episode, progress, undefined, page.rowMeta)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
         <TVStateBadges state={episode.libraryState} />
+        <span class="info-chevron" aria-hidden="true">›</span>
        </button>
       </article>;
      })}
      {selected && unknownKey && <article key={unknownKey} role="listitem" class="episode-row unknown-group">
-      <button class={`episode-tile ${selectedKey === unknownKey ? 'selected' : ''}`} aria-current={selectedKey === unknownKey ? 'true' : undefined} data-episode-key={unknownKey} data-focus-region="episodes" data-focus-row={selected.episodes.length} data-focus-col="0" data-focus-key={unknownKey} onFocus={() => scheduleSelect(unknownKey)} onClick={() => enterVersions(unknownKey)}>
-       <span><b>Unknown episodes ({selected.unknown!.length})</b><small>Files without episode information</small></span>
+      <button class={`info-stop info-row episode-tile ${selectedKey === unknownKey ? 'selected' : ''}`} aria-current={selectedKey === unknownKey ? 'true' : undefined} data-episode-key={unknownKey} data-focus-region="episodes" data-focus-row={selected.episodes.length} data-focus-col="0" data-focus-key={unknownKey} onFocus={() => scheduleSelect(unknownKey)} onClick={() => openVersions(unknownKey)}>
+       <span class="info-row-copy"><b>Unknown episodes ({selected.unknown!.length})</b><small>Files without episode information</small></span>
+       <span class="info-chevron" aria-hidden="true">›</span>
       </button>
      </article>}
     </div>
-    <section class="versions-pane" aria-label="Versions">
-     <header class="versions-head"><small>Versions</small><h3>{paneTitle}</h3></header>
-     <div class="versions-scroll">
-      {paneSources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} region="versions" row={index} best={index === 0} onPlay={onPlay} />)}
-      {unknownSources.map((source, index) => <SourceButton key={`unknown-${source.release.id}:${source.fileIndex ?? -1}:${index}`} source={source} region="versions" row={index} focusKey={`unknown-source-${index}`} onPlay={onPlay} />)}
-      {selectedEpisode && paneSources.length === 0 && <p class="versions-empty" role="status">No versions of this episode yet.</p>}
-      {packs.length > 0 && <div class="season-pack-downloads"><h4>Complete season</h4><p class="supporting">Download every episode of season {selected!.number} at once.</p>{packs.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected!.number} row={packBase + index} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>}
-      {!selectedEpisode && unknownSources.length === 0 && packs.length === 0 && <p class="versions-empty" role="status">Pick an episode to see its versions.</p>}
-     </div>
-    </section>
-   </div>
+   </div>}
   </section>}
   {detail.seasons.length === 0 && detail.sources.length === 0 && <section class="source-list"><EmptyState title="No versions yet">The trackers have no release for this title right now. Press Refresh data to search them again.</EmptyState></section>}
   {detail.seasons.length === 0 && detail.sources.length > 0 && <section class="source-list"><h2>Versions</h2>{detail.sources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={2 + index} onPlay={onPlay} />)}</section>}

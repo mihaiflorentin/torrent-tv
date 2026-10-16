@@ -42,3 +42,12 @@ describe('captureNav family', () => {
     expect('family' in captureNav({ route: 'categories', detail: null, target: {}, query: '', category: '', sort: 'newest' })).toBe(false);
   });
 });
+
+describe('captureNav versions', () => {
+  it('records the episode whose Versions view is open, and leaves it out otherwise', () => {
+    const base = { route: 'home', detail: { id: 't1', title: 'Alpha' }, target: {}, query: '', category: '', sort: 'newest' };
+    expect(captureNav({ ...base, versions: '2:4' }).versions).toBe('2:4');
+    expect('versions' in captureNav({ ...base, versions: '' })).toBe(false);
+    expect('versions' in captureNav(base)).toBe(false);
+  });
+});
