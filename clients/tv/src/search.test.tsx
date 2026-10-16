@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogFacets, CatalogTitle } from '@torrent-tv/shared';
 
 // TV Search: recent searches under the field, results that follow what you typed from the cache only,
@@ -15,7 +16,7 @@ document.body.appendChild(appRoot);
 const { Catalog } = await import('./main');
 const { chooseStructuredTarget } = await import('./navigation');
 
-const wait = (ms = 40) => new Promise(resolve => setTimeout(resolve, ms));
+const wait = (ms = 40) => sleep(ms);
 const alpha = { id: 'a', title: 'Alpha', kind: 'movie', year: 2019, resolutions: ['1080p'], categories: [], trackers: [], sourceCount: 1, bestSeeders: 5, largestSizeBytes: 1 } as CatalogTitle;
 const RECENT = 'filelist.recentSearches';
 

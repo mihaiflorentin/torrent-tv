@@ -1074,10 +1074,15 @@ button.primary.active {
 .season-browser,
 .source-list {
  width: 1500px;
+ box-sizing: border-box;
  padding: var(--tt-space-5) var(--tt-space-6);
  background: var(--tt-surface);
  border: 1px solid var(--tt-line);
  border-radius: var(--tt-radius-lg)
+}
+
+.season-browser {
+ width: 100%
 }
 
 .season-browser h2,
@@ -1124,8 +1129,70 @@ button.primary.active {
  border-top: 1px solid var(--tt-line)
 }
 
-.episode-row.expanded {
- padding-bottom: var(--tt-space-4)
+/* Two panes under the season bar: episodes left, the selected episode's versions right. Each scrolls on its own;
+   flexbox only (no grid) for Chromium 53. */
+.season-panes {
+ display: -webkit-box;
+ display: flex;
+ align-items: stretch
+}
+
+.episode-pane {
+ -webkit-box-flex: 0;
+ flex: 0 0 760px;
+ box-sizing: border-box;
+ max-height: 600px;
+ overflow-y: auto;
+ padding: var(--tt-space-1) var(--tt-space-4) var(--tt-space-1) var(--tt-space-2);
+ margin-right: var(--tt-space-5)
+}
+
+.versions-pane {
+ -webkit-box-flex: 1;
+ flex: 1 1 0;
+ min-width: 0;
+ display: -webkit-box;
+ display: flex;
+ flex-direction: column;
+ padding-left: var(--tt-space-5);
+ border-left: 1px solid var(--tt-line)
+}
+
+.versions-head small {
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-bold);
+ letter-spacing: .08em;
+ text-transform: uppercase
+}
+
+.versions-head h3 {
+ margin: var(--tt-space-1) 0 0;
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-black)
+}
+
+.versions-scroll {
+ max-height: 520px;
+ overflow-y: auto;
+ padding: var(--tt-space-1) var(--tt-space-3) var(--tt-space-3) var(--tt-space-2)
+}
+
+.versions-empty {
+ margin-top: var(--tt-space-4);
+ color: var(--tt-text-muted)
+}
+
+/* The selected episode stays marked while focus is in the versions pane: a tint plus a bar, never colour alone. */
+.episode-tile.selected {
+ background: var(--tt-accent-soft);
+ border-color: var(--tt-accent-line);
+ box-shadow: inset 8px 0 0 var(--tt-accent)
+}
+
+.episode-tile.selected:focus {
+ border-color: var(--tt-focus-edge);
+ box-shadow: inset 8px 0 0 var(--tt-accent), var(--tt-focus-shadow-tv)
 }
 
 .episode-tile {
@@ -1268,72 +1335,54 @@ button.primary.active {
  transition: opacity var(--tt-dur-fast)
 }
 
+.source-best {
+ padding: var(--tt-space-1) var(--tt-space-3);
+ border-radius: var(--tt-radius-sm);
+ background: var(--tt-accent);
+ color: var(--tt-on-accent);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-black)
+}
+
 .source-button:focus .source-filename {
  opacity: 1
 }
 
-/* Season packs: a header that discloses controls, the release name inside. */
+/* Season packs: plain cards in the versions pane, controls always visible. */
 .season-pack-downloads {
- margin: var(--tt-space-3) 0 var(--tt-space-4)
+ margin: var(--tt-space-5) 0 var(--tt-space-3);
+ padding-top: var(--tt-space-4);
+ border-top: 1px solid var(--tt-line)
 }
 
-.packs-toggle {
- display: flex;
- width: 100%;
- justify-content: space-between;
- text-align: left
+.season-pack-downloads h4 {
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold)
 }
 
-.packs-toggle>span {
- display: flex;
- flex-direction: column
-}
-
-.packs-toggle small {
+.season-pack-downloads>.supporting {
+ margin: var(--tt-space-1) 0 var(--tt-space-3);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
 }
 
-.season-pack-grid {
- display: flex;
- align-items: flex-start;
- overflow-x: auto;
- padding: 20px 24px 28px;
- margin: 0 -24px
-}
-
-.season-pack-grid>* {
- flex: 0 0 520px;
- margin-right: var(--tt-space-4)
-}
-
 .season-pack-card {
  min-width: 0;
+ margin-top: var(--tt-space-3);
+ padding: var(--tt-space-4) var(--tt-space-5);
  border: 1px solid var(--tt-line);
  border-radius: var(--tt-radius-md);
  background: var(--tt-raised)
 }
 
-.season-pack-card.expanded {
- border-color: var(--tt-accent-line)
-}
-
-.season-pack-button {
+.season-pack-head {
+ display: -webkit-box;
  display: flex;
- flex-direction: column;
- align-items: stretch;
- justify-content: flex-start;
- width: 100%;
- margin: 0;
- padding: var(--tt-space-4) var(--tt-space-5);
- border: 0;
- border-radius: var(--tt-radius-md);
- background: transparent;
- text-align: left
+ align-items: flex-start;
+ justify-content: space-between
 }
 
-.season-pack-copy,
-.season-pack-action {
+.season-pack-copy {
  display: flex;
  flex-direction: column;
  align-items: flex-start;
@@ -1351,21 +1400,16 @@ button.primary.active {
 
 .season-pack-copy small {
  color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis;
- max-width: 100%
+ font-size: var(--tt-tv-text-meta)
 }
 
 .season-pack-action {
- margin-top: var(--tt-space-3);
- padding-top: var(--tt-space-3);
- border-top: 1px solid var(--tt-line)
-}
-
-.season-pack-action>*+* {
- margin-top: var(--tt-space-2)
+ display: flex;
+ flex-direction: column;
+ align-items: flex-end;
+ -webkit-box-flex: 0;
+ flex: 0 0 auto;
+ margin-left: var(--tt-space-4)
 }
 
 .season-pack-action>b {
@@ -1373,31 +1417,29 @@ button.primary.active {
  font-weight: var(--tt-weight-bold)
 }
 
-.season-pack-controls {
- display: flex;
- flex-wrap: wrap;
- padding: var(--tt-space-4) var(--tt-space-4) var(--tt-space-2) var(--tt-space-5);
- border-top: 1px solid var(--tt-line)
-}
-
-.season-pack-controls>* {
- margin: 0 var(--tt-space-3) var(--tt-space-3) 0
-}
-
-.season-pack-controls>.source-filename {
- flex: 0 0 100%;
+.season-pack-card>.source-filename {
  opacity: 1;
  white-space: normal;
  overflow-wrap: break-word;
- overflow-wrap: anywhere;
- margin-right: 0
+ overflow-wrap: anywhere
 }
 
-.season-pack-controls progress {
- flex: 0 0 100%;
+.season-pack-card progress {
+ display: block;
+ width: 100%;
  height: 10px;
- margin-right: 0;
+ margin-top: var(--tt-space-2);
  accent-color: var(--tt-accent)
+}
+
+.season-pack-controls {
+ display: flex;
+ flex-wrap: wrap;
+ margin-top: var(--tt-space-3)
+}
+
+.season-pack-controls>* {
+ margin: 0 var(--tt-space-3) var(--tt-space-2) 0
 }
 
 .season-pack-controls button {
@@ -1725,33 +1767,61 @@ button.primary.active {
  font-size: var(--tt-tv-text-meta)
 }
 
-/* Category cards and projects ------------------------------------------------- */
-.tv-category-grid {
+/* Category families: wide 16:9 image tiles in a wrapped flex grid (no CSS grid on webOS 4). A tile is a poster
+   card in the content focus region, so it takes the shared focus ring and scale. The text sits on a scrim panel
+   so the name and facts clear contrast over any image. */
+.tv-family-grid {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-5) 0 0
+ padding: 28px 24px 0;
+ margin: 0 -24px
 }
 
-.tv-category-grid button {
- flex: 0 0 396px;
- width: 396px;
- height: 140px;
- margin: 0 var(--tt-space-4) var(--tt-space-4) 0;
- flex-direction: column;
- justify-content: center;
- align-items: flex-start;
- text-align: left
+.family-tile {
+ position: relative;
+ width: 512px;
+ height: 288px;
+ margin: 0 var(--tt-space-5) var(--tt-space-5) 0
 }
 
-.tv-category-grid strong {
+.family-tile img,
+.family-tile .poster-pending {
+ display: block;
+ width: 100%;
+ height: 288px;
+ object-fit: cover
+}
+
+.family-copy {
+ position: absolute;
+ left: 0;
+ right: 0;
+ bottom: 0;
+ display: block;
+ padding: var(--tt-space-3) var(--tt-space-4);
+ background: var(--tt-scrim-text)
+}
+
+.family-copy strong {
+ display: block;
  font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ line-height: var(--tt-leading-tight);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
-.tv-category-grid span {
+.family-copy span {
+ display: block;
  margin-top: var(--tt-space-1);
  color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta)
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium);
+ line-height: 1.25;
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
 .tv-projects {

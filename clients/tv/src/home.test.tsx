@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogFacets, CatalogTitle, HouseholdItem, HouseholdState } from '@torrent-tv/shared';
 
 // TV Home: the hero resumes what the household is watching, discovery rows load only as focus
@@ -14,7 +15,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { Catalog } = await import('./main');
 
-const wait = (ms = 40) => new Promise(resolve => setTimeout(resolve, ms));
+const wait = (ms = 40) => sleep(ms);
 const make = (id: string, over: Partial<CatalogTitle> = {}): CatalogTitle => ({ id, title: id.toUpperCase(), kind: 'movie', year: 2020, trackers: [], categories: [], resolutions: ['1080p'], sourceCount: 1, bestSeeders: 5, largestSizeBytes: 1, ...over });
 const newest = make('new1');
 const release = { id: 'rel-9', trackerId: 'f', trackerName: 'F', providerId: '9', categoryId: '4', browseClass: '', name: 'Show.S02E04', category: 'x', sizeBytes: 1, seeders: 1, leechers: 0, freeleech: false };

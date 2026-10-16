@@ -1,3 +1,4 @@
+import type { CategoryFamily } from './families';
 export type TrackerRef = { id: string; name: string };
 export type TrackerStatus = TrackerRef & {
  enabled: boolean;
@@ -230,6 +231,9 @@ export class API {
  seasonInfo(id: string, season: number) { return this.call<InfoSeasonDetail>(`/catalog/titles/${encodeURIComponent(id)}/info/seasons/${season}`) }
  episodeInfo(id: string, season: number, episode: number) { return this.call<InfoEpisode>(`/catalog/titles/${encodeURIComponent(id)}/info/seasons/${season}/episodes/${episode}`) }
  facets() { return this.call<CatalogFacets>('/catalog/facets') }
+ families() { return this.call<Page<CategoryFamily>>('/catalog/families') }
+ libraryFamilies() { return this.call<Page<CategoryFamily>>('/library/families') }
+ libraryFamilyItems(family: string, category = '') { return this.call<Page<HouseholdItem>>('/library/families?family=' + encodeURIComponent(family) + (category ? '&category=' + encodeURIComponent(category) : '')) }
  trackers() { return this.call<TrackerStatus[]>('/trackers') }
  prepare(id: string, fileIndex = -1, signal?: AbortSignal) {
   return this.call<Download>(`/releases/${encodeURIComponent(id)}/prepare`, {
@@ -293,3 +297,5 @@ export { formatEtaLeft, prepareHint, readyLine, readyPercent } from './getting-r
 
 export { castInitials, EPISODE_EMPTY, EPISODE_LOADING, episodeAirLabel, episodeRowView, episodeView, formatRuntime, formatShortDate, infoCrumbs, infoEpisodeCode, infoView, releaseLine, SEASON_EMPTY, SEASON_LOADING, seasonCardView, seasonDetailView, seasonLabel, SEASONS_EMPTY, SEASONS_LOADING } from './title-info';
 export type { EpisodeRowView, EpisodeView, InfoLevel, InfoView, SeasonCardView, SeasonDetailView } from './title-info';
+export { familyCountLabel, familyNewestLine, familyTileLabel } from './families';
+export type { CategoryFamily, FamilyArt } from './families';

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, HouseholdState, TitleInfo } from '@torrent-tv/shared';
 
 // The Info panel on the TV: an Info button on the title page and on the Home hero opens a
@@ -22,7 +23,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { Catalog } = await import('./main');
 
-const wait = (ms = 40) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 40) => sleep(ms);
 const title = (over: Partial<CatalogTitle> = {}): CatalogTitle => ({ id: 'a', title: 'Alpha', kind: 'movie', year: 2019, resolutions: ['1080p'], categories: [], sourceCount: 2, bestSeeders: 77, largestSizeBytes: 1000, trackers: [{ id: 'filelist', name: 'FileList' }], ...over });
 const source = (id: string): CatalogSource => ({ release: { id, trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '4', browseClass: 'video', name: `Alpha.${id}`, category: 'Movies HD', sizeBytes: 4_200_000_000, seeders: 50, leechers: 2, freeleech: false, doubleUp: false, internal: false, moderated: false, comments: 0, fileCount: 1 } as CatalogSource['release'], parsed: { title: 'Alpha', sortTitle: 'alpha', kind: 'movie', resolution: '1080p', quality: 'WEB-DL' }, fileIndex: 0, filePath: `${id}.mkv`, fileSizeBytes: 4_200_000_000 });
 const empty: HouseholdState = { favorites: [], continueWatching: [], recent: [], watched: [] };

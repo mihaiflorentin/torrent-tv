@@ -13,14 +13,17 @@ export interface NavSnapshot {
   category: string;
   sort: NavSort;
   focusKey: string;
+  /** The open Category family on a Categories page, and its raw-category chip. */
+  family?: string;
+  familyCategory?: string;
 }
 
 export function navSort(value: string): NavSort {
   return value === 'seeders' || value === 'title' || value === 'rating' ? value : 'newest';
 }
 
-export function captureNav(state: { route: string; detail: { id: string; title: string } | null; target: NavTarget; query: string; category: string; sort: string }): NavSnapshot {
-  return {
+export function captureNav(state: { route: string; detail: { id: string; title: string } | null; target: NavTarget; query: string; category: string; sort: string; family?: string; familyCategory?: string }): NavSnapshot {
+  const snapshot: NavSnapshot = {
     route: state.route,
     titleId: state.detail ? state.detail.id : '',
     titleName: state.detail ? state.detail.title : '',
@@ -30,6 +33,8 @@ export function captureNav(state: { route: string; detail: { id: string; title: 
     sort: navSort(state.sort),
     focusKey: '',
   };
+  if (state.family) { snapshot.family = state.family; snapshot.familyCategory = state.familyCategory || '' }
+  return snapshot;
 }
 
 // The card to focus on a restored list. An open title page focuses its own Play or Resume.

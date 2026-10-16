@@ -109,6 +109,9 @@ type Repository interface {
 	ListCatalogSourcesByTitleIDs(context.Context, []string, []string) ([]domain.CatalogSource, error)
 	CatalogTitleIDsForReleases(context.Context, []string) (map[string]string, error)
 	CatalogFacets(context.Context, []string) (domain.CatalogFacets, error)
+	CatalogFamilyRows(context.Context, []string) ([]domain.FamilyTitleRow, error)
+	FamilyArtPick(ctx context.Context, familyKey, quarter string) (string, error)
+	SaveFamilyArtPick(ctx context.Context, familyKey, quarter, titleID string) error
 	SaveCatalogMetadata(context.Context, domain.CatalogMetadata) error
 	GetCatalogMetadata(context.Context, string) (domain.CatalogMetadata, error)
 	SaveSeriesSeasons(context.Context, domain.SeriesSeasons) error

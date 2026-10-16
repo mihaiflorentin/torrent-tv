@@ -73,6 +73,8 @@ CREATE TABLE IF NOT EXISTS catalog_releases(
  hdr TEXT NOT NULL DEFAULT '',edition TEXT NOT NULL DEFAULT '',release_group TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS catalog_releases_title ON catalog_releases(title_id);
 CREATE INDEX IF NOT EXISTS catalog_releases_browse ON catalog_releases(media_kind,sort_title,year);
+CREATE TABLE IF NOT EXISTS family_art(
+ family_key TEXT NOT NULL,quarter TEXT NOT NULL,title_id TEXT NOT NULL,picked_at INTEGER NOT NULL,PRIMARY KEY(family_key,quarter));
 CREATE TABLE IF NOT EXISTS catalog_metadata(
  title_id TEXT PRIMARY KEY,provider TEXT NOT NULL DEFAULT '',provider_id TEXT NOT NULL DEFAULT '',title TEXT NOT NULL DEFAULT '',
  original_title TEXT NOT NULL DEFAULT '',overview TEXT NOT NULL DEFAULT '',poster_path TEXT NOT NULL DEFAULT '',backdrop_path TEXT NOT NULL DEFAULT '',
@@ -476,6 +478,12 @@ func catalogFilter(q domain.CatalogQuery) (string, []any) {
 			args = append(args, f.value)
 		}
 	}
+	if len(q.Categories) > 0 {
+		where = append(where, "r.category COLLATE NOCASE IN ("+strings.TrimRight(strings.Repeat("?,", len(q.Categories)), ",")+")")
+		for _, value := range q.Categories {
+			args = append(args, value)
+		}
+	}
 	if q.MinSeeders > 0 {
 		where = append(where, "r.seeders>=?")
 		args = append(args, q.MinSeeders)
@@ -542,6 +550,38 @@ func (r *Repository) QueryCatalogTitleIDs(ctx context.Context, q domain.CatalogQ
 		next = &value
 	}
 	return domain.Page[string]{Items: items, NextCursor: next, Total: total}, nil
+}
+
+// CatalogFamilyRows returns one row per (tracker category, title) over the
+// discoverable catalog in a single aggregate pass, carrying what the Category
+// family tiles need: newest upload, best seeders, rating and artwork. Callers
+// fold the rows into families by category, so no per-family query is needed.
+func (r *Repository) CatalogFamilyRows(ctx context.Context, eligible []string) ([]domain.FamilyTitleRow, error) {
+	where, args := catalogFilter(domain.CatalogQuery{TrackerIDs: eligible})
+	rows, err := r.db.QueryContext(ctx, `SELECT r.category,c.title_id,MAX(COALESCE(r.uploaded_at,0)),MAX(r.seeders),
+COALESCE(MAX(m.rating),0),COALESCE(MAX(m.backdrop_path<>''),0),COALESCE(MAX(m.poster_path<>''),0)
+FROM releases r JOIN catalog_releases c ON c.release_id=r.id LEFT JOIN catalog_metadata m ON m.title_id=c.title_id
+WHERE `+where+` AND r.category<>'' GROUP BY r.category,c.title_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []domain.FamilyTitleRow{}
+	for rows.Next() {
+		var x domain.FamilyTitleRow
+		var backdrop, poster int
+		if err := rows.Scan(&x.Category, &x.TitleID, &x.UploadedAt, &x.Seeders, &x.Rating, &backdrop, &poster); err != nil {
+			return nil, err
+		}
+		switch {
+		case backdrop != 0:
+			x.ArtKind = "backdrop"
+		case poster != 0:
+			x.ArtKind = "poster"
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
 }
 
 func (r *Repository) ListCatalogSourcesByTitleIDs(ctx context.Context, ids []string, eligible []string) ([]domain.CatalogSource, error) {
@@ -1411,4 +1451,19 @@ func DecodeCursor(v string) (int, error) {
 
 func escapeLike(s string) string {
 	return strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(s)
+}
+
+// FamilyArtPick returns the title chosen for a Category family's art in a calendar
+// quarter, or sql.ErrNoRows when none was chosen yet.
+func (r *Repository) FamilyArtPick(ctx context.Context, familyKey, quarter string) (string, error) {
+	var titleID string
+	err := r.db.QueryRowContext(ctx, `SELECT title_id FROM family_art WHERE family_key=? AND quarter=?`, familyKey, quarter).Scan(&titleID)
+	return titleID, err
+}
+
+// SaveFamilyArtPick remembers (or replaces) the title chosen for a family's art in a quarter.
+func (r *Repository) SaveFamilyArtPick(ctx context.Context, familyKey, quarter, titleID string) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO family_art(family_key,quarter,title_id,picked_at) VALUES(?,?,?,?)
+ON CONFLICT(family_key,quarter) DO UPDATE SET title_id=excluded.title_id,picked_at=excluded.picked_at`, familyKey, quarter, titleID, time.Now().Unix())
+	return err
 }

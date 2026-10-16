@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 
 // App-seam tests for landing focus: entering a screen puts the D-pad cursor on
 // the screen's first card (never the header Refresh button), cards that load
@@ -25,7 +26,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { App } = await import('./main');
 
-const wait = (ms = 60) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 60) => sleep(ms);
 const respond = (body: unknown) => ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) });
 const titleRow = (id: string) => ({ id, title: `Title ${id}`, kind: 'movie', year: 2019, resolutions: ['1080p'], categories: [], sourceCount: 1, bestSeeders: 50, largestSizeBytes: 4e9, trackers: [{ id: 'filelist', name: 'FileList' }] });
 const release = { id: 'rel-1', trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '4', browseClass: 'video', name: 'Alpha.1080p', category: 'Movies', sizeBytes: 4e9, seeders: 50, leechers: 1, freeleech: false };
@@ -51,6 +52,7 @@ describe('landing focus through the app', () => {
       if (url.includes('/catalog/search')) return respond({ items: [titleRow('s1'), titleRow('s2')], nextCursor: null, total: 2 });
       if (/\/catalog\/titles\/[^?]/.test(url)) return respond(detailBody);
       if (url.includes('/catalog/titles')) { if (titlesGate) await titlesGate; return respond({ items: url.includes('search=') ? [titleRow('s1'), titleRow('s2')] : [titleRow('a'), titleRow('b')], nextCursor: null, total: 2 }); }
+      if (url.includes('/catalog/families')) return respond({ items: [{ key: 'movies', name: 'Movies', count: 3, newestTitle: 'Alpha', categories: ['Movies'], art: { url: '/api/v1/catalog/families/movies/art.svg', source: 'bundled' } }], nextCursor: null, total: 1 });
       if (url.includes('/catalog/facets')) return respond({ categories: ['Movies'], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] });
       if (url.includes('/settings/schema')) return respond({ items: [] });
       if (url.includes('/settings')) return respond({});
@@ -113,10 +115,10 @@ describe('landing focus through the app', () => {
     expect(focusKey()).toBe('setting-audio-primary');
   });
 
-  it('lands on the first category tile when Categories opens', async () => {
+  it('lands on the first family tile when Categories opens', async () => {
     await start();
     await open('categories');
-    expect(focusKey()).toBe('category-Movies');
+    expect(focusKey()).toBe('family-movies');
   });
 
   it('lands on the Jobs filters when there are no jobs', async () => {

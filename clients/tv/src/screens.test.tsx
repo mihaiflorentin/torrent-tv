@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, HouseholdItem, HouseholdState, Job } from '@torrent-tv/shared';
 
 // DESIGN.md "Information priorities", checked on what the TV screens really render: the primary
@@ -22,7 +23,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { Catalog, Player } = await import('./main');
 
-const wait = (ms = 40) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 40) => sleep(ms);
 const release = (over = {}) => ({ id: 'rel-1', trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '4', browseClass: 'video', name: 'Alpha.2019.1080p.WEB-DL.DDP5.1.H264-GRP', category: 'Movies HD', sizeBytes: 4_200_000_000, seeders: 77, leechers: 2, freeleech: false, ...over });
 const title = (over: Partial<CatalogTitle> = {}): CatalogTitle => ({ id: 'a', title: 'Alpha', kind: 'movie', year: 2019, resolutions: ['2160p', '1080p'], categories: [], sourceCount: 5, bestSeeders: 77, largestSizeBytes: 1000, trackers: [{ id: 'filelist', name: 'FileList' }], ...over });
 const source = (parsed: Partial<CatalogSource['parsed']> = {}): CatalogSource => ({ release: release(), parsed: { title: 'Alpha', sortTitle: 'alpha', kind: 'movie', resolution: '1080p', quality: 'WEB-DL', videoCodec: 'H264', audio: 'DDP 5.1', ...parsed }, fileIndex: 0, filePath: 'Alpha.2019.1080p.WEB-DL.mkv', fileSizeBytes: 4_200_000_000 });

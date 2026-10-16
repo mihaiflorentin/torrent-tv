@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogFacets, Download } from '@torrent-tv/shared';
 
 // The calm "getting ready" experience: the Prepare modal counts seconds and, after 15 s, says why it
@@ -17,7 +18,7 @@ document.body.appendChild(appRoot);
 const { Catalog, Player } = await import('./main');
 render(null, appRoot);
 
-const tick = (ms = 25) => new Promise(resolve => setTimeout(resolve, ms));
+const tick = (ms = 25) => sleep(ms);
 
 describe('Prepare modal elapsed counter', () => {
   let container: HTMLDivElement;

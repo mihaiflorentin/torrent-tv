@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 
 // Play from a title page, press Back in the Player, and the same title page comes back (focused
 // on Play/Resume, with fresh data) instead of Home. main.tsx asserts #app at module evaluation.
@@ -23,7 +24,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { App } = await import('./main');
 
-const wait = (ms = 60) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 60) => sleep(ms);
 const rel = { id: 'rel-1', trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '4', browseClass: 'video', name: 'Alpha.1080p', category: 'Movies', sizeBytes: 4e9, seeders: 50, leechers: 1, freeleech: false };
 const titleRow = { id: 'a', title: 'Alpha', kind: 'movie', year: 2019, resolutions: ['1080p'], categories: [], sourceCount: 1, bestSeeders: 50, largestSizeBytes: 4e9, trackers: [{ id: 'filelist', name: 'FileList' }] };
 const detailBody = { title: titleRow, seasons: [], sources: [{ release: rel, parsed: { title: 'Alpha', sortTitle: 'alpha', kind: 'movie', resolution: '1080p', quality: 'WEB-DL' }, fileIndex: 0, filePath: 'a.mkv', fileSizeBytes: 4e9 }] };

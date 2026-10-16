@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API } from '@torrent-tv/shared';
 // Static import cannot work here: main.tsx bootstraps and asserts the presence
 // of document.getElementById('app') during module evaluation. The #app container
@@ -83,7 +84,7 @@ describe('TV engine ownership feedback', () => {
       />,
       container
     );
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
     expect(container.textContent).toContain('Running now: qBittorrent');
     expect(container.textContent).toContain('new downloads after restart');
   });
@@ -105,7 +106,7 @@ describe('TV engine ownership feedback', () => {
       />,
       container
     );
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
     expect(container.textContent).toContain('Existing downloads keep the engine that owns them');
     expect(container.textContent).not.toContain('Running now');
   });
@@ -145,7 +146,7 @@ describe('TV catalog maintenance in Settings', () => {
       />,
       container
     );
-    return new Promise(r => setTimeout(r, 20));
+    return sleep(20);
   };
   const byKey = (key: string) => container.querySelector<HTMLButtonElement>(`[data-focus-key="${key}"]`);
 
@@ -158,7 +159,7 @@ describe('TV catalog maintenance in Settings', () => {
     const fetch = byKey('catalog-fetch-latest')!;
     expect(section.contains(fetch)).toBe(true);
     fetch.click();
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
     expect(sync).toHaveBeenCalledWith('latest');
     expect(section.querySelector('[role="status"]')!.textContent).toContain('queued');
   });
@@ -204,7 +205,7 @@ describe('TV catalog maintenance in Settings', () => {
     expect(closed).toHaveBeenCalledTimes(1);
     expect(sync).not.toHaveBeenCalled();
     buttons[1].click();
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
     expect(sync).toHaveBeenCalledWith('rebuild');
     expect(closed).toHaveBeenCalledTimes(2);
   });

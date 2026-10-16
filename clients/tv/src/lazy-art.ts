@@ -76,3 +76,29 @@ export function useArtReach(span: RailWindow): ArtReach {
 }
 
 export const inReach = (reach: ArtReach, col: number): boolean => reach !== null && col >= reach[0] && col <= reach[1];
+
+/** Grid rows loaded either side of the focused row for a wrapped grid (Category tiles, library cards). */
+export const ART_ROW_REACH = 2;
+export type RowReach = [number, number];
+
+function rowReachFor(firstRow: number, current: FocusPoint, previous: RowReach | null): RowReach {
+  const row = current.row < 0 ? firstRow : current.row;
+  const lo = row - ART_ROW_REACH;
+  const hi = row + ART_ROW_REACH;
+  if (previous && previous[0] <= lo && previous[1] >= hi) return previous;
+  return previous ? [Math.min(previous[0], lo), Math.max(previous[1], hi)] : [lo, hi];
+}
+
+/** The inclusive row range of a grid whose artwork should be loaded. Starts around `firstRow` and only ever grows. */
+export function useRowReach(firstRow: number): RowReach {
+  const [reach, setReach] = useState<RowReach>(() => rowReachFor(firstRow, point, null));
+  useEffect(() => {
+    const update = () => setReach(previous => rowReachFor(firstRow, point, previous));
+    update();
+    listeners.add(update);
+    return () => { listeners.delete(update); };
+  }, [firstRow]);
+  return reach;
+}
+
+export const inRowReach = (reach: RowReach, row: number): boolean => row >= reach[0] && row <= reach[1];

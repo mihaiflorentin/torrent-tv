@@ -1,13 +1,13 @@
 import { Fragment, render, type JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
+import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, rankSources, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSeason, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
 import { episodeAirLabel } from '@torrent-tv/shared';
-import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation } from './navigation';
+import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation, visibleFocusables } from './navigation';
 import { LANDING_REQUEST_EVENT, landingTarget, requestLanding, useLanding } from './landing';
 import { PROJECTS_MENU_ROW, REBUILD_DIALOG_REGION, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_DIAGNOSTICS_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_REBUILD_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, UPDATE_RELEASE_LINK_ROW, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
 import { AVTrack, clampSeek, formatTime, isDownloadComplete, isEditableTarget, normalizeTrack, parseVTT, playerAction, preferredAudio, preferredSubtitle, SubtitleCue, subtitleAt } from './player';
 import { PlayerKeyController, type PlayerFocus } from './player-keys';
-import { HOME_ROW, homeExtraRowsDue, homeHero, homeRowItems, homeRowSpecs, householdSections, nearEnd, trackerCategories } from './catalog-data';
+import { HOME_ROW, homeExtraRowsDue, homeHero, homeRowItems, homeRowSpecs, householdSections, nearEnd } from './catalog-data';
 import { discoverServers, DiscoveredServer, normalizeServerURL } from './discovery';
 import { Backdrop } from './backdrop';
 import { captureNav, type NavSnapshot } from './nav-snapshot';
@@ -17,7 +17,9 @@ import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL
 import { detectCapabilities } from './capability';
 import { memo, useStableCallback } from './memo';
 import { createStatusStore, useStatus, type StatusStore } from './status-store';
-import { inReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach } from './lazy-art';
+import { inReach, inRowReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach, useRowReach } from './lazy-art';
+import { FamilyChips, FamilyTiles } from './families';
+import type { CategoryFamily } from '@torrent-tv/shared';
 import { TitleInfoPanel } from './title-info-panel';
 import '@torrent-tv/shared/design/fonts.css';
 import '@torrent-tv/shared/design/tokens.css';
@@ -579,6 +581,11 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  const [searching, setSearching] = useState(false);
  const [recent, setRecent] = useState(() => loadRecentSearches(deviceStorage()));
  const [category, setCategory] = useState(() => initialNav ? initialNav.category : '');
+ // The open Category family and its category chip (Categories pages). Catalog keeps them so a title page or the Player can come and go; familyBack lets Back close the family first.
+ const [familyKey, setFamilyKey] = useState(() => initialNav?.family || '');
+ const [familyChip, setFamilyChip] = useState(() => initialNav?.familyCategory || '');
+ const familyBack = useRef<(() => string) | null>(null);
+ const familyCache = useRef<Record<string, FamilyCacheEntry>>({});
  const [sort, setSort] = useState<'newest' | 'seeders' | 'title' | 'rating'>(() => initialNav ? initialNav.sort : 'newest');
  const [remoteTitles, setRemoteTitles] = useState(titles.slice(0, 12));
  // Discovery rows under Recently added load one at a time as focus reaches the row before. They are dropped with the route, so Home holds at most four extra rows of ten posters.
@@ -665,7 +672,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  const openLibraryItem = useStableCallback(async (item: HouseholdItem) => { const id = item.titleId || item.catalog?.id; if (!id) { setDetailMessage('This library item is not linked to a catalog title yet. Refresh the catalog and try again.'); return } const title = item.catalog || { id, title: item.release.name, kind: 'movie', trackers: item.release.trackerId ? [{ id: item.release.trackerId, name: item.release.trackerName }] : [], categories: [], resolutions: [], sourceCount: 1, bestSeeders: item.release.seeders, largestSizeBytes: item.release.sizeBytes } as CatalogTitle; await openTitle(title, { season: item.seasonNumber, episode: item.episodeNumber }) });
  // Rehydrate the open title through the same path as a normal open (fresh fetch, so Resume reflects the new position; failure falls back to the route list with the usual notice), and report the current spot so App can keep it while the Player owns the screen.
  useEffect(() => { if (initialNav && initialNav.titleId) void openTitle({ id: initialNav.titleId, title: initialNav.titleName, kind: 'movie', trackers: [], categories: [], resolutions: [], sourceCount: 0, bestSeeders: 0, largestSizeBytes: 0 } as CatalogTitle, initialNav.target) }, []);
- useEffect(() => { onNav?.(captureNav({ route, detail: detail ? { id: detail.title.id, title: detail.title.title } : null, target: detailTarget, query, category, sort })) }, [route, detail?.title.id, detailTarget, query, category, sort]);
+ useEffect(() => { onNav?.(captureNav({ route, detail: detail ? { id: detail.title.id, title: detail.title.title } : null, target: detailTarget, query, category, sort, family: familyKey, familyCategory: familyChip })) }, [route, detail?.title.id, detailTarget, query, category, sort, familyKey, familyChip]);
  const manageSeasonPack = async (source: CatalogSource, season: number, action: SeasonPackAction) => {
   const isAcquire = action === 'download' || (action === 'retry' && !source.libraryState?.downloadId);
   if (!isAcquire) setDetailMessage(`Updating season ${season} download…`);
@@ -684,7 +691,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
    if (!isAcquire) { setDetailMessage((error as Error).message); throw error; }
   }
  };
- const chooseRoute = (next: TVRoute) => { resetFocusPoint(); setNotice(''); homeGeneration.current++; homeRequested.current = {}; setExtraRows({}); setHomeDepth(0); if (!['home', 'browse', 'search', 'tracker'].includes(next)) { setRemoteTitles([]); setNextCursor(null); } lastContent.current = null; setRoute(next); setDetail(null); setMenuOpen(false); landing.arm(); };
+ const chooseRoute = (next: TVRoute) => { resetFocusPoint(); setNotice(''); homeGeneration.current++; homeRequested.current = {}; setExtraRows({}); setHomeDepth(0); if (!['home', 'browse', 'search', 'tracker'].includes(next)) { setRemoteTitles([]); setNextCursor(null); } lastContent.current = null; familyCache.current = {}; setFamilyKey(''); setFamilyChip(''); setRoute(next); setDetail(null); setMenuOpen(false); landing.arm(); };
  // Projects route: activation hands the link to the platform browser. When
  // no browser takes it (several ATV boxes ship none) the address stays on
  // the card and the hint says so — the URL is the fallback.
@@ -745,7 +752,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  }, [preparing?.error, preparing?.label, onCancelPrepare]);
  // Back to the card the viewer left, or, when it is gone (another route, a reload), land like a fresh screen.
  const restoreContentFocus = () => { const key = lastContent.current; const target = key ? document.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`) : null; if (target) focusElement(target); else landing.arm() };
- const onBack = () => { if (preparing) { onCancelPrepare?.(); return; } if (updateConfirm) { closeUpdateConfirm(); return; } if (rebuildConfirm) { closeRebuildConfirm(); return; } if (detail) { setDetail(null); window.setTimeout(restoreContentFocus, 0); return; } if (menuOpen) { setMenuOpen(false); window.setTimeout(restoreContentFocus, 0); return; } setMenuOpen(true); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-menu-route="${route}"]`)), 0); };
+ const onBack = () => { if (preparing) { onCancelPrepare?.(); return; } if (updateConfirm) { closeUpdateConfirm(); return; } if (rebuildConfirm) { closeRebuildConfirm(); return; } if (detail) { setDetail(null); window.setTimeout(restoreContentFocus, 0); return; } if (menuOpen) { setMenuOpen(false); window.setTimeout(restoreContentFocus, 0); return; } const closedFamily = familyBack.current?.(); if (closedFamily) { window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closedFamily}"]`); if (tile) focusElement(tile); else landing.arm() }, 0); return; } setMenuOpen(true); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-menu-route="${route}"]`)), 0); };
  useTVNavigation({
   getInitialFocus: () => landingTarget() || first.current, restoreKey: restoreFocus, onFocusKey: key => { onFocus(key); if (route === 'home' && document.activeElement instanceof HTMLElement) { const row = Number(document.activeElement.dataset.focusRow); if (row >= HOME_ROW.recent) setHomeDepth(depth => Math.max(depth, row)) } if (document.activeElement instanceof HTMLElement && document.activeElement.dataset.focusRegion === 'content' && !detail) { lastContent.current = key; setFocusPoint(Number(document.activeElement.dataset.focusRow), Number(document.activeElement.dataset.focusCol)) } }, onBack, onLongBack: exitApplication, onDirection: (direction, current) => {
    if (detail || updateConfirm || rebuildConfirm) return false;
@@ -811,8 +818,8 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
    {notice && <p class="tv-notice" role="status">{notice}</p>}
    {route === 'search' && <div class="tv-search"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="search-input" data-landing="control" value={draftQuery} onInput={event => setDraftQuery(event.currentTarget.value)} onBlur={event => refreshFromCache(event.currentTarget.value)} placeholder="Search titles; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="search-submit" class="primary" aria-disabled={searching ? 'true' : undefined} onClick={() => void submitSearch()}>{searching ? 'Searching…' : 'Search'}</button>{query && <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="search-clear" onClick={() => { setDraftQuery(''); setQuery('') }}>Clear</button>}</div>}
    {route === 'search' && !draftQuery && recent.length > 0 && <div class="tv-recent" role="group" aria-label="Recent searches">{recent.map((term, index) => <button data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`recent-${index}`} onClick={() => runRecent(term)}>{term}</button>)}<button data-focus-region="content" data-focus-row="2" data-focus-col={recent.length} data-focus-key="recent-clear" onClick={forgetRecent}>Clear recent</button></div>}
-   {['tracker', 'browse', 'categories', 'search'].includes(route) && <div class="tv-filters"><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="0" data-focus-key="sort-newest" class={sort === 'newest' ? 'active' : ''} onClick={() => setSort('newest')}>Newest</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="1" data-focus-key="sort-seeders" class={sort === 'seeders' ? 'active' : ''} onClick={() => setSort('seeders')}>Most seeded</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="2" data-focus-key="sort-rating" class={sort === 'rating' ? 'active' : ''} onClick={() => setSort('rating')}>Rating</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="3" data-focus-key="sort-title" class={sort === 'title' ? 'active' : ''} onClick={() => setSort('title')}>A–Z</button>{category && <button data-focus-region="content" data-focus-row={sortRow} data-focus-col="4" data-focus-key="clear-category" onClick={() => setCategory('')}>Clear {category}</button>}</div>}
-   {route === 'projects' ? <section class="tv-projects"><p class="tv-muted">Project sites published with this server. Press OK on a card to open it.</p>{portal && portal.links.length > 0 ? portal.links.map((link, index) => <button class="tv-project" key={link.id} data-landing="card" data-focus-region="content" data-focus-row={3 + index} data-focus-col="0" data-focus-key={`project-${link.id}`} onClick={() => openProjectLink(link)}><strong>{link.title}</strong>{link.description && <p>{link.description}</p>}<code>{link.url}</code></button>) : <EmptyState title="No project links yet">They appear here when the server publishes them.</EmptyState>}{projectsMessage && <p class="focus-hint" aria-live="polite">{projectsMessage}</p>}</section> : route === 'settings' ? <TVSettings api={api} onChangeServer={onChangeServer} onForgetServer={onForgetServer} updateStatus={updateStatus} onUpdateStatus={onUpdateStatus} confirmOpen={updateConfirm} onConfirmOpen={openUpdateConfirm} onConfirmClose={closeUpdateConfirm} rebuildConfirmOpen={rebuildConfirm} onRebuildConfirmOpen={openRebuildConfirm} onRebuildConfirmClose={closeRebuildConfirm} /> : route === 'downloads' ? <TVDownloads items={downloads} onPlay={onPlayDownload} onManage={onManageDownload} /> : route === 'library-categories' ? <TVLibraryCategories api={api} onOpen={openLibraryItem} /> : route === 'jobs' ? <TVJobs api={api} items={jobs} /> : route === 'categories' ? trackerCategories(facets).length === 0 ? <EmptyState title="No categories yet">Categories appear after the first catalog sync. Open Settings and choose Fetch latest.</EmptyState> : <section class="tv-category-grid">{trackerCategories(facets).map((name, index) => <button data-landing="card" data-focus-region="content" data-focus-row={3 + Math.floor(index / 4)} data-focus-col={index % 4} data-focus-key={`category-${name}`} onClick={() => { setCategory(name); setRoute('browse'); landing.arm() }}><strong>{name}</strong><span>Browse titles</span></button>)}</section> : <>
+   {['tracker', 'browse', 'search'].includes(route) && <div class="tv-filters"><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="0" data-focus-key="sort-newest" class={sort === 'newest' ? 'active' : ''} onClick={() => setSort('newest')}>Newest</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="1" data-focus-key="sort-seeders" class={sort === 'seeders' ? 'active' : ''} onClick={() => setSort('seeders')}>Most seeded</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="2" data-focus-key="sort-rating" class={sort === 'rating' ? 'active' : ''} onClick={() => setSort('rating')}>Rating</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="3" data-focus-key="sort-title" class={sort === 'title' ? 'active' : ''} onClick={() => setSort('title')}>A–Z</button>{category && <button data-focus-region="content" data-focus-row={sortRow} data-focus-col="4" data-focus-key="clear-category" onClick={() => setCategory('')}>Clear {category}</button>}</div>}
+   {route === 'projects' ? <section class="tv-projects"><p class="tv-muted">Project sites published with this server. Press OK on a card to open it.</p>{portal && portal.links.length > 0 ? portal.links.map((link, index) => <button class="tv-project" key={link.id} data-landing="card" data-focus-region="content" data-focus-row={3 + index} data-focus-col="0" data-focus-key={`project-${link.id}`} onClick={() => openProjectLink(link)}><strong>{link.title}</strong>{link.description && <p>{link.description}</p>}<code>{link.url}</code></button>) : <EmptyState title="No project links yet">They appear here when the server publishes them.</EmptyState>}{projectsMessage && <p class="focus-hint" aria-live="polite">{projectsMessage}</p>}</section> : route === 'settings' ? <TVSettings api={api} onChangeServer={onChangeServer} onForgetServer={onForgetServer} updateStatus={updateStatus} onUpdateStatus={onUpdateStatus} confirmOpen={updateConfirm} onConfirmOpen={openUpdateConfirm} onConfirmClose={closeUpdateConfirm} rebuildConfirmOpen={rebuildConfirm} onRebuildConfirmOpen={openRebuildConfirm} onRebuildConfirmClose={closeRebuildConfirm} /> : route === 'downloads' ? <TVDownloads items={downloads} onPlay={onPlayDownload} onManage={onManageDownload} /> : route === 'library-categories' ? <TVFamilies api={api} mode="library" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : route === 'jobs' ? <TVJobs api={api} items={jobs} /> : route === 'categories' ? <TVFamilies api={api} mode="catalog" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : <>
     {route === 'home' && hero && <section class="tv-hero"><div class="tv-hero-copy"><span class="eyebrow">{heroFacts(hero).join(' · ')}</span><h2>{hero.title}</h2>{hero.overview && <p class="tv-hero-overview">{hero.overview}</p>}{hero.genres && hero.genres.length > 0 && <p class="tv-hero-genres">{hero.genres.slice(0, 3).join(' · ')}</p>}{resumeHero?.resume && <p class="tv-hero-genres">{libraryCardLine(resumeHero.resume)}</p>}<button ref={first} data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key={`hero-${hero.id}`} data-landing="control" data-art={artURL(api, hero)} class="primary" onClick={() => { const resume = resumeHero?.resume; if (resume) onPlay(resume.release, resume.fileIndex, resume.positionMs); else void openTitle(hero) }}>{resumeHero?.resume ? resumeActionLabel(resumeHero.resume, hero.kind) : 'View versions'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key={`hero-info-${hero.id}`} onClick={() => setHeroInfo(hero)}>Info</button></div></section>}
     {homeLibrary.map((section, index) => <HouseholdRail api={api} title={section.title} items={section.items} row={3 + index} from={spanOf(3 + index).from} until={spanOf(3 + index).until} empty={route === 'home' ? '' : HOUSEHOLD_EMPTY[section.key]} onOpen={openLibraryItem} />)}
     <div class="tv-rows">{shownRows.map((row, rowIndex) => { const railRow = row.row ?? rowIndex + 10; const span = spanOf(railRow); return <TitleRail api={api} heading={row.title} items={row.items} row={railRow} from={span.from} until={span.until} keyPrefix={row.keyPrefix} seeders={row.key === 'tracker-seeded'} focusRef={!hero && rowIndex === 0 ? first : undefined} onOpen={openTitleStable} /> })}</div>
@@ -904,7 +911,68 @@ function TVDownloads({ items, onPlay, onManage }: { items: Download[]; onPlay: (
   return <article key={download.id} data-download-id={download.id} class="tv-download-row"><div class="tv-download-main"><strong class="tv-download-title" title={download.displayTitle || download.filePath}>{download.displayTitle || download.filePath}</strong><span class={`tv-download-status ${status.tone}`}>{downloadProgressLine(download)}</span><i class={`tv-meter ${status.tone}`} role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={status.percent}><b style={{ width: `${status.percent}%` }} /></i><small class="tv-download-facts">{downloadFacts(download, { sizeBytes: group.totalSizeBytes, files: multi ? group.rows.length : 0 })}</small>{detailsShown && <dl class="tv-download-details"><dt>Release</dt><dd>{download.releaseName || download.filePath}</dd><dt>{multi ? 'Files' : 'File'}</dt><dd>{multi ? `${group.rows.length} files in this torrent` : `${download.filePath} (file ${download.fileIndex})`}</dd><dt>Tracker</dt><dd>{download.trackerName} release {download.releaseId}{download.trackerSeeders !== undefined ? ` · ${download.trackerSeeders} seeders` : ''}{download.releaseSizeBytes ? ` · ${formatBytes(download.releaseSizeBytes)} total` : ''}</dd><dt>Transfer</dt><dd>{download.seeds} connected seeds · {download.peers} peers</dd></dl>}</div><div class="tv-download-actions"><button data-landing="card" data-focus-region="content" data-focus-row={band} data-focus-col="0" data-focus-key={`download-${download.id}-play`} class="primary" onClick={() => onPlay(download)}>Play</button>{downloadTransferActions(download).map(item => <button key={item.action} aria-disabled={busyAction.startsWith(download.id + ':') ? 'true' : undefined} data-focus-region="content" data-focus-row={band} data-focus-col="1" data-focus-key={`download-${download.id}-${item.action}`} onClick={() => void runAction(download, item.action)}>{busyAction === download.id + ':' + item.action ? item.pendingLabel : item.label}</button>)}<button class="danger-button" data-focus-region="content" data-focus-row={band} data-focus-col="2" data-focus-key={`download-${download.id}-delete`} onClick={() => setPending({ download, scope: 'torrent' })}>Delete download</button><button data-focus-region="content" data-focus-row={band} data-focus-col="3" data-focus-key={`download-${download.id}-details`} aria-expanded={detailsShown} onClick={() => toggleDetails(download.id)}>{detailsShown ? 'Hide details' : 'Details'}</button>{multi && <button data-focus-region="content" data-focus-row={band} data-focus-col="4" data-focus-key={`download-${download.id}-files`} aria-expanded={expanded} onClick={() => toggleFiles(download.engineId)}>{expanded ? 'Hide files' : 'Show files'}</button>}</div>{multi && expanded && <div class="tv-download-files">{group.rows.map((row, rowIndex) => <div key={row.id} class="tv-download-file"><strong title={row.displayTitle || row.filePath}>{row.displayTitle || row.filePath}</strong><small>{formatBytes(row.sizeBytes)}</small><span><button data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="0" data-focus-key={`download-${row.id}-file-${row.fileIndex}-play`} onClick={() => onPlay(row)}>Play</button><button class="danger-button" data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="1" data-focus-key={`download-${row.id}-file-${row.fileIndex}-remove`} onClick={() => setPending({ download: row, scope: 'file' })}>Remove</button></span></div>)}</div>}</article>;
  })}</section>
 }
-function TVLibraryCategories({ api, onOpen }: { api: API; onOpen: (item: HouseholdItem) => void }) { const [categories, setCategories] = useState<LibraryCategory[]>([]); const [items, setItems] = useState<HouseholdItem[]>([]); const [selected, setSelected] = useState(''); const [message, setMessage] = useState('Loading library categories…'); useEffect(() => { api.libraryCategories().then(page => { setCategories(page.items as LibraryCategory[]); setMessage('') }).catch(error => setMessage(error.message)) }, []); async function open(name: string) { setSelected(name); setMessage('Loading category…'); requestLanding(); try { const page = await api.libraryCategories(name); setItems(canonicalHouseholdItems(page.items as HouseholdItem[])); setMessage('') } catch (error) { setMessage((error as Error).message) } } if (selected) return <section><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="library-category-back" onClick={() => { setSelected(''); setItems([]); requestLanding() }}>All categories</button><div class="row-heading"><h2>{selected}</h2></div>{message && <p aria-live="polite">{message}</p>}<div class="tv-library-grid">{items.map((item, index) => <LibraryCard api={api} item={item} row={2 + Math.floor(index / 5)} col={index % 5} focusKey={`library-item-${item.titleId || item.catalog?.id || item.release.id}`} onOpen={onOpen} />)}</div>{items.length === 0 && !message && <p class="tv-muted">Nothing is left in this category. Press All categories to go back.</p>}</section>; return <section class="tv-category-grid">{message && <p aria-live="polite">{message}</p>}{categories.map((category, index) => <button data-focus-region="content" data-focus-row={1 + Math.floor(index / 4)} data-focus-col={index % 4} data-focus-key={`library-category-${category.name}`} onClick={() => void open(category.name)}><strong>{category.name}</strong><span>{category.count} item{category.count === 1 ? '' : 's'}</span></button>)}</section> }
+// Category families (both Categories pages). Tiles first; opening a family lists its titles (Tracker) or managed items (My Library)
+// with a chip per raw tracker category. Lists are cached in Catalog so Back from a title page lands on already-rendered cards.
+type FamilyCacheEntry = { families?: CategoryFamily[]; titles?: CatalogTitle[]; items?: HouseholdItem[]; nextCursor?: string | null; focusKey?: string };
+const FAMILY_PAGE = 60;
+const FAMILY_CHIP_ROW = 2;
+const FAMILY_SORT_ROW = 3;
+const FAMILY_LIST_ROW = 10;
+function TVFamilies({ api, mode, familyKey, chip, sort, setFamilyKey, setChip, setSort, cache, backRef, onOpenTitle, onOpenLibraryItem }: { api: API; mode: 'catalog' | 'library'; familyKey: string; chip: string; sort: 'newest' | 'seeders' | 'title' | 'rating'; setFamilyKey: (key: string) => void; setChip: (category: string) => void; setSort: (sort: 'newest' | 'seeders' | 'title' | 'rating') => void; cache: { current: Record<string, FamilyCacheEntry> }; backRef: { current: (() => string) | null }; onOpenTitle: (title: CatalogTitle) => void; onOpenLibraryItem: (item: HouseholdItem) => void }) {
+ const unit = mode === 'library' ? 'item' : 'title';
+ const tilesKey = `${mode}:tiles`;
+ const listKey = `${mode}:${familyKey}:${chip}:${mode === 'catalog' ? sort : ''}`;
+ const [families, setFamilies] = useState<CategoryFamily[] | null>(() => cache.current[tilesKey]?.families || null);
+ const [list, setList] = useState<FamilyCacheEntry | null>(() => cache.current[listKey] || null);
+ const [message, setMessage] = useState('');
+ const [loadingMore, setLoadingMore] = useState(false);
+ const reach = useRowReach(FAMILY_LIST_ROW);
+ useEffect(() => {
+  let live = true;
+  (mode === 'library' ? api.libraryFamilies() : api.families()).then(page => { if (!live) return; cache.current[tilesKey] = { families: page.items }; setFamilies(page.items); setMessage('') }).catch(error => { if (live) setMessage((error as Error).message) });
+  return () => { live = false };
+ }, [api, mode]);
+ useEffect(() => {
+  if (!familyKey) { setList(null); return }
+  let live = true;
+  setList(cache.current[listKey] || null);
+  const load: Promise<FamilyCacheEntry> = mode === 'library'
+   ? api.libraryFamilyItems(familyKey, chip).then(page => ({ items: canonicalHouseholdItems(page.items as HouseholdItem[]), nextCursor: null }))
+   : api.titles({ family: familyKey, category: chip, sort, pageSize: FAMILY_PAGE }).then(page => { void api.ensureMetadata(page.items.map(item => item.id)).catch(() => { }); return { titles: page.items, nextCursor: page.nextCursor } });
+  load.then(entry => { if (!live) return; cache.current[listKey] = entry; setList(entry); setMessage('') }).catch(error => { if (live) { setList({ titles: [], items: [], nextCursor: null }); setMessage((error as Error).message) } });
+  return () => { live = false };
+ }, [api, mode, familyKey, chip, sort]);
+ const family = families?.find(item => item.key === familyKey) || null;
+ const open = (key: string) => { setChip(''); setFamilyKey(key); requestLanding() };
+ const pickChip = (category: string) => { setChip(category); requestLanding() };
+ backRef.current = () => { if (!familyKey) return ''; const closing = familyKey; setFamilyKey(''); setChip(''); return closing };
+ useEffect(() => () => { backRef.current = null }, []);
+ const more = () => {
+  if (loadingMore || !list?.nextCursor || mode !== 'catalog') return;
+  setLoadingMore(true);
+  api.titles({ family: familyKey, category: chip, sort, pageSize: FAMILY_PAGE, cursor: list.nextCursor }).then(page => { void api.ensureMetadata(page.items.map(item => item.id)).catch(() => { }); const entry = { titles: [...(list.titles || []), ...page.items], nextCursor: page.nextCursor }; cache.current[listKey] = entry; setList(entry) }).catch(error => setMessage((error as Error).message)).then(() => setLoadingMore(false));
+ };
+ if (!familyKey) {
+  if (families && families.length === 0) return <EmptyState title={mode === 'library' ? 'No library categories yet' : 'No categories yet'}>{mode === 'library' ? 'Download or watch a title and its category appears here.' : 'Categories appear after the first catalog sync. Open Settings and choose Fetch latest.'}</EmptyState>;
+  return <section class="tv-family-page">{message && <p class="tv-muted" aria-live="polite">{message}</p>}{!families && !message && <p class="tv-muted" aria-live="polite">Loading categories…</p>}{families && <FamilyTiles api={api} families={families} unit={unit} onOpen={open} />}</section>;
+ }
+ const name = family?.name || familyKey;
+ const titles = list?.titles || [];
+ const items = list?.items || [];
+ const empty = list !== null && titles.length === 0 && items.length === 0;
+ const heading = <div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="family-back" onClick={() => { const closing = familyKey; setFamilyKey(''); setChip(''); window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closing}"]`); if (tile) focusElement(tile); else requestLanding() }, 0) }}>← All categories</button></div>;
+ return <section class="tv-family-page">
+  {heading}
+  <FamilyChips name={name} categories={family?.categories || []} active={chip} row={FAMILY_CHIP_ROW} onPick={pickChip} />
+  {mode === 'catalog' && <div class="tv-filters" role="group" aria-label="Sort titles">{([['newest', 'Newest'], ['seeders', 'Most seeded'], ['rating', 'Rating'], ['title', 'A–Z']] as const).map(([value, label], index) => <button class={sort === value ? 'active' : ''} aria-pressed={sort === value ? 'true' : 'false'} data-focus-region="content" data-focus-row={FAMILY_SORT_ROW} data-focus-col={index} data-focus-key={`family-sort-${value}`} onClick={() => setSort(value)}>{label}</button>)}</div>}
+  {message && <p class="tv-muted" aria-live="polite">{message}</p>}
+  {list === null && !message && <p class="tv-muted" aria-live="polite">Loading…</p>}
+  {mode === 'catalog' && titles.length > 0 && <TitleRail api={api} heading={name} items={titles} row={FAMILY_LIST_ROW} from={-Infinity} until={Infinity} keyPrefix="family-title" onOpen={onOpenTitle} />}
+  {mode === 'library' && items.length > 0 && <><div class="row-heading"><h2>{name}</h2></div><div class="tv-library-grid">{items.map((item, index) => { const row = FAMILY_LIST_ROW + Math.floor(index / 5); return <LibraryCard api={api} item={item} row={row} col={index % 5} focusKey={`library-item-${item.titleId || item.catalog?.id || item.release.id}`} loadArt={inRowReach(reach, row)} onOpen={onOpenLibraryItem} /> })}</div></>}
+  {mode === 'catalog' && list?.nextCursor && <div class="tv-filters"><button data-focus-region="content" data-focus-row={FAMILY_LIST_ROW + 1} data-focus-col="0" data-focus-key="family-more" aria-disabled={loadingMore ? 'true' : undefined} onClick={more}>{loadingMore ? 'Loading…' : 'Show more titles'}</button></div>}
+  {empty && !message && <p class="tv-muted">{mode === 'library' ? 'Nothing is left in this category. Press All categories to go back.' : 'No titles in this category yet. Choose All or another category.'}</p>}
+ </section>;
+}
 function TVJobs({ api, items: initial }: { api: API; items: Job[] }) {
  const [items, setItems] = useState(initial); const [query, setQuery] = useState(''); const [state, setState] = useState(''); const [kind, setKind] = useState(''); const [retryable, setRetryable] = useState(''); const [updatedHours, setUpdatedHours] = useState(''); const [next, setNext] = useState<string | null>(null); const [message, setMessage] = useState(''); const [detail, setDetail] = useState<{ job: Job; logs: JobLog[]; next: string | null } | null>(null);
  async function load(target = '', append = false) { try { const page = await api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: target }); setItems(value => append ? [...value, ...page.items] : page.items); setNext(page.nextCursor) } catch (error) { setMessage((error as Error).message) } }
@@ -1099,62 +1167,108 @@ const TitleCard = memo(function TitleCard({ api, title, row, col, focusKey, seed
  return <button ref={focusRef} class="poster-card" data-landing="card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey || `title-${title.id}`} data-art={artURL(api, title)} onClick={() => onOpen(title)}>{title.posterUrl ? <PosterArt src={api.streamURL(title.posterUrl)} load={loadArt} /> : <div class="poster-fallback">{title.title.slice(0, 1)}</div>}<TVStateBadges state={title.libraryState} /><div class="poster-copy"><strong>{title.title}</strong><span>{cardMeta(title, { seeders })}</span></div></button>;
 });
 function sourceActionLabel(source: CatalogSource) { return source.libraryState?.downloadState && source.libraryState.downloadState !== 'none' ? 'Play' : 'Play and download' }
-function SourceButton({ source, row, onPlay, focusKey }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void; focusKey?: string }) {
+function SourceButton({ source, row, onPlay, focusKey, region = 'content', best }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void; focusKey?: string; region?: string; best?: boolean }) {
  const name = source.filePath || source.release.name;
  const secondary = [source.release.trackerName, source.parsed.audio].filter(Boolean).join(' · ');
  // The decision point: resolution, chips, size and seeders lead. Tracker and audio are secondary; the release and file name is evidence and shows only while the row has focus.
- return <button class="source-button" data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={focusKey || `source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}>
-  <span class="source-main"><b class="source-resolution">{sourceHeadline(source.parsed)}</b>{sourceChips(source.parsed, source.release.category).map(chip => <span class="source-chip">{chip}</span>)}<span class="source-facts">{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b></span></span>
+ return <button class={`source-button ${best ? 'best' : ''}`} data-focus-region={region} data-focus-row={row} data-focus-col="0" data-focus-key={focusKey || `source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}>
+  <span class="source-main"><b class="source-resolution">{sourceHeadline(source.parsed)}</b>{best && <span class="source-best">Best match</span>}{sourceChips(source.parsed, source.release.category).map(chip => <span class="source-chip">{chip}</span>)}<span class="source-facts">{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b></span></span>
   {secondary && <span class="source-secondary">{secondary}</span>}
   <span class="source-filename" title={name}>{name}</span>
  </button>;
 }
 
 type SeasonPackAction = 'download' | 'pause' | 'resume' | 'retry' | 'delete';
-function TVSeasonPackCard({ source, season, index, baseRow, open, onToggle, onAction, onDelete }: { source: CatalogSource; season: number; index: number; baseRow: number; open: boolean; onToggle: () => void; onAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onDelete: () => void }) {
+// A complete-season pack in the versions pane: always open, one row of actions, no disclosure to step through.
+function TVSeasonPackCard({ source, season, row, onAction, onDelete }: { source: CatalogSource; season: number; row: number; onAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onDelete: () => void }) {
  const state = source.libraryState; const [busy, setBusy] = useState(''); const managed = Boolean(state?.downloadId); const paused = state?.transferState === 'paused'; const complete = state?.downloadState === 'downloaded'; const error = state?.downloadState === 'error';
  const run = async (action: SeasonPackAction) => { if (busy) return; setBusy(action); try { await onAction(source, season, action) } catch { /* the detail area already shows the message */ } finally { setBusy('') } };
- // Unique structured row band per pack card: shared rows collided across
- // cards, so D-pad movement crossed into sibling headers and controls.
- const row = baseRow + index * 4;
- return <article class={`season-pack-card ${open ? 'expanded' : ''}`}>
-  <button class="season-pack-button" data-focus-region="content" data-focus-row={row} data-focus-col={index} data-focus-key={`season-pack-${source.release.id}`} aria-expanded={open} aria-controls={`tv-pack-${source.release.id}`} onClick={onToggle} aria-label={`${source.parsed.resolution || 'Season pack'} · ${seasonPackActionLabel(state)} · ${open ? 'hide' : 'show'} controls`}>
+ const base = `season-pack-${source.release.id}`;
+ return <article class="season-pack-card">
+  <div class="season-pack-head">
    <span class="season-pack-copy"><strong>{source.parsed.resolution ? sourceHeadline(source.parsed) : 'Season pack'}</strong>{sourceChips(source.parsed).length > 0 && <small>{sourceChips(source.parsed).join(' · ')}</small>}<small>{formatBytes(source.release.sizeBytes)} · {source.release.seeders} seeders</small><small>{[source.release.trackerName, source.parsed.audio].filter(Boolean).join(' · ')}</small></span>
    <span class="season-pack-action"><TVStateBadges state={state} /><b>{seasonPackActionLabel(state)}</b></span>
-  </button>
-  {open && <div id={`tv-pack-${source.release.id}`} class="season-pack-controls"><p class="source-filename">{source.release.name}</p><progress value={state?.progress || 0} max="1" aria-label="Season download progress" />{!managed && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="0" data-focus-key={`season-pack-${source.release.id}-download`} onClick={() => void run('download')}>{busy ? 'Starting…' : 'Download season'}</button>}{managed && !complete && !error && <button aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="1" data-focus-key={`season-pack-${source.release.id}-toggle`} onClick={() => void run(paused ? 'resume' : 'pause')}>{busy ? `${paused ? 'Resuming' : 'Pausing'}…` : paused ? 'Resume' : 'Pause'}</button>}{error && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="2" data-focus-key={`season-pack-${source.release.id}-retry`} onClick={() => void run('retry')}>{busy ? 'Retrying…' : 'Retry'}</button>}{managed && <button class="danger-button" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="3" data-focus-key={`season-pack-${source.release.id}-delete`} onClick={() => { if (!busy) onDelete() }}>Delete download</button>}</div>}
+  </div>
+  <p class="source-filename">{source.release.name}</p>
+  {managed && <progress value={state?.progress || 0} max="1" aria-label="Season download progress" />}
+  <div class="season-pack-controls">{!managed && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="versions" data-focus-row={row} data-focus-col="0" data-focus-key={`${base}-download`} onClick={() => void run('download')}>{busy ? 'Starting…' : 'Download season'}</button>}{managed && !complete && !error && <button aria-disabled={busy ? 'true' : undefined} data-focus-region="versions" data-focus-row={row} data-focus-col="1" data-focus-key={`${base}-toggle`} onClick={() => void run(paused ? 'resume' : 'pause')}>{busy ? `${paused ? 'Resuming' : 'Pausing'}…` : paused ? 'Resume' : 'Pause'}</button>}{error && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="versions" data-focus-row={row} data-focus-col="2" data-focus-key={`${base}-retry`} onClick={() => void run('retry')}>{busy ? 'Retrying…' : 'Retry'}</button>}{managed && <button class="danger-button" aria-disabled={busy ? 'true' : undefined} data-focus-region="versions" data-focus-row={row} data-focus-col="3" data-focus-key={`${base}-delete`} onClick={() => { if (!busy) onDelete() }}>Delete download</button>}</div>
  </article>;
 }
+
+const episodeKeyOf = (episode: { season: number; number: number }) => `${episode.season}:${episode.number}`;
+// The episode that opens selected in the versions pane: the link's target, the saved progress, else the first one not yet watched.
+function defaultEpisodeOf(season: CatalogSeason | undefined, target: DetailTarget, resume?: HouseholdItem): CatalogEpisode | undefined {
+ if (!season) return undefined;
+ const targeted = target.episode && target.season === season.number ? season.episodes.find(item => item.number === target.episode) : undefined;
+ const saved = resume?.seasonNumber === season.number && resume.episodeNumber ? season.episodes.find(item => item.number === resume.episodeNumber) : undefined;
+ return targeted || saved || season.episodes.find(item => item.libraryState?.watchState !== 'watched') || season.episodes[0];
+}
+const paneFocusable = (selector: string) => document.querySelector<HTMLElement>(selector);
 
 function TitleDetail({ api, detail, target, message, resume, favorite, onClose, onFavorite, onResume, onPlay, onPackAction }: { api: API; detail: CatalogDetail; target: DetailTarget; message: string; resume?: HouseholdItem; favorite: boolean; onClose: () => void; onFavorite: (title: CatalogTitle, value: boolean) => void; onResume: (item: HouseholdItem) => void; onPlay: (release: Release, fileIndex?: number) => void; onPackAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean> }) {
  // Season to open: the link's target, else the season of the saved progress, else the first.
  const [season, setSeason] = useState(() => target.season || (resume?.seasonNumber && detail.seasons.some(item => item.number === resume.seasonNumber) ? resume.seasonNumber : 0) || detail.seasons[0]?.number || 0);
- const [expanded, setExpanded] = useState(target.episode ? `${target.season}:${target.episode}` : '');
- const [expandedPack, setExpandedPack] = useState('');
+ // The episode whose versions show on the right; '' follows the default. Focus selects it after a short pause.
+ const [picked, setPicked] = useState('');
  const [pendingPack, setPendingPack] = useState<CatalogSource | null>(null);
  const [deleting, setDeleting] = useState(false);
  const [refreshing, setRefreshing] = useState(false);
  const [refreshNote, setRefreshNote] = useState('');
- const [packsOpen, setPacksOpen] = useState(false);
  const [infoOpen, setInfoOpen] = useState(false);
  const selected = detail.seasons.find(item => item.number === season);
- // The packs toggle owns row 3. Expanded pack cards occupy 4-row bands
- // from row 4 (4 + index * 4); collapsed packs render no cards at all, so
- // episode rows start right after the toggle and the bands stay disjoint
- // for any pack count.
- const packCount = selected?.packSources?.length || 0;
- const episodeRowBase = packsOpen && packCount > 0 ? 5 + packCount * 4 : 4;
- // Best version: the primary Play prepares the top-ranked source of the selected season's target episode (movies: of the title). The full list stays below and behind Choose version.
+ // Best version: the primary Play prepares the top-ranked source of the selected season's target episode (movies: of the title).
  const playEpisode = selected && (target.episode && target.season === selected.number ? selected.episodes.find(item => item.number === target.episode) : undefined) || selected?.episodes[0];
  const firstSource = bestSourceForDetail(detail, { season: selected?.number, episode: playEpisode?.number });
- const chooseVersion = () => {
-  const episodeKey = playEpisode ? `${playEpisode.season}:${playEpisode.number}` : '';
-  if (episodeKey && expanded !== episodeKey) setExpanded(episodeKey);
-  window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('.source-button')), 0);
+ const defaultEpisode = defaultEpisodeOf(selected, target, resume);
+ const unknownKey = selected?.unknown && selected.unknown.length > 0 ? `unknown-${selected.number}` : '';
+ // A pick that vanished in a data refresh falls back to the default; one that is still there never moves.
+ const pickedValid = picked !== '' && (picked === unknownKey || Boolean(selected?.episodes.some(item => episodeKeyOf(item) === picked)));
+ const selectedKey = pickedValid ? picked : defaultEpisode ? episodeKeyOf(defaultEpisode) : unknownKey;
+ const selectedEpisode = selected?.episodes.find(item => episodeKeyOf(item) === selectedKey);
+ const timer = useRef(0);
+ const enterFor = useRef('');
+ const focusVersions = () => { const first = paneFocusable('[data-focus-region="versions"]'); if (first) focusElement(first); return Boolean(first) };
+ // Move into the versions pane for an episode; a not-yet-committed pick is committed first and focus follows its render.
+ const enterVersions = (key: string) => {
+  window.clearTimeout(timer.current);
+  if (key === selectedKey) { focusVersions(); return }
+  enterFor.current = key; setPicked(key);
  };
- useEffect(() => { const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(timer); }, []);
- useEffect(() => { if (!pendingPack) return; const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(timer) }, [pendingPack]);
- useEffect(() => { if (infoOpen || (!expanded && !expandedPack && !pendingPack)) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (pendingPack && !deleting) setPendingPack(null); else if (expandedPack) setExpandedPack(''); else setExpanded('') }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [expanded, expandedPack, pendingPack, deleting, infoOpen]);
+ useEffect(() => { if (enterFor.current && enterFor.current === selectedKey) { enterFor.current = ''; focusVersions() } });
+ useEffect(() => () => window.clearTimeout(timer.current), []);
+ const scheduleSelect = (key: string) => { window.clearTimeout(timer.current); if (key === selectedKey) return; timer.current = window.setTimeout(() => setPicked(key), 150) };
+ const chooseVersion = () => { if (detail.seasons.length === 0) { focusElement(document.querySelector<HTMLElement>('.source-button')); return } const key = playEpisode ? episodeKeyOf(playEpisode) : selectedKey; if (key) enterVersions(key); else focusVersions() };
+ useEffect(() => { const t = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-detail-initial]')), 0); return () => window.clearTimeout(t); }, []);
+ useEffect(() => { if (!pendingPack) return; const t = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(t) }, [pendingPack]);
+ const closePackDialog = () => { const pack = pendingPack; setPendingPack(null); if (pack) window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="season-pack-${pack.release.id}-delete"]`)), 0) };
+ useEffect(() => { if (!pendingPack) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (!deleting) closePackDialog() }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [pendingPack, deleting]);
+ // Pane movement. Up, Down and in-row moves inside a pane use the structured attributes; this only adds the moves between the panes and the season bar.
+ const latest = useRef({ season, selectedKey, enterVersions });
+ latest.current = { season, selectedKey, enterVersions };
+ useEffect(() => {
+  const handle = (event: KeyboardEvent) => {
+   const action = remoteAction(event.key, event.keyCode);
+   const active = document.activeElement as HTMLElement | null;
+   if (!action || !active || !active.dataset) return;
+   const region = active.dataset.focusRegion;
+   const now = latest.current;
+   const go = (element: HTMLElement | null) => { event.preventDefault(); event.stopImmediatePropagation(); focusElement(element) };
+   const episodeButton = () => paneFocusable(`[data-focus-region="episodes"][data-episode-key="${now.selectedKey}"]`) || paneFocusable('[data-focus-region="episodes"]');
+   if (region === 'episodes') {
+    if (action === 'right') { event.preventDefault(); event.stopImmediatePropagation(); now.enterVersions(active.dataset.episodeKey || now.selectedKey) }
+    else if (action === 'up' && active.dataset.focusRow === '0') go(paneFocusable(`[data-focus-key="season-${now.season}"]`));
+    else if (action === 'left') go(active);
+   } else if (region === 'versions') {
+    if (action === 'up' && active.dataset.focusRow === '0') go(paneFocusable(`[data-focus-key="season-${now.season}"]`));
+    else if (action === 'back') go(episodeButton());
+    else if (action === 'left' && !chooseStructuredTarget(active, visibleFocusables(), 'left')) go(episodeButton() || active);
+   } else if (region === 'content' && action === 'down' && (active.dataset.focusKey || '').indexOf('season-') === 0 && active.dataset.focusRow === '2') {
+    go(episodeButton() || paneFocusable('[data-focus-region="versions"]') || active);
+   }
+  };
+  document.addEventListener('keydown', handle, true);
+  return () => document.removeEventListener('keydown', handle, true);
+ }, []);
  const confirmDelete = async () => { if (!pendingPack || !selected || deleting) return; setDeleting(true); try { await onPackAction(pendingPack, selected.number, 'delete'); setPendingPack(null) } catch { /* the detail area already shows the message; the dialog stays open */ } finally { setDeleting(false) } };
  const refresh = async () => {
   if (refreshing) return;
@@ -1162,6 +1276,13 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
   setRefreshNote('');
   try { await api.refreshTitle(detail.title.id, detail.title.title, true) } catch (e) { setRefreshNote((e as Error).message) } finally { setRefreshing(false) }
  };
+ const packs = selected?.packSources || [];
+ const paneSources = selectedEpisode ? rankSources(selectedEpisode.sources, { season: selectedEpisode.season, episode: selectedEpisode.number }) : [];
+ const unknownSources: CatalogSource[] = [];
+ if (unknownKey && selectedKey === unknownKey && selected?.unknown) selected.unknown.forEach(episode => episode.sources.forEach(source => unknownSources.push(source)));
+ const code = (value: number) => (value < 10 ? '0' : '') + value;
+ const paneTitle = selectedEpisode ? `S${code(selectedEpisode.season)} · E${code(selectedEpisode.number)} · ${selectedEpisode.title}` : unknownSources.length > 0 && selected ? `S${code(selected.number)} · Unknown episodes` : selected ? `Season ${selected.number}` : '';
+ const packBase = Math.max(paneSources.length, unknownSources.length);
  return <main class="detail-screen">
   <Backdrop initial={artURL(api, detail.title)} follow={false} sharp posterOnly={!detail.title.backdropUrl && !!detail.title.posterUrl} />
   <button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}>Back</button>
@@ -1184,53 +1305,43 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
   {refreshNote && <p class="detail-message" role="alert">{refreshNote}</p>}
   {detail.seasons.length > 0 && <section class="season-browser">
    <h2>Seasons</h2>
-   <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { setSeason(item.number); setExpanded(''); setExpandedPack('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
-   {selected?.packSources && selected.packSources.length > 0 && <div class="season-pack-downloads">
-    <button class="episode-tile packs-toggle" aria-expanded={packsOpen} data-focus-region="content" data-focus-row="3" data-focus-col="0" data-focus-key={`packs-toggle-${selected.number}`} onClick={() => setPacksOpen(current => !current)}>
-     <span><b>Complete season versions ({selected.packSources.length})</b><small>Download every episode of this season at once. Open a version to review it first.</small></span>
-     <b>{packsOpen ? 'Hide' : 'Show'}</b>
-    </button>
-    {packsOpen && <div class="season-pack-grid">{selected.packSources.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected.number} index={index} baseRow={4} open={expandedPack === source.release.id} onToggle={() => setExpandedPack(current => current === source.release.id ? '' : source.release.id)} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>}
-   </div>}
-   {selected && selected.episodes.length === 0 ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates by itself when it is ready.</p> : selected?.episodes.map((episode, index) => {
-    const key = `${episode.season}:${episode.number}`;
-    const open = expanded === key;
-    const row = episodeRowBase + index * 20;
-    const episodeState = episode.libraryState;
-    const progress = episodeState && episodeState.watchState !== 'watched' && episodeState.positionMs ? watchProgress({ positionMs: episodeState.positionMs, durationMs: episodeState.durationMs || 0 }) : 0;
-    return <article key={key} class={`episode-row ${open ? 'expanded' : ''}`}>
-     <button class="episode-tile" aria-expanded={open} data-focus-region="content" data-focus-row={row} data-focus-col="0" data-focus-key={`episode-${key}`} onClick={() => setExpanded(current => current === key ? '' : key)}>
-      <span><b>{episode.number ? `${episode.number}. ` : ''}{episode.title}</b><small>{episodeMeta(episode, progress)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
-      <TVStateBadges state={episode.libraryState} />
-     </button>
-     {open && episode.sources.map((source, sourceIndex) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={row + 1 + sourceIndex} onPlay={onPlay} />)}
-    </article>;
-   })}
-   {selected && selected.unknown && selected.unknown.length > 0 && (() => {
-    const groupKey = `unknown-${selected.number}`;
-    const groupOpen = expanded === groupKey;
-    const groupRow = episodeRowBase + selected.episodes.length * 20;
-    // Built with forEach+push: flatMap/flat are absent from the Tizen 5.0
-    // engine floor and the pack validator rejects them.
-    const children: JSX.Element[] = [];
-    selected.unknown.forEach((episode, episodeIndex) => {
-     const key = `unknown-episode-${episode.season}:${episode.number}`;
-     episode.sources.forEach((source, sourceIndex) => {
-      children.push(<SourceButton key={`${key}-${sourceIndex}`} source={source} row={groupRow + 1 + episodeIndex * 2 + sourceIndex} focusKey={`${key}-${sourceIndex}`} onPlay={onPlay} />);
-     });
-    });
-    return <article key={groupKey} class="episode-row unknown-group">
-     <button class="episode-tile" aria-expanded={groupOpen} data-focus-region="content" data-focus-row={groupRow} data-focus-col="0" data-focus-key={groupKey} onClick={() => setExpanded(current => current === groupKey ? '' : groupKey)}>
-      <span><b>Unknown episodes ({selected.unknown.length})</b><small>Files without episode information</small></span>
-     </button>
-     {groupOpen && children}
-    </article>;
-   })()}
+   <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { window.clearTimeout(timer.current); setSeason(item.number); setPicked('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
+   <div class="season-panes">
+    <div class="episode-pane" role="list" aria-label={`Season ${season} episodes`}>
+     {selected && selected.episodes.length === 0 && !unknownKey ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates by itself when it is ready.</p> : selected?.episodes.map((episode, index) => {
+      const key = episodeKeyOf(episode);
+      const chosen = selectedKey === key;
+      const episodeState = episode.libraryState;
+      const progress = episodeState && episodeState.watchState !== 'watched' && episodeState.positionMs ? watchProgress({ positionMs: episodeState.positionMs, durationMs: episodeState.durationMs || 0 }) : 0;
+      return <article key={key} role="listitem" class="episode-row">
+       <button class={`episode-tile ${chosen ? 'selected' : ''}`} aria-current={chosen ? 'true' : undefined} data-episode-key={key} data-focus-region="episodes" data-focus-row={index} data-focus-col="0" data-focus-key={`episode-${key}`} onFocus={() => scheduleSelect(key)} onClick={() => enterVersions(key)}>
+        <span><b>{episode.number ? `${episode.number}. ` : ''}{episode.title}</b><small>{episodeMeta(episode, progress)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
+        <TVStateBadges state={episode.libraryState} />
+       </button>
+      </article>;
+     })}
+     {selected && unknownKey && <article key={unknownKey} role="listitem" class="episode-row unknown-group">
+      <button class={`episode-tile ${selectedKey === unknownKey ? 'selected' : ''}`} aria-current={selectedKey === unknownKey ? 'true' : undefined} data-episode-key={unknownKey} data-focus-region="episodes" data-focus-row={selected.episodes.length} data-focus-col="0" data-focus-key={unknownKey} onFocus={() => scheduleSelect(unknownKey)} onClick={() => enterVersions(unknownKey)}>
+       <span><b>Unknown episodes ({selected.unknown!.length})</b><small>Files without episode information</small></span>
+      </button>
+     </article>}
+    </div>
+    <section class="versions-pane" aria-label="Versions">
+     <header class="versions-head"><small>Versions</small><h3>{paneTitle}</h3></header>
+     <div class="versions-scroll">
+      {paneSources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} region="versions" row={index} best={index === 0} onPlay={onPlay} />)}
+      {unknownSources.map((source, index) => <SourceButton key={`unknown-${source.release.id}:${source.fileIndex ?? -1}:${index}`} source={source} region="versions" row={index} focusKey={`unknown-source-${index}`} onPlay={onPlay} />)}
+      {selectedEpisode && paneSources.length === 0 && <p class="versions-empty" role="status">No versions of this episode yet.</p>}
+      {packs.length > 0 && <div class="season-pack-downloads"><h4>Complete season</h4><p class="supporting">Download every episode of season {selected!.number} at once.</p>{packs.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected!.number} row={packBase + index} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>}
+      {!selectedEpisode && unknownSources.length === 0 && packs.length === 0 && <p class="versions-empty" role="status">Pick an episode to see its versions.</p>}
+     </div>
+    </section>
+   </div>
   </section>}
   {detail.seasons.length === 0 && detail.sources.length === 0 && <section class="source-list"><EmptyState title="No versions yet">The trackers have no release for this title right now. Press Refresh data to search them again.</EmptyState></section>}
   {detail.seasons.length === 0 && detail.sources.length > 0 && <section class="source-list"><h2>Versions</h2>{detail.sources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={2 + index} onPlay={onPlay} />)}</section>}
   {infoOpen && <TitleInfoPanel api={api} title={detail.title} onClose={() => { setInfoOpen(false); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="detail-info"]')), 0) }} />}
-  {pendingPack && <section role="dialog" aria-modal="true" aria-labelledby="tv-season-pack-delete-heading" class="tv-settings tv-removal-confirm tv-season-pack-confirm"><h2 id="tv-season-pack-delete-heading">Delete season download?</h2><strong>Season {selected?.number}</strong><p>{pendingPack.release.name} · {pendingPack.release.trackerName}</p><p>This permanently deletes the season download and every episode file in it. You can download the season again later.</p><button aria-disabled={deleting ? 'true' : undefined} data-focus-region="season-pack-dialog" data-focus-row="0" data-focus-col="0" data-focus-key="season-pack-delete-cancel" onClick={() => { if (!deleting) setPendingPack(null) }}>Cancel</button><button aria-disabled={deleting ? 'true' : undefined} class="danger-button" data-focus-region="season-pack-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="season-pack-delete-confirm" onClick={() => void confirmDelete()}>{deleting ? 'Deleting…' : 'Delete download'}</button></section>}
+  {pendingPack && <section role="dialog" aria-modal="true" aria-labelledby="tv-season-pack-delete-heading" class="tv-settings tv-removal-confirm tv-season-pack-confirm"><h2 id="tv-season-pack-delete-heading">Delete season download?</h2><strong>Season {selected?.number}</strong><p>{pendingPack.release.name} · {pendingPack.release.trackerName}</p><p>This permanently deletes the season download and every episode file in it. You can download the season again later.</p><button aria-disabled={deleting ? 'true' : undefined} data-focus-region="season-pack-dialog" data-focus-row="0" data-focus-col="0" data-focus-key="season-pack-delete-cancel" onClick={() => { if (!deleting) closePackDialog() }}>Cancel</button><button aria-disabled={deleting ? 'true' : undefined} class="danger-button" data-focus-region="season-pack-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="season-pack-delete-confirm" onClick={() => void confirmDelete()}>{deleting ? 'Deleting…' : 'Delete download'}</button></section>}
  </main>;
 }
 

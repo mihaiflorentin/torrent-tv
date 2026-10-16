@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, Download, PlaybackPreferences } from '@torrent-tv/shared';
 import type { TVPlatformHooks } from './platform';
 
@@ -114,7 +115,7 @@ render(null, appRoot);
 appRoot.remove();
 
 // Helper to let Preact and happy-dom complete microtask turns and effect commits
-const tick = (ms = 25) => new Promise(r => setTimeout(r, ms));
+const tick = (ms = 25) => sleep(ms);
 
 interface MockAVPlayListener {
   onbufferingstart?: () => void;

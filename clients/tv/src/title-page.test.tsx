@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { NavSnapshot } from './nav-snapshot';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, HouseholdItem, HouseholdState } from '@torrent-tv/shared';
 
@@ -22,7 +23,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { Catalog } = await import('./main');
 
-const wait = (ms = 40) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 40) => sleep(ms);
 const release = (id: string, over = {}) => ({ id, trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '4', browseClass: 'video', name: `Alpha.${id}`, category: 'Movies HD', sizeBytes: 4_200_000_000, seeders: 50, leechers: 2, freeleech: false, ...over });
 const title = (over: Partial<CatalogTitle> = {}): CatalogTitle => ({ id: 'a', title: 'Alpha', kind: 'movie', year: 2019, resolutions: ['1080p'], categories: [], sourceCount: 2, bestSeeders: 77, largestSizeBytes: 1000, trackers: [{ id: 'filelist', name: 'FileList' }], ...over });
 const source = (id: string, parsed: Partial<CatalogSource['parsed']> = {}, rel = {}, state?: CatalogSource['libraryState']): CatalogSource => ({ release: release(id, rel), parsed: { title: 'Alpha', sortTitle: 'alpha', kind: 'movie', resolution: '1080p', quality: 'WEB-DL', ...parsed }, fileIndex: 0, filePath: `${id}.mkv`, fileSizeBytes: 4_200_000_000, libraryState: state });
@@ -215,7 +216,7 @@ describe('TV title page', () => {
       mount(container, { title: async () => data } as unknown as Partial<API>, { titles: [title()], initialNav: nav({ titleId: 'a', titleName: 'Alpha', target: { season: 2, episode: 2 } }) });
       await wait(80);
       expect(key('season-2')!.className).toContain('active');
-      expect(key('episode-2:2')!.getAttribute('aria-expanded')).toBe('true');
+      expect(key('episode-2:2')!.getAttribute('aria-current')).toBe('true');
     });
 
     it('restores the list route and focuses the saved card when it is still there', async () => {

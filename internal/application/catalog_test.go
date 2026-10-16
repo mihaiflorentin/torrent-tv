@@ -123,7 +123,7 @@ type bayCatalog struct{ Tracker }
 func (bayCatalog) ID() string   { return "piratebay" }
 func (bayCatalog) Name() string { return "The Pirate Bay" }
 
-func dualTrackerRegistry(t *testing.T) *TrackerRegistry {
+func dualTrackerRegistry(t testing.TB) *TrackerRegistry {
 	t.Helper()
 	reg, err := NewTrackerRegistry([]TrackerRegistration{
 		{Adapter: openCatalog{}, Enabled: func() bool { return true }, Configured: func() bool { return true }},
@@ -135,7 +135,7 @@ func dualTrackerRegistry(t *testing.T) *TrackerRegistry {
 	return reg
 }
 
-func projectionHarness(t *testing.T) (*Service, *sqlite.Repository) {
+func projectionHarness(t testing.TB) (*Service, *sqlite.Repository) {
 	t.Helper()
 	repo, settings := retryHarness(t)
 	service := NewService(dualTrackerRegistry(t), singleEngineSet(t, "qb:", &streamingEngine{}), repo, settings)

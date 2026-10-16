@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, Download } from '@torrent-tv/shared';
 // Static import cannot work here: main.tsx bootstraps and asserts the presence
 // of document.getElementById('app') during module evaluation. The #app container
@@ -23,7 +24,7 @@ document.body.appendChild(appRoot);
 
 const { Catalog } = await import('./main');
 
-const wait = (ms = 30) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 30) => sleep(ms);
 const lastSort = (fn: { mock: { calls: unknown[][] } }) => (fn.mock.calls[fn.mock.calls.length - 1]?.[0] as { sort?: string } | undefined)?.sort;
 
 const title = (id: string, name: string): CatalogTitle => ({
@@ -141,10 +142,6 @@ describe('calm action errors', () => {
 
     key('hero-series-1')?.click();
     await wait(40);
-    key('packs-toggle-1')?.click();
-    await wait();
-    container.querySelector<HTMLButtonElement>('[data-focus-key="season-pack-rel-pack-1"]')?.click();
-    await wait();
     key('season-pack-rel-pack-1-toggle')?.click();
     await wait(40);
 

@@ -262,6 +262,12 @@ paths:
         - { in: query, name: category, schema: { type: string } }
         - {
             in: query,
+            name: family,
+            description: Category family key (see /catalog/families); limits results to that family's tracker categories. Combine with category to narrow to one category inside it.,
+            schema: { type: string, enum: [movies, series, uhd, anime, kids, romanian, docs-sport, music-videos, other] },
+          }
+        - {
+            in: query,
             name: kind,
             schema: { type: string, enum: [movie, series] },
           }
@@ -442,6 +448,62 @@ paths:
                       },
                   },
               },
+          },
+      }
+  /catalog/families:
+    get:
+      {
+        operationId: listCatalogFamilies,
+        description: Category families with titles in the catalog, each with its title count, newest title, the raw tracker categories inside it and its quarterly Family art. Audio-only categories and CAM/TS are not listed. Cached for ten minutes on the server.,
+        responses:
+          {
+            "200":
+              {
+                description: Category family tiles in display order,
+                content:
+                  {
+                    application/json:
+                      {
+                        schema: { $ref: "#/components/schemas/FamilyPage" },
+                      },
+                  },
+              },
+          },
+      }
+  /catalog/families/{key}/art.svg:
+    get:
+      {
+        operationId: getFamilyArt,
+        description: The family's bundled artwork, used as Family art when none of its titles has artwork.,
+        parameters:
+          [{ in: path, name: key, required: true, schema: { type: string } }],
+        responses:
+          {
+            "200":
+              {
+                description: Bundled SVG artwork,
+                content: { image/svg+xml: { schema: { type: string } } },
+              },
+            "404": { description: Unknown family },
+          },
+      }
+  /library/families:
+    get:
+      {
+        operationId: listLibraryFamilies,
+        description: Category families that hold managed library items (downloaded, watched, in progress or favorited), same tile shape as /catalog/families. With family (and optionally category) it returns that family's household items instead.,
+        parameters:
+          [
+            { in: query, name: family, schema: { type: string } },
+            { in: query, name: category, schema: { type: string } },
+          ],
+        responses:
+          {
+            "200":
+              {
+                description: Family tiles, or household items when family is given,
+              },
+            "400": { description: Unknown family },
           },
       }
   /artwork/{titleId}/{kind}:
@@ -1815,6 +1877,42 @@ components:
               {
                 type: array,
                 items: { $ref: "#/components/schemas/CatalogSource" },
+              },
+          },
+      }
+    FamilyPage:
+      {
+        type: object,
+        required: [items, total],
+        properties:
+          {
+            items: { type: array, items: { $ref: "#/components/schemas/Family" } },
+            nextCursor: { type: string, nullable: true },
+            total: { type: integer },
+          },
+      }
+    Family:
+      {
+        type: object,
+        required: [key, name, count, categories, art],
+        properties:
+          {
+            key: { type: string, example: movies },
+            name: { type: string, example: Movies },
+            count: { type: integer, description: Canonical titles in the family },
+            newestTitle: { type: string },
+            newestTitleId: { type: string },
+            categories: { type: array, items: { type: string }, description: Raw tracker categories inside the family, sub-filter chips },
+            art:
+              {
+                type: object,
+                required: [url, source],
+                properties:
+                  {
+                    url: { type: string, description: Server-relative image URL },
+                    source: { type: string, enum: [catalog, bundled] },
+                    titleId: { type: string },
+                  },
               },
           },
       }

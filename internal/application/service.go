@@ -57,6 +57,11 @@ type Service struct {
 	seasonCalls      map[string]*seasonCall
 	mediaInfoMu      sync.Mutex
 	mediaInfoCache   map[string]cachedMediaInfo
+	familyMu         sync.Mutex
+	families         familyCache
+	familyGen        uint64
+	familyFlight     *familyFlight
+	familyNow        func() time.Time
 	providerMu       sync.Mutex
 	providerCtx      context.Context
 	providerCancel   context.CancelFunc
@@ -619,6 +624,9 @@ func (s *Service) runCatalogSync(job domain.Job, mode string) {
 	} else {
 		s.jobLog(job, "error", "complete", "Catalog synchronization failed", map[string]any{"error": job.Error})
 	}
+	// Counts and newest titles in the family tiles changed; the stored art picks are untouched.
+	// Callers keep the previous tiles until the background recomputation lands.
+	s.RefreshFamilies()
 	s.publish("catalog.updated", map[string]any{"mode": mode, "items": total, "job": job})
 }
 
