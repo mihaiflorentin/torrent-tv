@@ -1,3 +1,4 @@
+import type { CategoryFamily } from './families';
 export type TrackerRef = { id: string; name: string };
 export type TrackerStatus = TrackerRef & {
  enabled: boolean;
@@ -221,6 +222,9 @@ export class API {
  title(id: string) { return this.call<CatalogDetail>(`/catalog/titles/${encodeURIComponent(id)}`) }
  titleInfo(id: string) { return this.call<TitleInfo>(`/catalog/titles/${encodeURIComponent(id)}/info`) }
  facets() { return this.call<CatalogFacets>('/catalog/facets') }
+ families() { return this.call<Page<CategoryFamily>>('/catalog/families') }
+ libraryFamilies() { return this.call<Page<CategoryFamily>>('/library/families') }
+ libraryFamilyItems(family: string, category = '') { return this.call<Page<HouseholdItem>>('/library/families?family=' + encodeURIComponent(family) + (category ? '&category=' + encodeURIComponent(category) : '')) }
  trackers() { return this.call<TrackerStatus[]>('/trackers') }
  prepare(id: string, fileIndex = -1, signal?: AbortSignal) {
   return this.call<Download>(`/releases/${encodeURIComponent(id)}/prepare`, {
@@ -282,5 +286,7 @@ export { buildPath, parsePath } from './routes';
 export type { Route, View } from './routes';
 export { formatEtaLeft, prepareHint, readyLine, readyPercent } from './getting-ready';
 
+export { familyCountLabel, familyNewestLine, familyTileLabel } from './families';
+export type { CategoryFamily, FamilyArt } from './families';
 export { castInitials, episodeAirLabel, formatRuntime, formatShortDate, infoView, releaseLine } from './title-info';
 export type { InfoView } from './title-info';
