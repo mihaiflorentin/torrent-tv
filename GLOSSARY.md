@@ -26,6 +26,13 @@ The media class of a Release: `movie` or `series`. Never inferred from the track
 A tracker category ID or class; a hint that can mislead Kind.
 _Avoid_: genre, section
 
+**Category family**:
+A household-facing grouping of tracker Categories that mean the same kind of video (for example Movies, Series, 4K & UHD, Anime). What the Categories pages show; audio-only Categories and CAM/TS belong to no family and are reached only through Browse filters.
+_Avoid_: genre, section
+
+**Family art**:
+The one image a Category family shows, the same on every device for a calendar quarter: the backdrop of one of the family's best titles, or the family's bundled artwork when none has art.
+
 **Canonical title**:
 One movie/show identity that groups many Releases (IMDb ID preferred, title+year fallback). The unit the library browses.
 
