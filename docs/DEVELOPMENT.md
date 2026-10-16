@@ -31,6 +31,29 @@ make validate-tizen-wgt TIZEN_TARGET=5.0
 
 `npm run build -w @torrent-tv/webos` compiles the shared TV sources for the Chromium 53 floor into `clients/webos/dist` (classic scripts only); the webOS unit tests run with `npm run test -w @torrent-tv/webos`. `make webos-ipk` packs the dist through the official `ares-package` CLI, pinned to `@webos-tools/cli` 3.2.5, producing `clients/webos/.build/artifacts/torrent-tv-<version>-webos.ipk` plus its SHA-256; `make validate-webos-ipk` checks archive layout, LG metadata (the declared version must equal `VERSION`), packaged scripts, and the classic-script gates. `make smoke-webos-engine` boots the packaged index in the pinned `selenoid/chrome:53.0` image — the engine of the required webOS 4.x generation — and runs clean, injected-error, and broken-bundle cases with playback, seek, and track assertions. CI's `webos` job chains build, tests, packaging, validation, the smoke, and the same-bundle byte check that proves the webOS build left the Tizen and Android bundles untouched.
 
+### TV menu and D-pad performance harness
+
+```sh
+make perf-tv
+```
+
+`make perf-tv` builds the TV bundle (`npm run build:tv`, which also runs its unit tests) and then runs `tools/tv_perf/run.mjs`. The harness is development only: it is not part of any package, uses no npm dependencies (Node 22 or newer, native `fetch` and `WebSocket` speak the DevTools protocol), and needs no Docker or network. Run `node tools/tv_perf/run.mjs` directly to reuse an existing `clients/tv/dist`.
+
+It serves the built bundle on `127.0.0.1` together with a synthetic household API (`tools/tv_perf/fixture.mjs`: 60 titles with generated poster and backdrop images, facets, families, household state, downloads and jobs), preseeds the app's server address (`filelist.serverUrl` in localStorage) and drives a headless Chromium through CDP with `Emulation.setCPUThrottlingRate` (default 6) and a Chrome trace. It finds the Chromium that Playwright caches under `~/.cache/ms-playwright`; set `CHROME_BIN` or pass `--chrome PATH` to use another. Real key events (`Input.dispatchKeyEvent`, TV key codes) run these journeys:
+
+1. one idle second, as the cost floor;
+2. Down from the hero to the first rail, hold Right along it (20 presses at 100 ms key-repeat cadence), hold Down through the rails (8 presses), hold Right along the last rail;
+3. every sidebar destination in turn: Left to open the menu, Up/Down to the destination, OK for the route change.
+
+Per step it reports main-thread time split into script, style, layout and paint, long tasks (50 ms or more), and frames over 50 ms. Grouped rows average a held key's presses; every step, with a per-event breakdown, is in the JSON report (`tools/tv_perf/.out/report.json`, git-ignored; `--out FILE` changes it, `--verbose` prints every step, `--trace FILE` saves the raw trace). Work that begins after the step's burst ends (an image arriving later) is not charged to the step.
+
+Budgets at the 6x throttle (exit code 1 when exceeded, 2 when the harness itself fails):
+
+- a menu route change finishes its main-thread work within 150 ms of the keypress ("settle");
+- a D-pad move costs under 50 ms of main-thread time and contains no long task.
+
+Options: `--server URL` runs against a real server instead of the fixture (the TV bundle is still served locally; the server must allow cross-origin requests, as the TV clients need), `--throttle N`, `--repeat-ms N`, `--rail-presses N`, `--down-presses N`. Through make: `make perf-tv PERF_ARGS="--server http://192.168.50.2:8097"`. The pure analysis and budget logic has unit tests: `node --test tools/tv_perf`. The throttle is a proxy for a 2019 TV, trace recording adds some overhead of its own, and software rendering makes paint cost approximate, so compare runs of the same machine with each other rather than against TV timings. Run it on a quiet machine: other CPU load inflates every number (the harness warns when the load average is high), and the idle row shows the floor to compare steps against.
+
 ## Server builds and Raspberry Pi deployment
 
 ```sh

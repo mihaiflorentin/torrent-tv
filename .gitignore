@@ -88,3 +88,6 @@ server
 
 # Isolated worktrees
 .worktrees/
+
+# TV performance harness output (tools/tv_perf)
+tools/tv_perf/.out/

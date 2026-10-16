@@ -1,4 +1,4 @@
-.PHONY: help check test build build-arm64 build-arm64-headless build-amd64-headless build-all desktop-assets package-darwin wails-cross web frontend tizen-wgt validate-tizen-wgt smoke-tizen-engine webos-ipk validate-webos-ipk smoke-webos-engine torrenttv-apk deploy-pi bootstrap-server-dry-run
+.PHONY: help check test build build-arm64 build-arm64-headless build-amd64-headless build-all desktop-assets package-darwin wails-cross web frontend tizen-wgt validate-tizen-wgt smoke-tizen-engine webos-ipk validate-webos-ipk smoke-webos-engine perf-tv torrenttv-apk deploy-pi bootstrap-server-dry-run
 
 VERSION ?= $(shell tr -d '[:space:]' < VERSION)
 PI_HOST ?=
@@ -251,6 +251,11 @@ smoke-webos-engine:
 		exit 1; \
 	fi
 	@echo "smoke-webos-engine: PASS — clean boot and fatal-error panel verified on Google Chrome 53; broken fixture rejected."
+
+## perf-tv: build the TV bundle, then measure menu and D-pad cost in throttled headless Chromium (dev only; PERF_ARGS="--server http://host:8097 --throttle 4")
+perf-tv:
+	npm run build:tv
+	node tools/tv_perf/run.mjs $(PERF_ARGS)
 
 ## deploy-pi: build-arm64-headless, then stage binary + systemd units to PI_HOST (make deploy-pi PI_HOST=user@host)
 deploy-pi: build-arm64-headless
