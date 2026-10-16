@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, Download, MediaState, UpdateStatus } from '@torrent-tv/shared';
 import type { TVPlatformHooks } from './platform';
 // main.tsx asserts #app during module evaluation, so the container exists first.
@@ -27,7 +28,7 @@ render(null, appRoot);
 
 const testWindow = window as unknown as { FileListTVPlatform?: TVPlatformHooks };
 
-const settle = () => new Promise(resolve => setTimeout(resolve, 20));
+const settle = () => sleep(20);
 const control = (container: ParentNode, key: string) => container.querySelector<HTMLButtonElement>(`[data-focus-key="${key}"]`);
 
 // A busy control stays in the focus set: it is announced as disabled but is

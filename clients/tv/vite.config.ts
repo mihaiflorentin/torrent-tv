@@ -20,6 +20,8 @@ function packageStaticFiles(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [preact(), packageStaticFiles()],
+  // Read by vitest (vite ignores the key); see src/test-setup.ts.
+  test: { setupFiles: ['./src/test-setup.ts'] },
   build: {
     target: 'es2017',
     outDir: 'dist',

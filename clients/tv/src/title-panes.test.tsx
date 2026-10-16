@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSource, CatalogTitle, HouseholdItem, HouseholdState } from '@torrent-tv/shared';
 
 // The series title page on the TV: season bar on top, episodes on the left, the selected episode's versions on the right.
@@ -23,7 +24,7 @@ const { Catalog } = await import('./main');
 // main.tsx boots the real App into #app; its Setup screen listens for the same keys, so take it down.
 render(null, appRoot);
 
-const wait = (ms = 30) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 30) => sleep(ms);
 const release = (id: string, over = {}) => ({ id, trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '4', browseClass: 'video', name: `Show.${id}`, category: 'TV HD', sizeBytes: 1_200_000_000, seeders: 50, leechers: 2, freeleech: false, ...over });
 const source = (id: string, parsed: Partial<CatalogSource['parsed']> = {}): CatalogSource => ({ release: release(id), parsed: { title: 'Show', sortTitle: 'show', kind: 'series', resolution: '1080p', quality: 'WEB-DL', ...parsed }, fileIndex: 0, filePath: `${id}.mkv`, fileSizeBytes: 1_200_000_000 });
 const series: CatalogTitle = { id: 'show', title: 'Show', kind: 'series', year: 2019, resolutions: ['1080p'], categories: [], sourceCount: 2, bestSeeders: 77, largestSizeBytes: 1000, trackers: [{ id: 'filelist', name: 'FileList' }] };

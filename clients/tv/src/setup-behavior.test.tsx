@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, HouseholdState, PortalState, UpdateStatus } from '@torrent-tv/shared';
 import type { TVPlatformHooks } from './platform';
 // Static import cannot work here: main.tsx bootstraps and asserts the presence
@@ -69,7 +70,7 @@ describe('Setup and link handoff behavioral regressions', () => {
     );
 
     // Give mount effects time to execute
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
 
     // Verify visible UI state: scanning has not started host probing early
     const rescanBtn = container.querySelector<HTMLButtonElement>('[data-focus-key="setup-rescan"]');
@@ -84,7 +85,7 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     // Resolve network info as empty to cleanly end the scan
     resolveNetwork!(null);
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
   });
 
   it('leaves Manual address usable when network discovery fails or times out', async () => {
@@ -112,7 +113,7 @@ describe('Setup and link handoff behavioral regressions', () => {
     );
 
     // Wait for scan() catch block to execute
-    await new Promise(r => setTimeout(r, 30));
+    await sleep(30);
 
     // Verify exact failure message displayed to user
     const hint = container.querySelector<HTMLParagraphElement>('.focus-hint');
@@ -193,7 +194,7 @@ describe('Setup and link handoff behavioral regressions', () => {
     );
     const projectsMenuBtn = container.querySelector<HTMLButtonElement>('[data-menu-route="projects"]');
     projectsMenuBtn?.click();
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
 
     // Confirm the project button is visible with the displayed address
     const projectBtn = container.querySelector<HTMLButtonElement>('[data-focus-key="project-1"]');
@@ -203,7 +204,7 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     // Click the project link (triggers openExternalURL which resolves false)
     projectBtn?.click();
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
 
     // Address remains visible on the card
     expect(projectBtn?.querySelector('code')?.textContent).toBe(testUrl);
@@ -258,14 +259,14 @@ describe('Setup and link handoff behavioral regressions', () => {
       container
     );
 
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
 
     const link = container.querySelector<HTMLButtonElement>('.tv-update-notice [data-focus-key="update-release-link"]');
     expect(link).not.toBeNull();
     expect(link?.textContent).toBe(releaseUrl);
 
     link?.click();
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
 
     // Address remains visible in the link
     expect(link?.textContent).toBe(releaseUrl);
@@ -313,7 +314,7 @@ describe('Setup and link handoff behavioral regressions', () => {
       container
     );
 
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
 
     const dialog = container.querySelector<HTMLElement>('.tv-prepare-confirm');
     expect(dialog).not.toBeNull();
@@ -373,7 +374,7 @@ describe('Setup and link handoff behavioral regressions', () => {
       container
     );
 
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
 
     const dialog = container.querySelector<HTMLElement>('.tv-prepare-confirm');
     expect(dialog).not.toBeNull();
@@ -484,18 +485,18 @@ describe('Setup and link handoff behavioral regressions', () => {
       container
     );
 
-    await new Promise(r => setTimeout(r, 20));
+    await sleep(20);
 
     // Open detail
     const heroBtn = container.querySelector<HTMLButtonElement>('[data-focus-key="hero-series-1"]');
     heroBtn?.click();
-    await new Promise(r => setTimeout(r, 40));
+    await sleep(40);
 
     // Click download season button with manageOutcome = false (failed prepare)
     const downloadBtn = container.querySelector<HTMLButtonElement>('[data-focus-key="season-pack-rel-pack-1-download"]');
     expect(downloadBtn).not.toBeNull();
     downloadBtn?.click();
-    await new Promise(r => setTimeout(r, 40));
+    await sleep(40);
 
     expect(onManageSeasonPack).toHaveBeenCalledTimes(1);
     const detailMsg = container.querySelector('.detail-message');
@@ -505,7 +506,7 @@ describe('Setup and link handoff behavioral regressions', () => {
     onManageSeasonPack.mockClear();
     manageOutcome = false;
     downloadBtn?.click();
-    await new Promise(r => setTimeout(r, 40));
+    await sleep(40);
 
     expect(onManageSeasonPack).toHaveBeenCalledTimes(1);
     expect(container.querySelector('.detail-message')?.textContent || '').not.toContain('Season 1 is downloading');
@@ -514,7 +515,7 @@ describe('Setup and link handoff behavioral regressions', () => {
     onManageSeasonPack.mockClear();
     manageOutcome = true;
     downloadBtn?.click();
-    await new Promise(r => setTimeout(r, 40));
+    await sleep(40);
 
     expect(onManageSeasonPack).toHaveBeenCalledTimes(1);
     expect(container.querySelector('.detail-message')?.textContent).toContain('Season 1 is downloading. Episode tiles will update here.');

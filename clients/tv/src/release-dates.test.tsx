@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, HouseholdState } from '@torrent-tv/shared';
 import { cardMeta, episodeMeta, heroFacts } from './display';
 
@@ -43,7 +44,7 @@ const appRoot = document.createElement('div');
 appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { Catalog } = await import('./main');
-const wait = (ms = 40) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 40) => sleep(ms);
 const empty: HouseholdState = { favorites: [], continueWatching: [], recent: [], watched: [] };
 
 describe('TV title page episode air dates', () => {

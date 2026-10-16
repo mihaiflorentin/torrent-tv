@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 
 // App-seam tests for landing focus: entering a screen puts the D-pad cursor on
 // the screen's first card (never the header Refresh button), cards that load
@@ -25,7 +26,7 @@ appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { App } = await import('./main');
 
-const wait = (ms = 60) => new Promise(r => setTimeout(r, ms));
+const wait = (ms = 60) => sleep(ms);
 const respond = (body: unknown) => ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) });
 const titleRow = (id: string) => ({ id, title: `Title ${id}`, kind: 'movie', year: 2019, resolutions: ['1080p'], categories: [], sourceCount: 1, bestSeeders: 50, largestSizeBytes: 4e9, trackers: [{ id: 'filelist', name: 'FileList' }] });
 const release = { id: 'rel-1', trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '4', browseClass: 'video', name: 'Alpha.1080p', category: 'Movies', sizeBytes: 4e9, seeders: 50, leechers: 1, freeleech: false };

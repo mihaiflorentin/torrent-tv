@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleep } from './test-wait';
 import type { API, CatalogFacets, CatalogTitle, HouseholdState } from '@torrent-tv/shared';
 import { ART_COLUMN_REACH, inReach, railNear, railWindows, resetFocusPoint, setFocusPoint } from './lazy-art';
 
@@ -41,7 +42,7 @@ describe('lazy poster artwork in the catalog', () => {
   let container: HTMLDivElement;
   const make = (id: string): CatalogTitle => ({ id, title: id.toUpperCase(), kind: 'movie', year: 2020, trackers: [], categories: [], resolutions: ['1080p'], sourceCount: 1, bestSeeders: 5, largestSizeBytes: 1, posterUrl: `/art/${id}.jpg` });
   const many = Array.from({ length: 30 }, (_, index) => make(`t${index}`));
-  const wait = (ms = 40) => new Promise(resolve => setTimeout(resolve, ms));
+  const wait = (ms = 40) => sleep(ms);
   const images = () => Array.from(container.querySelectorAll('.poster-card img')).map(node => node.getAttribute('src'));
   const empty: HouseholdState = { favorites: [], continueWatching: [], recent: [], watched: [] };
   const mount = () => render(
