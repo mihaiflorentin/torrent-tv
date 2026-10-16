@@ -20,7 +20,6 @@ const adopted: [View, string][] = [
   ['browse', '/tracker/browse'],
   ['categories', '/tracker/categories'],
   ['jobs', '/jobs'],
-  ['events', '/events'],
   ['settings', '/settings'],
   ['projects', '/projects'],
 ];
@@ -94,7 +93,7 @@ describe('Client routes', () => {
   });
 
   it('falls back to home for unknown paths (the app decides)', () => {
-    for (const path of ['/unknown', '/library/unknown', '/library/dashboard/nested/path', '/LIBRARY/DOWNLOADS', '/jobsx']) {
+    for (const path of ['/unknown', '/library/unknown', '/library/dashboard/nested/path', '/LIBRARY/DOWNLOADS', '/jobsx', '/events']) {
       expect(parsePath(path, '')).toEqual({ view: 'home', query: '' });
     }
     expect(buildPath({ view: 'gibberish' as View })).toBe('/');

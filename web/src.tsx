@@ -4,7 +4,7 @@ import { homeHero, homeRowItems, homeRowSpecs, clearRecentSearches, deviceStorag
 import { applyVolumeStep, fractionTarget, resolveEscape, resolveShortcut, ScrubCoalescer, seekTarget, type PlayerCommand } from './shortcuts';
 import { attachCompatStream, compatStreamSupported, type CompatStream } from './compat-stream';
 import { OsdLayer, type OsdFeedback } from './osd';
-import { CacheCoverage, Events, Settings } from './settings';
+import { Settings } from './settings';
 import { TrackerBadge, trackerSourceKey } from './tracker-badge';
 import { Icon } from './icons';
 import { BackdropLayer, backdropArtFor, setBackdropArt } from './backdrop';
@@ -66,7 +66,7 @@ const navGroups: { label?: string; items: NavItem[] }[] = [
   { items: [{ id: 'home', label: 'Home', icon: 'home' }, { id: 'search', label: 'Search', icon: 'search' }] },
   { label: 'My Library', items: [{ id: 'library', label: 'Dashboard', icon: 'library' }, { id: 'continue', label: 'Continue watching', icon: 'play' }, { id: 'favorites', label: 'My List', icon: 'heart' }, { id: 'watched', label: 'Watched', icon: 'check' }, { id: 'downloads', label: 'Downloads', icon: 'download' }, { id: 'library-categories', label: 'Categories', icon: 'folder' }] },
   { label: 'Tracker', items: [{ id: 'tracker', label: 'Dashboard', icon: 'tracker' }, { id: 'browse', label: 'Browse', icon: 'grid' }, { id: 'categories', label: 'Categories', icon: 'folder' }] },
-  { items: [{ id: 'jobs', label: 'Jobs', icon: 'activity' }, { id: 'events', label: 'Events', icon: 'tracker' }, { id: 'projects', label: 'Projects', icon: 'link' }, { label: 'Bug Report', icon: 'bug', href: 'https://github.com/mihaiflorentin/torrent-tv/issues' }, { id: 'settings', label: 'Settings', icon: 'settings' }] },
+  { items: [{ id: 'jobs', label: 'Jobs', icon: 'activity' }, { id: 'projects', label: 'Projects', icon: 'link' }, { label: 'Bug Report', icon: 'bug', href: 'https://github.com/mihaiflorentin/torrent-tv/issues' }, { id: 'settings', label: 'Settings', icon: 'settings' }] },
 ];
 
 
@@ -869,8 +869,6 @@ export function App() {
     }
     {view === 'projects' &&
       <ProjectsPage links={portal?.links || []} openExternal={openExternal} />
-    }
-    {view === 'events' && <><CacheCoverage /><Events onError={setError} /></>
     }
     {view === 'settings' && settings && <Settings value={settings} fields={settingsFields} onSaved={setSettings} onError={setError} onDirtyChange={value => { settingsDirty.current = value }} accountsEnabled={portal?.accountsEnabled === true} updateSection={updateStatus ? <UpdateSection client={api} status={updateStatus} connected={portalConnected} failure={portalFailure} controller={updates} openExternal={openExternal} /> : null} />
     }

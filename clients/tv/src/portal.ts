@@ -32,6 +32,14 @@ export const SETTINGS_CHANGE_SERVER_ROW = 19;
 export const SETTINGS_FORGET_SERVER_ROW = 20;
 export const UPDATE_CHECK_ROW = 21;
 export const UPDATE_APPLY_ROW = 22;
+// Catalog maintenance: Fetch latest follows the connection tests (13-14, with
+// 15-18 spare) and precedes the server actions; the Rebuild catalog button of
+// the Danger zone is the last control on the page, below the update install.
+export const SETTINGS_CATALOG_FETCH_ROW = 15;
+export const SETTINGS_REBUILD_ROW = 23;
+
+// Focus region of the rebuild confirmation dialog, a trap like the update one.
+export const REBUILD_DIALOG_REGION = 'rebuild-dialog';
 
 // The promotion slot exists only while the server advertises ads and the
 // household is not a donor; a donor hides the slot entirely, and an absent

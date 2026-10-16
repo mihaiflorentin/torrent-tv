@@ -735,12 +735,16 @@ button.primary.active {
 }
 
 .tv-settings-page>h2,
-.tv-server>h2 {
+.tv-server>h2,
+.tv-catalog>h2,
+.tv-danger-zone>h2 {
  margin-top: var(--tt-space-3)
 }
 
 .tv-settings-page>button,
 .tv-settings-page .tv-server button,
+.tv-settings-page .tv-catalog button,
+.tv-settings-page .tv-danger-zone button,
 .tv-diagnostics-toggle {
  margin-top: var(--tt-space-4)
 }
@@ -820,6 +824,8 @@ button.primary.active {
 }
 
 .tv-server,
+.tv-catalog,
+.tv-danger-zone,
 .tv-diagnostics,
 .tv-update-panel {
  margin-top: var(--tt-space-6);
@@ -901,6 +907,7 @@ button.primary.active {
 
 .tv-season-pack-confirm,
 .tv-update-confirm,
+.tv-rebuild-confirm,
 .tv-prepare-confirm {
  position: fixed;
  left: 50%;
@@ -916,7 +923,8 @@ button.primary.active {
  top: 160px
 }
 
-.tv-update-confirm {
+.tv-update-confirm,
+.tv-rebuild-confirm {
  z-index: 120;
  top: 200px
 }
@@ -962,16 +970,19 @@ button.primary.active {
  margin-top: 0
 }
 
-.tv-update-confirm>div {
+.tv-update-confirm>div,
+.tv-rebuild-confirm>div {
  display: flex;
  margin-top: var(--tt-space-5)
 }
 
-.tv-update-confirm>div>*+* {
+.tv-update-confirm>div>*+*,
+.tv-rebuild-confirm>div>*+* {
  margin-left: var(--tt-space-4)
 }
 
-.tv-update-confirm button {
+.tv-update-confirm button,
+.tv-rebuild-confirm button {
  min-width: 320px
 }
 
@@ -2465,4 +2476,8 @@ button.primary.active {
 
 .info-skeleton.short {
  width: 55%
+}
+
+.tv-danger-zone>h2 {
+ color: var(--tt-danger)
 }

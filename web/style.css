@@ -2049,13 +2049,8 @@ dl .tracker-badge,
  color: var(--tt-text-muted);
 }
 
-.event-actions {
- display: grid;
- grid-template-columns: repeat(2, minmax(0, 1fr));
- gap: var(--tt-space-4);
-}
-
-.event-actions article,
+.catalog-actions,
+.danger-zone,
 .cache-coverage,
 .tracker-readiness,
 .update-section {
@@ -2065,7 +2060,8 @@ dl .tracker-badge,
  background: var(--tt-surface);
 }
 
-.event-actions h2,
+.catalog-actions h2,
+.danger-zone h2,
 .cache-coverage h2,
 .tracker-readiness h2,
 .update-section h2,
@@ -2073,8 +2069,24 @@ dl .tracker-badge,
  font-size: var(--tt-text-md);
 }
 
-.event-actions p {
+.catalog-actions p,
+.danger-zone p {
  color: var(--tt-text-muted);
+}
+
+.catalog-actions,
+.danger-zone {
+ margin: 0 0 var(--tt-space-4);
+}
+
+/* The rebuild sits apart at the bottom of Maintenance, framed in the danger tone. */
+.danger-zone {
+ margin-top: var(--tt-space-6);
+ border-color: var(--tt-danger);
+}
+
+.danger-zone h2 {
+ color: var(--tt-danger);
 }
 
 .cache-coverage,
@@ -3180,7 +3192,6 @@ dl .tracker-badge,
  }
 
  .fields,
- .event-actions,
  .season-pack-actions > div {
   grid-template-columns: minmax(0, 1fr);
  }
