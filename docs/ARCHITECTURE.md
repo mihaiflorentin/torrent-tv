@@ -24,6 +24,12 @@ Title-expansion jobs download each unseen season-pack `.torrent`, parse bounded 
 
 Preparing a whole season enables every playable episode file in the chosen pack, retains one engine torrent, and persists one managed `downloads` row per episode. Reconciliation derives each row's byte count and progress from that selected file instead of the torrent-wide total. The clients can therefore list and play individual episodes while pause, resume, and deletion deliberately apply to all sibling rows sharing the engine hash.
 
+### Season info and the families cache
+
+Season and episode descriptions come from a separate optional `SeasonInfoProvider` port, implemented by the TMDB, TVmaze and Jikan adapters; Jikan, whose season payload omits episode text, also offers `EpisodeDetailProvider` for a lazy per-episode synopsis. Adapters only translate provider answers. The application layer owns the cache rules in `seasoninfo.go`: rows are served while fresh, refreshed when expired (`seasonInfoTTL`), kept when a refresh fails, and failures are negatively cached for ten minutes. Concurrent fetches of one key share a single detached call (`flightGroup`, also used by title info), so a cancelled request never poisons the cache. Provider image paths stay server-side behind `season-N-...` artwork kinds.
+
+Category family tiles (counts and art) are precomputed. `CatalogFamilies` serves the cached tiles and, once they are older than ten minutes, serves them stale while one background computation refreshes them (stale-while-revalidate). The cache is warmed at startup and again after every Catalog sync, so the first Categories page does not wait on the aggregate query. Family art is picked from the family's ten best titles with artwork (rating, then seeders, then title id) and the pick is stored per quarter, so catalog churn never moves it.
+
 ## Runtime configuration
 
 The browser reads and updates `/api/v1/settings`. The server atomically replaces `data/settings.json` through a same-directory temporary file and enforces mode `0600`. Empty secret fields preserve an existing value. Responses never return stored secret values; they return `...Configured` booleans instead.

@@ -16,9 +16,6 @@ const (
 	// familyArtPool is how many of a family's best titles with artwork are
 	// candidates for the quarter's image.
 	familyArtPool = 10
-	// familyArtScan is how many top-rated and most-seeded titles are examined
-	// to fill the pool.
-	familyArtScan = 30
 	// familyBuildTimeout bounds one background computation of the tiles.
 	familyBuildTimeout = 2 * time.Minute
 )
@@ -302,39 +299,7 @@ func (s *Service) familyArt(ctx context.Context, key, quarter string, titles map
 			return art(stored, title.artKind)
 		}
 	}
-	all := make([]*familyTitle, 0, len(titles))
-	for _, title := range titles {
-		all = append(all, title)
-	}
-	candidates := []string{}
-	seen := map[string]bool{}
-	collect := func(less func(a, b *familyTitle) bool) {
-		sort.Slice(all, func(i, j int) bool { return less(all[i], all[j]) })
-		for i := 0; i < len(all) && i < familyArtScan; i++ {
-			title := all[i]
-			if seen[title.id] || len(candidates) >= familyArtPool || title.artKind == "" {
-				continue
-			}
-			seen[title.id] = true
-			candidates = append(candidates, title.id)
-		}
-	}
-	// Rated titles first, then by rating; unrated titles rank after them.
-	collect(func(a, b *familyTitle) bool {
-		if (a.rating > 0) != (b.rating > 0) {
-			return a.rating > 0
-		}
-		if a.rating != b.rating {
-			return a.rating > b.rating
-		}
-		return a.id < b.id
-	})
-	collect(func(a, b *familyTitle) bool {
-		if a.seeders != b.seeders {
-			return a.seeders > b.seeders
-		}
-		return a.id < b.id
-	})
+	candidates := rankFamilyArt(titles)
 	id, ok := domain.PickFamilyArt(key, quarter, candidates)
 	if !ok {
 		return bundled
@@ -343,6 +308,40 @@ func (s *Service) familyArt(ctx context.Context, key, quarter string, titles map
 		s.log.Warn("family art pick not stored", "family", key, "error", err)
 	}
 	return art(id, titles[id].artKind)
+}
+
+// rankFamilyArt returns the ids of the family's best titles with artwork, at
+// most familyArtPool of them, in one ordering: rated titles by rating, then
+// unrated ones; ties go to the most seeded, then the lowest title id.
+func rankFamilyArt(titles map[string]*familyTitle) []string {
+	all := make([]*familyTitle, 0, len(titles))
+	for _, title := range titles {
+		all = append(all, title)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		a, b := all[i], all[j]
+		if (a.rating > 0) != (b.rating > 0) {
+			return a.rating > 0
+		}
+		if a.rating != b.rating {
+			return a.rating > b.rating
+		}
+		if a.seeders != b.seeders {
+			return a.seeders > b.seeders
+		}
+		return a.id < b.id
+	})
+	candidates := []string{}
+	for _, title := range all {
+		if title.artKind == "" {
+			continue
+		}
+		candidates = append(candidates, title.id)
+		if len(candidates) == familyArtPool {
+			break
+		}
+	}
+	return candidates
 }
 
 // familyCategories returns the raw tracker categories of a family that exist in

@@ -24,41 +24,6 @@ type seasonResult struct {
 	usable  bool
 }
 
-type seasonCall struct {
-	done   chan struct{}
-	result seasonResult
-}
-
-// seasonFlight coalesces concurrent fetches of the same key into one provider
-// call, detached from the first caller's context like titleInfoFlight.
-func (s *Service) seasonFlight(ctx context.Context, key string, fetch func(context.Context) seasonResult) (seasonResult, bool) {
-	s.titleInfoMu.Lock()
-	call, running := s.seasonCalls[key]
-	if !running {
-		if s.seasonCalls == nil {
-			s.seasonCalls = map[string]*seasonCall{}
-		}
-		call = &seasonCall{done: make(chan struct{})}
-		s.seasonCalls[key] = call
-		go func() {
-			fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), titleInfoFetchTimeout)
-			defer cancel()
-			call.result = fetch(fetchCtx)
-			s.titleInfoMu.Lock()
-			delete(s.seasonCalls, key)
-			s.titleInfoMu.Unlock()
-			close(call.done)
-		}()
-	}
-	s.titleInfoMu.Unlock()
-	select {
-	case <-call.done:
-		return call.result, true
-	case <-ctx.Done():
-		return seasonResult{}, false
-	}
-}
-
 // seasonPayload serves one cached provider season document (the season list
 // when season is domain.SeasonListKey) with the title info cache rules: fresh
 // rows are served, expired rows are refreshed, a failed refresh keeps the
@@ -77,7 +42,7 @@ func (s *Service) seasonPayload(ctx context.Context, metadata domain.CatalogMeta
 	}
 	haveCached := cacheErr == nil && cached.Available
 	key := "season\x00" + metadata.Provider + "\x00" + metadata.ProviderID + "\x00" + strconv.Itoa(season) + "\x00" + language
-	result, ok := s.seasonFlight(ctx, key, func(fetchCtx context.Context) seasonResult {
+	result, ok := s.seasonFlights.do(ctx, &s.titleInfoMu, key, func(fetchCtx context.Context) seasonResult {
 		payload, err := fetch(fetchCtx, provider, language, settings.MetadataFallbackLanguage)
 		now := time.Now().UTC()
 		entry := domain.SeasonCacheEntry{Provider: metadata.Provider, ProviderID: metadata.ProviderID, Season: season, Language: language, FetchedAt: now}

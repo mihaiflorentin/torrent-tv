@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
@@ -33,8 +32,7 @@ func (c *Client) SeasonList(ctx context.Context, provider, providerID, language,
 	if err := c.getJSON(ctx, "/3/tv/"+url.PathEscape(providerID)+"?language="+url.QueryEscape(language), &show); err != nil {
 		return domain.TitleSeasons{}, err
 	}
-	now := time.Now().UTC()
-	list := domain.TitleSeasons{Provider: "tmdb", ProviderID: providerID, Language: language, Seasons: []domain.SeasonSummary{}, Available: len(show.Seasons) > 0, FetchedAt: now, ExpiresAt: now.Add(30 * 24 * time.Hour)}
+	list := domain.TitleSeasons{Provider: "tmdb", ProviderID: providerID, Language: language, Seasons: []domain.SeasonSummary{}, Available: len(show.Seasons) > 0}
 	for _, season := range show.Seasons {
 		name := strings.TrimSpace(season.Name)
 		if name == "" {
@@ -136,12 +134,10 @@ func (c *Client) SeasonDetail(ctx context.Context, provider, providerID string, 
 			}
 		}
 	}
-	now := time.Now().UTC()
 	info := domain.SeasonInfo{
 		Provider: "tmdb", ProviderID: providerID, Language: language, Number: season,
 		Name: strings.TrimSpace(detail.Name), Overview: strings.TrimSpace(detail.Overview), AirDate: normalizeDate(detail.AirDate),
 		PosterPath: detail.PosterPath, Episodes: []domain.EpisodeInfo{}, Available: true,
-		FetchedAt: now, ExpiresAt: now.Add(30 * 24 * time.Hour),
 	}
 	for _, member := range detail.AggregateCredits.Cast {
 		if len(info.Cast) >= maxSeasonCast {

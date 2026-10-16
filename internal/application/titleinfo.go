@@ -41,7 +41,7 @@ func (s *Service) TitleInfo(ctx context.Context, titleID string) (domain.TitleIn
 		return s.degradedTitleInfo(titleID, metadata), nil
 	}
 	flightKey := metadata.Provider + "\x00" + metadata.ProviderID + "\x00" + string(kind) + "\x00" + language
-	result, ok := s.titleInfoFlight(ctx, flightKey, func(fetchCtx context.Context) titleInfoResult {
+	result, ok := s.titleInfoFlights.do(ctx, &s.titleInfoMu, flightKey, func(fetchCtx context.Context) titleInfoResult {
 		return s.fetchTitleInfo(fetchCtx, provider, metadata, kind, language, cached, cacheErr == nil)
 	})
 	if !ok || !result.usable {
@@ -59,44 +59,6 @@ const titleInfoFetchTimeout = 30 * time.Second
 type titleInfoResult struct {
 	info   domain.TitleInfo
 	usable bool
-}
-
-type titleInfoCall struct {
-	done   chan struct{}
-	result titleInfoResult
-}
-
-// titleInfoFlight coalesces concurrent fetches of the same key into one
-// provider call. The call runs detached from the first caller's context
-// (bounded by titleInfoFetchTimeout), so closing the Info panel mid-fetch
-// neither aborts it nor poisons the cache; each waiter still leaves as soon
-// as its own context ends (ok=false).
-func (s *Service) titleInfoFlight(ctx context.Context, key string, fetch func(context.Context) titleInfoResult) (titleInfoResult, bool) {
-	s.titleInfoMu.Lock()
-	call, running := s.titleInfoCalls[key]
-	if !running {
-		if s.titleInfoCalls == nil {
-			s.titleInfoCalls = map[string]*titleInfoCall{}
-		}
-		call = &titleInfoCall{done: make(chan struct{})}
-		s.titleInfoCalls[key] = call
-		go func() {
-			fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), titleInfoFetchTimeout)
-			defer cancel()
-			call.result = fetch(fetchCtx)
-			s.titleInfoMu.Lock()
-			delete(s.titleInfoCalls, key)
-			s.titleInfoMu.Unlock()
-			close(call.done)
-		}()
-	}
-	s.titleInfoMu.Unlock()
-	select {
-	case <-call.done:
-		return call.result, true
-	case <-ctx.Done():
-		return titleInfoResult{}, false
-	}
 }
 
 // fetchTitleInfo performs the provider call and cache writes for one flight.

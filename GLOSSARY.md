@@ -180,3 +180,10 @@ _Avoid_: black screen (as a state name), crash overlay
 **Info panel**:
 The extended description of a title (tagline, overview, release date, runtime, rating, genres, director or creator, top-billed cast, and fine print such as country and status), opened from the Info button on the title page and the Home hero. A side sheet on the TV with its own focus region, an accessible dialog on the web; both render the same server answer, `GET /catalog/titles/{id}/info`, and say "No extra details available" when a provider has nothing.
 _Avoid_: details page, metadata screen
+
+**Season info**:
+The description of one season of a series (overview, air date, poster, cast and its episodes), reached from the Info panel by choosing Seasons and then a season. A series with no known seasons simply shows none.
+
+**Episode info**:
+The description of one episode (still, overview, air date, runtime and its guest stars), reached from Season info. Back from an episode returns to its season, and back from a season returns to the Info panel.
+_Avoid_: episode page

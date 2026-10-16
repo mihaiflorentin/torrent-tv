@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mihaiflorentin/torrent-tv/internal/domain"
 )
@@ -67,8 +66,7 @@ func (c *Client) SeasonList(ctx context.Context, provider, providerID, language,
 	if err != nil {
 		return domain.TitleSeasons{}, err
 	}
-	now := time.Now().UTC()
-	list := domain.TitleSeasons{Provider: "jikan", ProviderID: providerID, Language: language, Seasons: []domain.SeasonSummary{}, Available: len(episodes) > 0, FetchedAt: now, ExpiresAt: now.Add(30 * 24 * time.Hour)}
+	list := domain.TitleSeasons{Provider: "jikan", ProviderID: providerID, Language: language, Seasons: []domain.SeasonSummary{}, Available: len(episodes) > 0}
 	if len(episodes) > 0 {
 		list.Seasons = append(list.Seasons, domain.SeasonSummary{Number: 1, Name: "Episodes", AirDate: datePart(episodes[0].Aired), EpisodeCount: len(episodes)})
 	}
@@ -88,8 +86,7 @@ func (c *Client) SeasonDetail(ctx context.Context, provider, providerID string, 
 	if err != nil {
 		return domain.SeasonInfo{}, err
 	}
-	now := time.Now().UTC()
-	info := domain.SeasonInfo{Provider: "jikan", ProviderID: providerID, Language: language, Number: 1, Name: "Episodes", Episodes: []domain.EpisodeInfo{}, Available: true, FetchedAt: now, ExpiresAt: now.Add(30 * 24 * time.Hour)}
+	info := domain.SeasonInfo{Provider: "jikan", ProviderID: providerID, Language: language, Number: 1, Name: "Episodes", Episodes: []domain.EpisodeInfo{}, Available: true}
 	for i, episode := range episodes {
 		number := episode.ID
 		if number <= 0 {

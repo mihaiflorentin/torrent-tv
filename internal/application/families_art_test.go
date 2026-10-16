@@ -172,3 +172,37 @@ func TestSyncRefreshesFamilyCountsButKeepsTheArtPick(t *testing.T) {
 		t.Fatalf("a sync must not change the art pick: %s -> %s", movies.Art.TitleID, got.Art.TitleID)
 	}
 }
+
+func TestRankFamilyArtOrdersByRatingThenSeedersThenID(t *testing.T) {
+	titles := map[string]*familyTitle{
+		"a": {id: "a", rating: 7, seeders: 1, artKind: "poster"},
+		"b": {id: "b", rating: 7, seeders: 50, artKind: "poster"},
+		"c": {id: "c", rating: 9, seeders: 0, artKind: "poster"},
+		"d": {id: "d", seeders: 5, artKind: "poster"},
+		"e": {id: "e", seeders: 80, artKind: "backdrop"},
+		"f": {id: "f", rating: 9, seeders: 0, artKind: "poster"},
+		"g": {id: "g", rating: 10, seeders: 999},
+	}
+	got := rankFamilyArt(titles)
+	want := []string{"c", "f", "b", "a", "e", "d"}
+	if len(got) != len(want) {
+		t.Fatalf("ranking = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ranking = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestRankFamilyArtKeepsOnlyTheTenBest(t *testing.T) {
+	titles := map[string]*familyTitle{}
+	for i := 0; i < 15; i++ {
+		id := string(rune('a' + i))
+		titles[id] = &familyTitle{id: id, rating: 5, seeders: i, artKind: "poster"}
+	}
+	got := rankFamilyArt(titles)
+	if len(got) != familyArtPool || got[0] != "o" || got[familyArtPool-1] != "f" {
+		t.Fatalf("pool = %v", got)
+	}
+}
