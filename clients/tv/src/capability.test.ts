@@ -27,3 +27,16 @@ describe('capability detection', () => {
     expect(detectCapabilities()).toEqual({ supportsAbortController: false });
   });
 });
+
+describe('lean graphics detection', () => {
+  it('is on for the old TV Chromium builds', async () => {
+    const { detectLeanGraphics } = await import('./capability');
+    expect(detectLeanGraphics('Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/537.36 Chrome/56.0.2924.0 TV Safari/537.36')).toBe(true);
+    expect(detectLeanGraphics('Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 Chrome/53.0.2785.34 Safari/537.36')).toBe(true);
+  });
+  it('is off for modern or unidentified engines', async () => {
+    const { detectLeanGraphics } = await import('./capability');
+    expect(detectLeanGraphics('Mozilla/5.0 (SMART-TV; Linux; Tizen 8.0) Chrome/108.0.0.0 TV Safari/537.36')).toBe(false);
+    expect(detectLeanGraphics('')).toBe(false);
+  });
+});

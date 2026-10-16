@@ -182,7 +182,14 @@ button.primary.active {
  filter: blur(18px);
  transform: scale(2);
  transform-origin: 0 0;
+ will-change: opacity;
  transition: opacity var(--tt-dur-slow) var(--tt-ease-out)
+}
+
+/* Old TV engine: no blur pass, the 2x upscale of the half-resolution layer supplies the softness. */
+.tv-backdrop.lean .tv-backdrop-art {
+ -webkit-filter: none;
+ filter: none
 }
 
 .tv-backdrop-art.on {
@@ -504,6 +511,7 @@ button.primary.active {
 }
 
 .poster-card img,
+.poster-pending,
 .poster-fallback {
  display: block;
  width: 100%;

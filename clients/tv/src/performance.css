@@ -11,7 +11,8 @@
  contain: layout paint
 }
 
-.poster-card img {
+.poster-card img,
+.poster-pending {
  background: var(--tt-raised)
 }
 

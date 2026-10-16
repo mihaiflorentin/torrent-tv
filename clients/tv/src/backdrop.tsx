@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { detectLeanGraphics } from './capability';
 
 // Focus-following backdrop (DESIGN.md "Backdrop art"). One blurred layer pair behind the rows:
 // the front layer shows the art, the back layer takes the next one, and a change is a crossfade
 // of opacity only. The blur is static and the layers are half-resolution, scaled up by the
 // stylesheet, so the cost on an old TV is one decode and one fade per change. Nothing loops.
 // A card opts in with data-art="<url>"; an empty value means "no artwork" and brings the
-// designed fallback back. Controls without data-art leave the current art alone.
+// designed fallback back. On an old TV engine (capability.ts) the blur is dropped, since the half-resolution
+// layer scaled up is already soft, and the settle is longer. Controls without data-art leave the current art alone.
 
 /** Settle time before the art follows focus, so a held D-pad key loads only where it stops. */
 export const BACKDROP_FOLLOW_MS = 180;
+/** The same settle on an old TV engine: its decode and fade are slower, so wait for the key repeat to really stop. */
+export const BACKDROP_FOLLOW_LEAN_MS = 450;
 /** A slow image must not stall the crossfade forever. */
 const PRELOAD_GUARD_MS = 1500;
 
@@ -28,7 +32,7 @@ export function nextBackdrop(state: BackdropState, url: string): BackdropState {
   return { layers, front: back };
 }
 
-export function Backdrop({ initial = '', follow = true }: { initial?: string; follow?: boolean }) {
+export function Backdrop({ initial = '', follow = true, lean = detectLeanGraphics() }: { initial?: string; follow?: boolean; lean?: boolean }) {
   const [state, setState] = useState<BackdropState>({ layers: [initial, ''], front: 0 });
   const wanted = useRef(initial);
 
@@ -60,13 +64,13 @@ export function Backdrop({ initial = '', follow = true }: { initial?: string; fo
       wanted.current = art;
       window.clearTimeout(settle);
       window.clearTimeout(guard);
-      settle = window.setTimeout(() => show(art), BACKDROP_FOLLOW_MS);
+      settle = window.setTimeout(() => show(art), lean ? BACKDROP_FOLLOW_LEAN_MS : BACKDROP_FOLLOW_MS);
     };
     document.addEventListener('focusin', onFocus);
     return () => { generation++; window.clearTimeout(settle); window.clearTimeout(guard); document.removeEventListener('focusin', onFocus); };
-  }, [follow]);
+  }, [follow, lean]);
 
-  return <div class="tv-backdrop" aria-hidden="true">
+  return <div class={`tv-backdrop${lean ? ' lean' : ''}`} aria-hidden="true">
     {state.layers.map((url, index) => <div key={index} class={`tv-backdrop-art${state.front === index ? ' on' : ''}`} style={url ? { backgroundImage: cssURL(url) } : undefined} />)}
     <div class="tv-backdrop-scrim" />
   </div>;

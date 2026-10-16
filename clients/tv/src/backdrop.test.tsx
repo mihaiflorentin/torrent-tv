@@ -2,7 +2,7 @@
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Backdrop, BACKDROP_FOLLOW_MS, cssURL, nextBackdrop } from './backdrop';
+import { Backdrop, BACKDROP_FOLLOW_LEAN_MS, BACKDROP_FOLLOW_MS, cssURL, nextBackdrop } from './backdrop';
 
 // DESIGN.md "Backdrop art": one blurred layer behind the rows that follows the focused title,
 // changed by crossfading opacity, with a designed fallback when there is no artwork.
@@ -92,6 +92,24 @@ describe('Backdrop', () => {
     await settle();
     expect(loaded).toEqual(['http://s/c.jpg']);
     expect(front()?.style.backgroundImage).toContain('c.jpg');
+  });
+
+  it('waits longer and drops the blur on an old TV engine', async () => {
+    await act(async () => { render(<Backdrop initial="http://s/a.jpg" lean />, host); });
+    expect(host.querySelector('.tv-backdrop')!.classList.contains('lean')).toBe(true);
+    const button = document.createElement('button');
+    button.dataset.art = 'http://s/b.jpg';
+    host.appendChild(button);
+    focusOn(button);
+    await settle(BACKDROP_FOLLOW_MS + 5);
+    expect(front()?.style.backgroundImage).toContain('a.jpg');
+    await settle(BACKDROP_FOLLOW_LEAN_MS - BACKDROP_FOLLOW_MS);
+    expect(front()?.style.backgroundImage).toContain('b.jpg');
+  });
+
+  it('keeps the blurred look on a capable engine', async () => {
+    await act(async () => { render(<Backdrop initial="http://s/a.jpg" lean={false} />, host); });
+    expect(host.querySelector('.tv-backdrop')!.classList.contains('lean')).toBe(false);
   });
 
   it('falls back to the designed backdrop on a title without art', async () => {
