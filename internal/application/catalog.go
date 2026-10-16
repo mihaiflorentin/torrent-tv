@@ -780,12 +780,19 @@ func errorsIsNoRows(err error) bool { return err == sql.ErrNoRows }
 
 func (s *Service) Artwork(ctx context.Context, titleID, kind string) (string, string, error) {
 	isCast := strings.HasPrefix(kind, "cast-")
-	if kind != "poster" && kind != "backdrop" && !isCast {
+	isSeason := strings.HasPrefix(kind, "season-")
+	if kind != "poster" && kind != "backdrop" && !isCast && !isSeason {
 		return "", "", fmt.Errorf("invalid artwork kind")
 	}
 	var remotePath string
 	fetchKind := kind
-	if isCast {
+	if isSeason {
+		path, size, err := s.seasonImagePath(ctx, titleID, kind)
+		if err != nil {
+			return "", "", err
+		}
+		remotePath, fetchKind = path, size
+	} else if isCast {
 		path, err := s.castPhotoPath(ctx, titleID, kind)
 		if err != nil {
 			return "", "", err

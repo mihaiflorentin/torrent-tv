@@ -85,6 +85,42 @@ func (c *metadataChain) TitleInfo(ctx context.Context, provider, providerID stri
 	return details.TitleInfo(ctx, provider, providerID, kind, language, fallback)
 }
 
+func (c *metadataChain) SeasonList(ctx context.Context, provider, providerID, language, fallback string) (domain.TitleSeasons, error) {
+	entry, ok := c.byID[provider]
+	if !ok {
+		return domain.TitleSeasons{}, fmt.Errorf("unknown metadata provider %q", provider)
+	}
+	details, ok := entry.(SeasonInfoProvider)
+	if !ok {
+		return domain.TitleSeasons{}, fmt.Errorf("metadata provider %q does not serve season details", provider)
+	}
+	return details.SeasonList(ctx, provider, providerID, language, fallback)
+}
+
+func (c *metadataChain) SeasonDetail(ctx context.Context, provider, providerID string, season int, language, fallback string) (domain.SeasonInfo, error) {
+	entry, ok := c.byID[provider]
+	if !ok {
+		return domain.SeasonInfo{}, fmt.Errorf("unknown metadata provider %q", provider)
+	}
+	details, ok := entry.(SeasonInfoProvider)
+	if !ok {
+		return domain.SeasonInfo{}, fmt.Errorf("metadata provider %q does not serve season details", provider)
+	}
+	return details.SeasonDetail(ctx, provider, providerID, season, language, fallback)
+}
+
+func (c *metadataChain) EpisodeDetail(ctx context.Context, provider, providerID string, season, episode int, language string) (domain.EpisodeInfo, error) {
+	entry, ok := c.byID[provider]
+	if !ok {
+		return domain.EpisodeInfo{}, fmt.Errorf("unknown metadata provider %q", provider)
+	}
+	details, ok := entry.(EpisodeDetailProvider)
+	if !ok {
+		return domain.EpisodeInfo{}, fmt.Errorf("metadata provider %q does not serve episode details", provider)
+	}
+	return details.EpisodeDetail(ctx, provider, providerID, season, episode, language)
+}
+
 func (c *metadataChain) OpenArtwork(ctx context.Context, path, kind string) (io.ReadCloser, string, error) {
 	entry, ok := c.byID["tmdb"]
 	if !ok {

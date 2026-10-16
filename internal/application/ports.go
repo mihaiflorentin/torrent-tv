@@ -81,6 +81,19 @@ type MetadataProvider interface {
 type TitleInfoProvider interface {
 	TitleInfo(ctx context.Context, provider, providerID string, kind domain.MediaKind, language, fallback string) (domain.TitleInfo, error)
 }
+
+// SeasonInfoProvider is the optional season and episode detail capability of
+// a metadata provider, a separate port like TitleInfoProvider.
+type SeasonInfoProvider interface {
+	SeasonList(ctx context.Context, provider, providerID, language, fallback string) (domain.TitleSeasons, error)
+	SeasonDetail(ctx context.Context, provider, providerID string, season int, language, fallback string) (domain.SeasonInfo, error)
+}
+
+// EpisodeDetailProvider is implemented by providers whose season payload
+// leaves episode text to a per-episode call.
+type EpisodeDetailProvider interface {
+	EpisodeDetail(ctx context.Context, provider, providerID string, season, episode int, language string) (domain.EpisodeInfo, error)
+}
 type MediaProbe interface {
 	ProbeMedia(context.Context, string) (domain.MediaInfo, error)
 	ProbeSubtitles(context.Context, string) ([]domain.MediaSubtitleTrack, error)
@@ -104,6 +117,9 @@ type Repository interface {
 	SaveTitleInfo(context.Context, domain.TitleInfo) error
 	GetTitleInfo(context.Context, string, string, domain.MediaKind, string) (domain.TitleInfo, error)
 	DeleteTitleInfo(context.Context, string, string, domain.MediaKind, string) error
+	SaveSeasonCache(context.Context, domain.SeasonCacheEntry) error
+	GetSeasonCache(ctx context.Context, provider, providerID string, season int, language string) (domain.SeasonCacheEntry, error)
+	DeleteSeasonCache(ctx context.Context, provider, providerID, language string) error
 	GetRelease(context.Context, string) (domain.TorrentRelease, error)
 	SyncAge(context.Context, string) (int64, error)
 	RecordSync(context.Context, string, int, error) error

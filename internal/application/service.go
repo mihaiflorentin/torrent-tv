@@ -54,6 +54,7 @@ type Service struct {
 	leases           map[string]int
 	titleInfoMu      sync.Mutex
 	titleInfoCalls   map[string]*titleInfoCall
+	seasonCalls      map[string]*seasonCall
 	mediaInfoMu      sync.Mutex
 	mediaInfoCache   map[string]cachedMediaInfo
 	providerMu       sync.Mutex

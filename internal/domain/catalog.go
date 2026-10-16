@@ -216,6 +216,95 @@ type CastEntry struct {
 // MaxCastEntries bounds the cast list a provider adapter returns.
 const MaxCastEntries = 12
 
+// SeasonSummary is one row of a series' season list in the Info panel.
+// PosterPath is the provider-relative image and is never exposed; PosterURL is
+// the local proxy address the service assigns when a poster exists.
+type SeasonSummary struct {
+	Number       int    `json:"number"`
+	Name         string `json:"name"`
+	AirDate      string `json:"airDate,omitempty"`
+	EpisodeCount int    `json:"episodeCount,omitempty"`
+	Overview     string `json:"overview,omitempty"`
+	PosterURL    string `json:"posterUrl,omitempty"`
+	PosterPath   string `json:"posterPath,omitempty"`
+}
+
+// TitleSeasons is the season list of a series for the Info panel. Available
+// is false when no provider could list the seasons, a normal state.
+type TitleSeasons struct {
+	TitleID    string          `json:"titleId"`
+	Provider   string          `json:"provider,omitempty"`
+	ProviderID string          `json:"providerId,omitempty"`
+	Language   string          `json:"language,omitempty"`
+	Seasons    []SeasonSummary `json:"seasons"`
+	Available  bool            `json:"available"`
+	FetchedAt  time.Time       `json:"fetchedAt"`
+	ExpiresAt  time.Time       `json:"expiresAt"`
+}
+
+// EpisodeInfo is the display-ready description of one episode. StillPath is
+// the provider-relative image (never exposed); StillURL is its local proxy
+// address. LazyDetail marks an episode whose synopsis and runtime the provider
+// only serves from a per-episode call (Jikan); the episode endpoint fetches
+// them on first open and stores them.
+type EpisodeInfo struct {
+	Number     int         `json:"number"`
+	Name       string      `json:"name,omitempty"`
+	AirDate    string      `json:"airDate,omitempty"`
+	Runtime    int         `json:"runtimeMinutes,omitempty"`
+	Rating     float64     `json:"rating,omitempty"`
+	VoteCount  int         `json:"voteCount,omitempty"`
+	Overview   string      `json:"overview,omitempty"`
+	StillURL   string      `json:"stillUrl,omitempty"`
+	StillPath  string      `json:"stillPath,omitempty"`
+	Directors  []string    `json:"directors,omitempty"`
+	Writers    []string    `json:"writers,omitempty"`
+	GuestStars []CastEntry `json:"guestStars,omitempty"`
+	Filler     bool        `json:"filler,omitempty"`
+	Recap      bool        `json:"recap,omitempty"`
+	LazyDetail bool        `json:"lazyDetail,omitempty"`
+}
+
+// SeasonInfo is the detail of one season: story, dates, season cast and the
+// episodes with their own credits. Available is false when no provider could
+// describe the season.
+type SeasonInfo struct {
+	TitleID    string        `json:"titleId"`
+	Provider   string        `json:"provider,omitempty"`
+	ProviderID string        `json:"providerId,omitempty"`
+	Language   string        `json:"language,omitempty"`
+	Number     int           `json:"number"`
+	Name       string        `json:"name,omitempty"`
+	Overview   string        `json:"overview,omitempty"`
+	AirDate    string        `json:"airDate,omitempty"`
+	PosterURL  string        `json:"posterUrl,omitempty"`
+	PosterPath string        `json:"posterPath,omitempty"`
+	Cast       []CastEntry   `json:"cast,omitempty"`
+	Episodes   []EpisodeInfo `json:"episodes"`
+	Available  bool          `json:"available"`
+	FetchedAt  time.Time     `json:"fetchedAt"`
+	ExpiresAt  time.Time     `json:"expiresAt"`
+}
+
+// SeasonCacheEntry is one cached provider season payload. Season is
+// SeasonListKey for the season list of a title.
+type SeasonCacheEntry struct {
+	Provider   string
+	ProviderID string
+	Season     int
+	Language   string
+	Available  bool
+	Payload    []byte
+	FetchedAt  time.Time
+	ExpiresAt  time.Time
+}
+
+// SeasonListKey is the Season value of the cache row holding a title's season list.
+const SeasonListKey = -1
+
+// MaxGuestStars bounds the guest list of one episode.
+const MaxGuestStars = 12
+
 // SeriesSeasons is the provider canonical season/episode structure for a
 // series, cached per (provider, providerId, language).
 type SeriesSeasons struct {

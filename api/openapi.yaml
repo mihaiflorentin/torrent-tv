@@ -346,6 +346,85 @@ paths:
               description: Deduplicated persistent title-expansion job; successful refreshes are limited to once per title per hour,
             },
         }
+  /catalog/titles/{id}/info/seasons:
+    get:
+      operationId: getCatalogTitleSeasons
+      description: Season list of a series for the Info panel. Never fails for missing data; movies, unmatched titles and provider outages answer 200 with available false and no seasons.
+      parameters:
+        [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        {
+          "200":
+            {
+              description: Seasons with number, name, air date, episode count, overview and an artwork-proxy poster,
+              content:
+                {
+                  application/json:
+                    { schema: { $ref: "#/components/schemas/TitleSeasons" } },
+                },
+            },
+        }
+  /catalog/titles/{id}/info/seasons/{season}:
+    get:
+      operationId: getCatalogSeasonInfo
+      description: One season with its cast and episodes (director, writer, guest stars, still). Season 0 is specials. Answers 200 with available false when no provider has the season.
+      parameters:
+        [
+          { in: path, name: id, required: true, schema: { type: string } },
+          {
+            in: path,
+            name: season,
+            required: true,
+            schema: { type: integer, minimum: 0 },
+          },
+        ]
+      responses:
+        {
+          "200":
+            {
+              description: Season detail,
+              content:
+                {
+                  application/json:
+                    { schema: { $ref: "#/components/schemas/SeasonInfo" } },
+                },
+            },
+          "400": { $ref: "#/components/responses/Problem" },
+        }
+  /catalog/titles/{id}/info/seasons/{season}/episodes/{episode}:
+    get:
+      operationId: getCatalogEpisodeInfo
+      description: One episode of a season. Providers that leave episode text to a per-episode call (MyAnimeList) are asked once on first open and the answer is cached with the season.
+      parameters:
+        [
+          { in: path, name: id, required: true, schema: { type: string } },
+          {
+            in: path,
+            name: season,
+            required: true,
+            schema: { type: integer, minimum: 0 },
+          },
+          {
+            in: path,
+            name: episode,
+            required: true,
+            schema: { type: integer, minimum: 0 },
+          },
+        ]
+      responses:
+        {
+          "200":
+            {
+              description: Episode detail,
+              content:
+                {
+                  application/json:
+                    { schema: { $ref: "#/components/schemas/EpisodeInfo" } },
+                },
+            },
+          "400": { $ref: "#/components/responses/Problem" },
+          "404": { $ref: "#/components/responses/Problem" },
+        }
   /catalog/facets:
     get:
       {
@@ -375,7 +454,7 @@ paths:
             in: path,
             name: kind,
             required: true,
-            schema: { type: string, enum: [poster, backdrop] },
+            schema: { type: string, description: "poster, backdrop, cast-N, or a season image: season-N-poster, season-N-cast-I, season-N-still-E, season-N-guest-E-I" },
           },
         ]
       responses:
@@ -1439,6 +1518,67 @@ components:
           },
       }
   schemas:
+    CastEntry:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        character: { type: string }
+        imageUrl: { type: string, description: Artwork-proxy path of the profile photo; absent when the provider has none }
+    SeasonSummary:
+      type: object
+      required: [number, name]
+      properties:
+        number: { type: integer }
+        name: { type: string }
+        airDate: { type: string, format: date }
+        episodeCount: { type: integer }
+        overview: { type: string }
+        posterUrl: { type: string }
+    TitleSeasons:
+      type: object
+      required: [titleId, seasons, available]
+      properties:
+        titleId: { type: string }
+        provider: { type: string }
+        providerId: { type: string }
+        language: { type: string }
+        seasons: { type: array, items: { $ref: "#/components/schemas/SeasonSummary" } }
+        available: { type: boolean }
+    EpisodeInfo:
+      type: object
+      required: [number]
+      properties:
+        number: { type: integer }
+        name: { type: string }
+        airDate: { type: string, format: date }
+        runtimeMinutes: { type: integer }
+        rating: { type: number }
+        voteCount: { type: integer }
+        overview: { type: string }
+        stillUrl: { type: string }
+        directors: { type: array, items: { type: string } }
+        writers: { type: array, items: { type: string } }
+        guestStars: { type: array, items: { $ref: "#/components/schemas/CastEntry" } }
+        filler: { type: boolean }
+        recap: { type: boolean }
+        lazyDetail: { type: boolean, description: Synopsis and runtime arrive from the episode endpoint on first open }
+    SeasonInfo:
+      type: object
+      required: [titleId, number, episodes, available]
+      properties:
+        titleId: { type: string }
+        provider: { type: string }
+        providerId: { type: string }
+        language: { type: string }
+        number: { type: integer }
+        name: { type: string }
+        overview: { type: string }
+        airDate: { type: string, format: date }
+        posterUrl: { type: string }
+        cast: { type: array, items: { $ref: "#/components/schemas/CastEntry" } }
+        episodes: { type: array, items: { $ref: "#/components/schemas/EpisodeInfo" } }
+        available: { type: boolean }
     TrackerRef:
       type: object
       required: [id, name]

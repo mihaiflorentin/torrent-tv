@@ -204,4 +204,5 @@ func (s *Service) expireTitleInfo(titleID string) {
 		return
 	}
 	_ = s.repo.DeleteTitleInfo(context.Background(), metadata.Provider, metadata.ProviderID, s.titleInfoKind(context.Background(), titleID, metadata), s.settings.Get().MetadataLanguage)
+	_ = s.repo.DeleteSeasonCache(context.Background(), metadata.Provider, metadata.ProviderID, s.settings.Get().MetadataLanguage)
 }

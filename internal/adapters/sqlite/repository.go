@@ -114,7 +114,11 @@ CREATE TABLE IF NOT EXISTS series_seasons(
 CREATE TABLE IF NOT EXISTS title_info(
  provider TEXT NOT NULL,provider_id TEXT NOT NULL,media_kind TEXT NOT NULL,language TEXT NOT NULL,
  payload TEXT NOT NULL,fetched_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,
- PRIMARY KEY(provider,provider_id,media_kind,language));`)
+ PRIMARY KEY(provider,provider_id,media_kind,language));
+CREATE TABLE IF NOT EXISTS season_info(
+ provider TEXT NOT NULL,provider_id TEXT NOT NULL,season INTEGER NOT NULL,language TEXT NOT NULL,
+ available INTEGER NOT NULL DEFAULT 0,payload BLOB NOT NULL,fetched_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,
+ PRIMARY KEY(provider,provider_id,season,language));`)
 	}
 	if err != nil {
 		return err
@@ -729,6 +733,40 @@ func (r *Repository) GetTitleInfo(ctx context.Context, provider, providerID stri
 
 func (r *Repository) DeleteTitleInfo(ctx context.Context, provider, providerID string, kind domain.MediaKind, language string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM title_info WHERE provider=? AND provider_id=? AND media_kind=? AND language=?`, provider, providerID, string(kind), language)
+	return err
+}
+
+// SaveSeasonCache stores one provider season payload (the season list when
+// Season is domain.SeasonListKey).
+func (r *Repository) SaveSeasonCache(ctx context.Context, entry domain.SeasonCacheEntry) error {
+	available := 0
+	if entry.Available {
+		available = 1
+	}
+	_, err := r.db.ExecContext(ctx, `INSERT INTO season_info(provider,provider_id,season,language,available,payload,fetched_at,expires_at)
+VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(provider,provider_id,season,language) DO UPDATE SET available=excluded.available,
+payload=excluded.payload,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at`,
+		entry.Provider, entry.ProviderID, entry.Season, entry.Language, available, entry.Payload, entry.FetchedAt.Unix(), entry.ExpiresAt.Unix())
+	return err
+}
+
+func (r *Repository) GetSeasonCache(ctx context.Context, provider, providerID string, season int, language string) (domain.SeasonCacheEntry, error) {
+	entry := domain.SeasonCacheEntry{Provider: provider, ProviderID: providerID, Season: season, Language: language}
+	var available int
+	var fetched, expires int64
+	err := r.db.QueryRowContext(ctx, `SELECT available,payload,fetched_at,expires_at FROM season_info WHERE provider=? AND provider_id=? AND season=? AND language=?`, provider, providerID, season, language).
+		Scan(&available, &entry.Payload, &fetched, &expires)
+	if err != nil {
+		return domain.SeasonCacheEntry{}, err
+	}
+	entry.Available = available == 1
+	entry.FetchedAt, entry.ExpiresAt = time.Unix(fetched, 0).UTC(), time.Unix(expires, 0).UTC()
+	return entry, nil
+}
+
+// DeleteSeasonCache drops every cached season payload of a series.
+func (r *Repository) DeleteSeasonCache(ctx context.Context, provider, providerID, language string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM season_info WHERE provider=? AND provider_id=? AND language=?`, provider, providerID, language)
 	return err
 }
 

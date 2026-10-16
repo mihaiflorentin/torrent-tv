@@ -220,6 +220,8 @@ func (c *Client) OpenArtwork(ctx context.Context, path, kind string) (io.ReadClo
 	switch kind {
 	case "backdrop":
 		size = "w1280"
+	case "still":
+		size = "w300"
 	case "profile":
 		size = "w185"
 	}

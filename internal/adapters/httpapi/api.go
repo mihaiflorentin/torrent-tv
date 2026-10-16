@@ -81,6 +81,9 @@ func New(service *application.Service, settings *config.Store, log *slog.Logger,
 	mux.HandleFunc("GET /api/v1/catalog/titles", a.catalogTitles)
 	mux.HandleFunc("GET /api/v1/catalog/titles/{id}", a.catalogTitle)
 	mux.HandleFunc("GET /api/v1/catalog/titles/{id}/info", a.catalogTitleInfo)
+	mux.HandleFunc("GET /api/v1/catalog/titles/{id}/info/seasons", a.catalogTitleSeasons)
+	mux.HandleFunc("GET /api/v1/catalog/titles/{id}/info/seasons/{season}", a.catalogSeasonInfo)
+	mux.HandleFunc("GET /api/v1/catalog/titles/{id}/info/seasons/{season}/episodes/{episode}", a.catalogEpisodeInfo)
 	mux.HandleFunc("POST /api/v1/catalog/titles/{id}/refresh", a.refreshCatalogTitle)
 	mux.HandleFunc("POST /api/v1/catalog/sync", a.catalogSync)
 	mux.HandleFunc("GET /api/v1/catalog/status", a.catalogStatus)
@@ -464,6 +467,58 @@ func (a *API) catalogTitleInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	write(w, http.StatusOK, info)
+}
+
+func (a *API) catalogTitleSeasons(w http.ResponseWriter, r *http.Request) {
+	seasons, err := a.service.TitleSeasons(r.Context(), r.PathValue("id"))
+	if err != nil {
+		problem(w, http.StatusInternalServerError, err)
+		return
+	}
+	write(w, http.StatusOK, seasons)
+}
+
+// numberPath reads a non-negative integer path segment.
+func numberPath(r *http.Request, name string) (int, error) {
+	value, err := strconv.Atoi(r.PathValue(name))
+	if err != nil || value < 0 || value > 10000 {
+		return 0, fmt.Errorf("%s must be a non-negative number", name)
+	}
+	return value, nil
+}
+
+func (a *API) catalogSeasonInfo(w http.ResponseWriter, r *http.Request) {
+	season, err := numberPath(r, "season")
+	if err != nil {
+		problem(w, http.StatusBadRequest, err)
+		return
+	}
+	info, err := a.service.SeasonInfo(r.Context(), r.PathValue("id"), season)
+	if err != nil {
+		problem(w, http.StatusInternalServerError, err)
+		return
+	}
+	write(w, http.StatusOK, info)
+}
+
+func (a *API) catalogEpisodeInfo(w http.ResponseWriter, r *http.Request) {
+	season, err := numberPath(r, "season")
+	if err == nil {
+		var episode int
+		if episode, err = numberPath(r, "episode"); err == nil {
+			info, found, serviceErr := a.service.SeasonEpisode(r.Context(), r.PathValue("id"), season, episode)
+			switch {
+			case serviceErr != nil:
+				problem(w, http.StatusInternalServerError, serviceErr)
+			case !found:
+				problem(w, http.StatusNotFound, fmt.Errorf("episode details are unavailable"))
+			default:
+				write(w, http.StatusOK, info)
+			}
+			return
+		}
+	}
+	problem(w, http.StatusBadRequest, err)
 }
 
 func (a *API) catalogFacets(w http.ResponseWriter, r *http.Request) {
