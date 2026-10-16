@@ -334,6 +334,9 @@ func (a *App) ListenAndServe() error {
 	base := a.Server.BaseContext
 	a.Server.BaseContext = func(ln net.Listener) context.Context {
 		a.triggerStartupUpdate()
+		if a.Service != nil {
+			a.Service.WarmFamilies()
+		}
 		if base != nil {
 			return base(ln)
 		}

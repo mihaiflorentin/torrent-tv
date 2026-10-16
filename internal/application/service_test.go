@@ -213,7 +213,7 @@ func testRegistry(adapter Tracker) *TrackerRegistry {
 	return reg
 }
 
-func retryHarness(t *testing.T) (*sqlite.Repository, *config.Store) {
+func retryHarness(t testing.TB) (*sqlite.Repository, *config.Store) {
 	t.Helper()
 	dir := t.TempDir()
 	previous, err := os.Getwd()
@@ -404,7 +404,7 @@ func TestDownloadsFetchesEachTorrentOncePerAggregation(t *testing.T) {
 
 type dummyEngine struct{ TorrentEngine }
 
-func singleEngineSet(t *testing.T, prefix string, e TorrentEngine) *EngineSet {
+func singleEngineSet(t testing.TB, prefix string, e TorrentEngine) *EngineSet {
 	t.Helper()
 	if prefix == "" {
 		prefix = "qb:"

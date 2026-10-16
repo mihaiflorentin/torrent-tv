@@ -548,6 +548,38 @@ func (r *Repository) QueryCatalogTitleIDs(ctx context.Context, q domain.CatalogQ
 	return domain.Page[string]{Items: items, NextCursor: next, Total: total}, nil
 }
 
+// CatalogFamilyRows returns one row per (tracker category, title) over the
+// discoverable catalog in a single aggregate pass, carrying what the Category
+// family tiles need: newest upload, best seeders, rating and artwork. Callers
+// fold the rows into families by category, so no per-family query is needed.
+func (r *Repository) CatalogFamilyRows(ctx context.Context, eligible []string) ([]domain.FamilyTitleRow, error) {
+	where, args := catalogFilter(domain.CatalogQuery{TrackerIDs: eligible})
+	rows, err := r.db.QueryContext(ctx, `SELECT r.category,c.title_id,MAX(COALESCE(r.uploaded_at,0)),MAX(r.seeders),
+COALESCE(MAX(m.rating),0),COALESCE(MAX(m.backdrop_path<>''),0),COALESCE(MAX(m.poster_path<>''),0)
+FROM releases r JOIN catalog_releases c ON c.release_id=r.id LEFT JOIN catalog_metadata m ON m.title_id=c.title_id
+WHERE `+where+` AND r.category<>'' GROUP BY r.category,c.title_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []domain.FamilyTitleRow{}
+	for rows.Next() {
+		var x domain.FamilyTitleRow
+		var backdrop, poster int
+		if err := rows.Scan(&x.Category, &x.TitleID, &x.UploadedAt, &x.Seeders, &x.Rating, &backdrop, &poster); err != nil {
+			return nil, err
+		}
+		switch {
+		case backdrop != 0:
+			x.ArtKind = "backdrop"
+		case poster != 0:
+			x.ArtKind = "poster"
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) ListCatalogSourcesByTitleIDs(ctx context.Context, ids []string, eligible []string) ([]domain.CatalogSource, error) {
 	if len(ids) == 0 {
 		return []domain.CatalogSource{}, nil

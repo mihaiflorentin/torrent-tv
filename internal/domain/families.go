@@ -123,3 +123,15 @@ type FamilySummary struct {
 func BundledFamilyArtURL(key string) string {
 	return "/api/v1/catalog/families/" + key + "/art.svg"
 }
+
+// FamilyTitleRow is one title inside one raw tracker category, with the
+// figures family tiles are computed from. ArtKind is "backdrop", "poster" or
+// "" when the title has no artwork.
+type FamilyTitleRow struct {
+	Category   string
+	TitleID    string
+	UploadedAt int64
+	Seeders    int
+	Rating     float64
+	ArtKind    string
+}
