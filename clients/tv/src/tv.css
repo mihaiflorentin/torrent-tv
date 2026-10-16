@@ -2509,6 +2509,133 @@ button.primary.active {
  width: 55%
 }
 
+/* Seasons, episodes and guest stars: levels of the same sheet. The Seasons card and every list row end in a
+   saffron chevron (the one cue that OK opens something); artwork boxes keep their size while images load. */
+.info-head button+button {
+ margin-left: var(--tt-space-4)
+}
+
+.info-crumbs {
+ flex: 0 0 auto;
+ margin: var(--tt-space-3) 0 0;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap
+}
+
+.info-stop.info-seasons,
+.info-stop.info-row {
+ display: flex;
+ align-items: center
+}
+
+.info-seasons {
+ margin-top: var(--tt-space-4);
+ border-color: var(--tt-line)
+}
+
+.info-row-copy {
+ flex: 1 1 auto;
+ min-width: 0
+}
+
+.info-row-copy b {
+ display: block;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-bold);
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap
+}
+
+.info-row-copy small {
+ display: block;
+ margin-top: var(--tt-space-1);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap
+}
+
+.info-chevron {
+ flex: 0 0 auto;
+ margin-left: var(--tt-space-4);
+ color: var(--tt-accent);
+ font-size: var(--tt-tv-text-heading);
+ font-weight: var(--tt-weight-bold);
+ line-height: 1
+}
+
+.info-poster,
+.info-still-small {
+ position: relative;
+ flex: 0 0 auto;
+ margin-right: var(--tt-space-5);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ overflow: hidden;
+ border-radius: var(--tt-radius-sm);
+ background: var(--tt-line);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold)
+}
+
+.info-poster {
+ width: 88px;
+ height: 132px
+}
+
+.info-still-small {
+ width: 160px;
+ height: 90px
+}
+
+.info-poster img,
+.info-still-small img,
+.info-still img {
+ position: absolute;
+ top: 0;
+ left: 0;
+ width: 100%;
+ height: 100%;
+ object-fit: cover
+}
+
+.info-still {
+ position: relative;
+ display: block;
+ width: 640px;
+ height: 360px;
+ margin-bottom: var(--tt-space-4);
+ overflow: hidden;
+ border-radius: var(--tt-radius-md);
+ background: var(--tt-line)
+}
+
+.info-episode-title {
+ margin-top: var(--tt-space-2);
+ font-size: var(--tt-tv-text-heading);
+ font-weight: var(--tt-weight-bold);
+ line-height: var(--tt-leading-tight)
+}
+
+.info-credit-line {
+ margin-top: var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body)
+}
+
+.info-credit-line b {
+ margin-right: var(--tt-space-2);
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold)
+}
+
 .tv-danger-zone>h2 {
  color: var(--tt-danger)
 }

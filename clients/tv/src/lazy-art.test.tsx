@@ -2,7 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { API, CatalogFacets, CatalogTitle, HouseholdState } from '@torrent-tv/shared';
-import { ART_COLUMN_REACH, inReach, railNear, railWindows, resetFocusPoint, setFocusPoint } from './lazy-art';
+import { ART_COLUMN_REACH, ART_LIST_REACH, growListReach, inReach, railNear, railWindows, resetFocusPoint, setFocusPoint } from './lazy-art';
 
 if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage.getItem) {
   const store = new Map<string, string>();
@@ -12,6 +12,18 @@ const appRoot = document.createElement('div');
 appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { Catalog } = await import('./main');
+
+describe('list reach (Info panel lists)', () => {
+  it('opens on the first rows, follows focus down the list and never shrinks', () => {
+    const top = growListReach(null, 0);
+    expect(top).toEqual([0, ART_LIST_REACH]);
+    expect(inReach(top, ART_LIST_REACH)).toBe(true);
+    expect(inReach(top, ART_LIST_REACH + 1)).toBe(false);
+    const down = growListReach(top, 40);
+    expect(down).toEqual([0, 40 + ART_LIST_REACH]);
+    expect(growListReach(down, 2)).toBe(down);
+  });
+});
 
 describe('rail windows', () => {
   it('loads a rail while focus is on the rail before it, on it, or after it', () => {

@@ -17,6 +17,12 @@ export interface CatalogTitle { id: string; title: string; originalTitle?: strin
 export interface CastMember { name: string; character?: string; imageUrl?: string }
 /** Extended description of a title for the Info panel; every field but titleId and available is optional. */
 export interface TitleInfo { titleId: string; available: boolean; provider?: string; kind?: MediaKind; language?: string; tagline?: string; overview?: string; releaseDate?: string; lastAirDate?: string; status?: string; runtimeMinutes?: number; rating?: number; ratingVotes?: number; ratingProvider?: string; genres?: string[]; cast?: CastMember[]; directors?: string[]; creators?: string[]; countries?: string[]; originalLanguage?: string; seasons?: number; episodes?: number; certification?: string }
+/** One row of a series' season list in the Info panel. */
+export interface InfoSeason { number: number; name: string; airDate?: string; episodeCount?: number; overview?: string; posterUrl?: string }
+export interface InfoSeasons { titleId: string; available: boolean; provider?: string; seasons: InfoSeason[] }
+/** One episode with its own credits; stillUrl and photos are artwork-proxy paths. */
+export interface InfoEpisode { number: number; name?: string; airDate?: string; runtimeMinutes?: number; rating?: number; voteCount?: number; overview?: string; stillUrl?: string; directors?: string[]; writers?: string[]; guestStars?: CastMember[]; filler?: boolean; recap?: boolean; lazyDetail?: boolean }
+export interface InfoSeasonDetail { titleId: string; available: boolean; provider?: string; number: number; name?: string; overview?: string; airDate?: string; posterUrl?: string; cast?: CastMember[]; episodes: InfoEpisode[] }
 export interface CatalogEpisode { number: number; title: string; season: number; airDate?: string; sourceCount: number; sources: CatalogSource[]; libraryState?: MediaState }
 export interface CatalogSeason { number: number; title: string; episodeCount: number; episodes: CatalogEpisode[]; unknown?: CatalogEpisode[]; packSources?: CatalogSource[]; libraryState?: MediaState }
 export interface CatalogDetail { title: CatalogTitle; seasons: CatalogSeason[]; sources: CatalogSource[] }
@@ -220,6 +226,9 @@ export class API {
  titles(query: Record<string, string | number | boolean | undefined> = {}) { const params = new URLSearchParams(); for (const [key, value] of Object.entries(query)) { if (value !== undefined && value !== '') params.set(key, String(value)) } return this.call<Page<CatalogTitle>>('/catalog/titles?' + params.toString()) }
  title(id: string) { return this.call<CatalogDetail>(`/catalog/titles/${encodeURIComponent(id)}`) }
  titleInfo(id: string) { return this.call<TitleInfo>(`/catalog/titles/${encodeURIComponent(id)}/info`) }
+ titleSeasons(id: string) { return this.call<InfoSeasons>(`/catalog/titles/${encodeURIComponent(id)}/info/seasons`) }
+ seasonInfo(id: string, season: number) { return this.call<InfoSeasonDetail>(`/catalog/titles/${encodeURIComponent(id)}/info/seasons/${season}`) }
+ episodeInfo(id: string, season: number, episode: number) { return this.call<InfoEpisode>(`/catalog/titles/${encodeURIComponent(id)}/info/seasons/${season}/episodes/${episode}`) }
  facets() { return this.call<CatalogFacets>('/catalog/facets') }
  trackers() { return this.call<TrackerStatus[]>('/trackers') }
  prepare(id: string, fileIndex = -1, signal?: AbortSignal) {
@@ -282,5 +291,5 @@ export { buildPath, parsePath } from './routes';
 export type { Route, View } from './routes';
 export { formatEtaLeft, prepareHint, readyLine, readyPercent } from './getting-ready';
 
-export { castInitials, episodeAirLabel, formatRuntime, formatShortDate, infoView, releaseLine } from './title-info';
-export type { InfoView } from './title-info';
+export { castInitials, EPISODE_EMPTY, EPISODE_LOADING, episodeAirLabel, episodeRowView, episodeView, formatRuntime, formatShortDate, infoCrumbs, infoEpisodeCode, infoView, releaseLine, SEASON_EMPTY, SEASON_LOADING, seasonCardView, seasonDetailView, seasonLabel, SEASONS_EMPTY, SEASONS_LOADING } from './title-info';
+export type { EpisodeRowView, EpisodeView, InfoLevel, InfoView, SeasonCardView, SeasonDetailView } from './title-info';

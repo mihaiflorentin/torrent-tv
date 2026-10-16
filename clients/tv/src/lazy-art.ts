@@ -38,11 +38,29 @@ export type ArtReach = [number, number] | null;
 
 function reachFor(span: RailWindow, current: FocusPoint, previous: ArtReach): ArtReach {
   if (!railNear(span, current.row)) return previous;
-  const col = Math.max(0, current.col);
-  const lo = Math.max(0, col - ART_COLUMN_REACH);
-  const hi = col + ART_COLUMN_REACH;
+  return growReach(previous, Math.max(0, current.col), ART_COLUMN_REACH);
+}
+
+/** The reach around `center`, merged into `previous` so it only ever grows. */
+function growReach(previous: ArtReach, center: number, reach: number): ArtReach {
+  const lo = Math.max(0, center - reach);
+  const hi = center + reach;
   if (previous && previous[0] <= lo && previous[1] >= hi) return previous;
   return previous ? [Math.min(previous[0], lo), Math.max(previous[1], hi)] : [lo, hi];
+}
+
+/** Rows loaded either side of the focused row of a long vertical list (the Info panel's seasons, episodes and cast). */
+export const ART_LIST_REACH = 8;
+
+/** Grows the loaded window of a vertical list to cover `focused`; never shrinks, so artwork on screen stays. */
+export function growListReach(previous: ArtReach, focused: number): ArtReach {
+  return growReach(previous, Math.max(0, focused), ART_LIST_REACH);
+}
+
+/** The loaded window of one vertical list: starts at the top rows, grows with `focus(index)`, restarts with `reset()` when the list changes. */
+export function useListArtReach(): { reach: ArtReach; focus: (index: number) => void; reset: () => void } {
+  const [reach, setReach] = useState<ArtReach>(() => growListReach(null, 0));
+  return { reach, focus: (index: number) => setReach(previous => growListReach(previous, index)), reset: () => setReach(growListReach(null, 0)) };
 }
 
 /** The inclusive column range of a rail whose artwork should be loaded, or null while focus is far away. Re-renders only when the range grows. */

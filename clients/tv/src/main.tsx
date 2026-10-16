@@ -1,7 +1,7 @@
 import { Fragment, render, type JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
-import { castInitials, episodeAirLabel, infoView, type TitleInfo } from '@torrent-tv/shared';
+import { episodeAirLabel } from '@torrent-tv/shared';
 import { chooseStructuredTarget, focusElement, remoteAction, useTVNavigation } from './navigation';
 import { LANDING_REQUEST_EVENT, landingTarget, requestLanding, useLanding } from './landing';
 import { PROJECTS_MENU_ROW, REBUILD_DIALOG_REGION, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_DIAGNOSTICS_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_REBUILD_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, UPDATE_RELEASE_LINK_ROW, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
@@ -18,6 +18,7 @@ import { detectCapabilities } from './capability';
 import { memo, useStableCallback } from './memo';
 import { createStatusStore, useStatus, type StatusStore } from './status-store';
 import { inReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach } from './lazy-art';
+import { TitleInfoPanel } from './title-info-panel';
 import '@torrent-tv/shared/design/fonts.css';
 import '@torrent-tv/shared/design/tokens.css';
 import './tv.css';
@@ -1123,51 +1124,6 @@ function TVSeasonPackCard({ source, season, index, baseRow, open, onToggle, onAc
   </button>
   {open && <div id={`tv-pack-${source.release.id}`} class="season-pack-controls"><p class="source-filename">{source.release.name}</p><progress value={state?.progress || 0} max="1" aria-label="Season download progress" />{!managed && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="0" data-focus-key={`season-pack-${source.release.id}-download`} onClick={() => void run('download')}>{busy ? 'Starting…' : 'Download season'}</button>}{managed && !complete && !error && <button aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="1" data-focus-key={`season-pack-${source.release.id}-toggle`} onClick={() => void run(paused ? 'resume' : 'pause')}>{busy ? `${paused ? 'Resuming' : 'Pausing'}…` : paused ? 'Resume' : 'Pause'}</button>}{error && <button class="primary" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="2" data-focus-key={`season-pack-${source.release.id}-retry`} onClick={() => void run('retry')}>{busy ? 'Retrying…' : 'Retry'}</button>}{managed && <button class="danger-button" aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={row + 1} data-focus-col="3" data-focus-key={`season-pack-${source.release.id}-delete`} onClick={() => { if (!busy) onDelete() }}>Delete download</button>}</div>}
  </article>;
-}
-// Info panel: the extended description of a title in its own focus region, so the D-pad cannot leave it.
-// Stops run Close, the summary block, one row per cast member, then the fine print; the scroll follows focus.
-function TitleInfoPanel({ api, title, onClose }: { api: API; title: CatalogTitle; onClose: () => void }) {
- const [info, setInfo] = useState<TitleInfo | undefined>(undefined);
- const [phase, setPhase] = useState<'loading' | 'ready' | 'failed'>('loading');
- useEffect(() => {
-  let live = true;
-  api.titleInfo(title.id).then(value => { if (live) { setInfo(value); setPhase('ready') } }, () => { if (live) setPhase('failed') });
-  return () => { live = false };
- }, [title.id]);
- useEffect(() => {
-  const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="info-close"]')), 0);
-  const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); onClose() };
-  document.addEventListener('keydown', key, true);
-  return () => { window.clearTimeout(timer); document.removeEventListener('keydown', key, true) };
- }, []);
- const view = infoView(info);
- // The catalog card already knows a description; keep showing it when the provider has nothing more.
- const overview = view.overview || (!view.hasDetails ? title.overview || '' : '');
- const empty = phase !== 'loading' && !view.hasDetails;
- const summary = Boolean(view.tagline || overview || view.meta.length || view.genres.length);
- let row = 1;
- return <section role="dialog" aria-modal="true" aria-labelledby="tv-info-heading" class="info-panel">
-  <div class="info-sheet">
-   <header class="info-head"><h2 id="tv-info-heading">{title.title}</h2><button data-focus-region="info-panel" data-focus-row="0" data-focus-col="0" data-focus-key="info-close" onClick={onClose}>Close</button></header>
-   <div class="info-scroll">
-    {phase === 'loading' && <div role="status" class="info-loading"><p>Loading details…</p><span class="info-skeleton" /><span class="info-skeleton short" /><span class="info-skeleton" /></div>}
-    {empty && <p class="info-empty" role="status">No extra details available</p>}
-    {summary && <button class="info-stop info-summary" data-focus-region="info-panel" data-focus-row={row++} data-focus-col="0" data-focus-key="info-summary">
-     {view.meta.length > 0 && <span class="info-meta">{view.meta.join(' · ')}</span>}
-     {view.tagline && <span class="info-tagline">{view.tagline}</span>}
-     {overview && <span class="info-overview">{overview}</span>}
-     {view.genres.length > 0 && <span class="info-genres">{view.genres.join(' · ')}</span>}
-    </button>}
-    {view.credits.map(credit => <p class="info-credit"><b>{credit.label}</b> {credit.names}</p>)}
-    {view.cast.length > 0 && <h3 class="info-subheading">Cast</h3>}
-    {view.cast.map((member, index) => <button class="info-stop info-cast" data-focus-region="info-panel" data-focus-row={row++} data-focus-col="0" data-focus-key={`info-cast-${index}`}>
-     <span class="info-avatar" aria-hidden="true">{castInitials(member.name)}{member.imageUrl && <img src={api.streamURL(member.imageUrl)} alt="" loading="lazy" onError={event => { (event.currentTarget as HTMLElement).style.display = 'none' }} />}</span>
-     <span class="info-cast-copy"><b>{member.name}</b>{member.character && <small>{member.character}</small>}</span>
-    </button>)}
-    {view.fine.length > 0 && <button class="info-stop info-fine" data-focus-region="info-panel" data-focus-row={row++} data-focus-col="0" data-focus-key="info-fine">{view.fine.map(entry => <span><b>{entry.label}</b> {entry.value}</span>)}</button>}
-   </div>
-  </div>
- </section>;
 }
 
 function TitleDetail({ api, detail, target, message, resume, favorite, onClose, onFavorite, onResume, onPlay, onPackAction }: { api: API; detail: CatalogDetail; target: DetailTarget; message: string; resume?: HouseholdItem; favorite: boolean; onClose: () => void; onFavorite: (title: CatalogTitle, value: boolean) => void; onResume: (item: HouseholdItem) => void; onPlay: (release: Release, fileIndex?: number) => void; onPackAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean> }) {

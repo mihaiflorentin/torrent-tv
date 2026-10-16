@@ -1,6 +1,6 @@
 // Shared, framework-free decisions for release dates and the Info panel, so the TV and the browser
 // word dates and order facts identically. Pure, and Intl-free: Tizen 5 / webOS 4 ship limited Intl.
-import type { CatalogTitle, TitleInfo } from './index';
+import type { CatalogTitle, InfoEpisode, InfoSeason, InfoSeasonDetail, TitleInfo } from './index';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -65,13 +65,15 @@ export interface InfoView {
   credits: { label: string; names: string }[];
   /** Fine print, last. */
   fine: { label: string; value: string }[];
+  /** The Seasons card of a series whose providers know its seasons or episodes; opens the season level. Null for movies. */
+  seasons: { label: string; value: string } | null;
 }
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /** Projects an info answer onto the ordered, display-ready sections both Info panels render. */
 export function infoView(info: TitleInfo | undefined): InfoView {
-  const view: InfoView = { hasDetails: false, tagline: '', overview: '', meta: [], genres: [], cast: [], credits: [], fine: [] };
+  const view: InfoView = { hasDetails: false, tagline: '', overview: '', meta: [], genres: [], cast: [], credits: [], fine: [], seasons: null };
   if (!info || !info.available) return view;
   view.tagline = info.tagline || '';
   view.overview = info.overview || '';
@@ -86,13 +88,132 @@ export function infoView(info: TitleInfo | undefined): InfoView {
   view.cast = info.cast || [];
   if (info.directors && info.directors.length) view.credits.push({ label: 'Directed by', names: info.directors.join(', ') });
   if (info.creators && info.creators.length) view.credits.push({ label: 'Created by', names: info.creators.join(', ') });
-  if (info.seasons) view.fine.push({ label: 'Seasons', value: info.episodes ? `${plural(info.seasons, 'season')}, ${plural(info.episodes, 'episode')}` : plural(info.seasons, 'season') });
-  else if (info.episodes) view.fine.push({ label: 'Episodes', value: plural(info.episodes, 'episode') });
+  const counts = info.seasons ? { label: 'Seasons', value: info.episodes ? `${plural(info.seasons, 'season')}, ${plural(info.episodes, 'episode')}` : plural(info.seasons, 'season') } : info.episodes ? { label: 'Episodes', value: plural(info.episodes, 'episode') } : null;
+  if (counts && kind === 'series') view.seasons = counts;
+  else if (counts) view.fine.push(counts);
   if (info.status) view.fine.push({ label: 'Status', value: info.status });
   const last = formatShortDate(info.lastAirDate);
   if (last && kind === 'series') view.fine.push({ label: 'Last aired', value: last });
   if (info.countries && info.countries.length) view.fine.push({ label: 'Country', value: info.countries.join(', ') });
   if (info.originalLanguage) view.fine.push({ label: 'Original language', value: info.originalLanguage });
-  view.hasDetails = Boolean(view.tagline || view.overview || view.meta.length || view.genres.length || view.cast.length || view.credits.length || view.fine.length);
+  view.hasDetails = Boolean(view.tagline || view.overview || view.meta.length || view.genres.length || view.cast.length || view.credits.length || view.fine.length || view.seasons);
+  return view;
+}
+
+// ---- Season and episode levels of the Info panel ----
+
+/** One level of the Info drill-down stack: the season list, a season, or an episode of a season. */
+export type InfoLevel = { kind: 'seasons' } | { kind: 'season'; season: number } | { kind: 'episode'; season: number; episode: number };
+
+export const SEASONS_LOADING = 'Loading seasons…';
+export const SEASON_LOADING = 'Loading episodes…';
+export const EPISODE_LOADING = 'Loading episode…';
+export const SEASONS_EMPTY = 'No season details from the metadata providers yet';
+export const SEASON_EMPTY = 'No episode details from the metadata providers yet';
+export const EPISODE_EMPTY = 'No episode details from the metadata providers yet';
+
+const two = (value: number) => (value < 10 ? '0' : '') + value;
+
+/** 'Season 2', or 'Specials' for season 0. */
+export function seasonLabel(season: number): string {
+  return season === 0 ? 'Specials' : `Season ${season}`;
+}
+
+/** 'S02E05' */
+export function infoEpisodeCode(season: number, episode: number): string {
+  return `S${two(season)}E${two(episode)}`;
+}
+
+/** 'Title › Season 2 › E05' pieces: the title, then one piece per level (the season list is 'Seasons'; an episode level adds its season, then 'E05'). */
+export function infoCrumbs(title: string, stack: InfoLevel[]): string[] {
+  const crumbs = [title];
+  for (const level of stack) {
+    if (level.kind === 'seasons') crumbs.push('Seasons');
+    else if (level.kind === 'season') crumbs.push(seasonLabel(level.season));
+    else {
+      if (crumbs[crumbs.length - 1] !== seasonLabel(level.season)) crumbs.push(seasonLabel(level.season));
+      crumbs.push(`E${two(level.episode)}`);
+    }
+  }
+  return crumbs;
+}
+
+const plural2 = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+export interface SeasonCardView { name: string; meta: string; initial: string }
+
+/** A season row: its name, then 'Year · N episodes'. */
+export function seasonCardView(season: InfoSeason): SeasonCardView {
+  const date = parseDate(season.airDate);
+  const parts: string[] = [];
+  if (date) parts.push(String(date.year));
+  if (season.episodeCount) parts.push(plural2(season.episodeCount, 'episode'));
+  return { name: season.name || seasonLabel(season.number), meta: parts.join(' · '), initial: season.number === 0 ? 'S' : String(season.number) };
+}
+
+export interface EpisodeRowView { number: number; code: string; /** 'E05' */ short: string; title: string; meta: string }
+
+/** An episode row of a season: 'E05 · Title' over 'Air date · runtime · rating'. */
+export function episodeRowView(season: number, episode: InfoEpisode, now: Date = new Date()): EpisodeRowView {
+  const meta: string[] = [];
+  const air = episodeAirLabel(episode.airDate, now);
+  if (air) meta.push(air);
+  const runtime = formatRuntime(episode.runtimeMinutes);
+  if (runtime) meta.push(runtime);
+  if (episode.rating && episode.rating > 0) meta.push(`${episode.rating.toFixed(1)} / 10`);
+  return { number: episode.number, code: infoEpisodeCode(season, episode.number), short: `E${two(episode.number)}`, title: episode.name || `Episode ${episode.number}`, meta: meta.join(' · ') };
+}
+
+export interface SeasonDetailView {
+  /** False when the providers know nothing about this season: clients show the calm empty state. */
+  hasDetails: boolean;
+  overview: string;
+  meta: string[];
+  cast: NonNullable<InfoSeasonDetail['cast']>;
+  episodes: EpisodeRowView[];
+}
+
+/** Projects a season answer onto the ordered sections both clients render. */
+export function seasonDetailView(detail: InfoSeasonDetail | undefined, now: Date = new Date()): SeasonDetailView {
+  const view: SeasonDetailView = { hasDetails: false, overview: '', meta: [], cast: [], episodes: [] };
+  if (!detail || !detail.available) return view;
+  view.overview = detail.overview || '';
+  const air = formatShortDate(detail.airDate);
+  if (air) view.meta.push(air);
+  const episodes = detail.episodes || [];
+  if (episodes.length) view.meta.push(plural2(episodes.length, 'episode'));
+  view.cast = detail.cast || [];
+  view.episodes = episodes.map(episode => episodeRowView(detail.number, episode, now));
+  view.hasDetails = Boolean(view.overview || view.cast.length || view.episodes.length);
+  return view;
+}
+
+export interface EpisodeView {
+  hasDetails: boolean;
+  code: string;
+  title: string;
+  meta: string[];
+  /** Flags the provider set on the episode: 'Filler', 'Recap'. */
+  badges: string[];
+  overview: string;
+  credits: { label: string; names: string }[];
+  guests: NonNullable<InfoEpisode['guestStars']>;
+}
+
+/** Projects an episode onto the ordered sections both clients render: code and title, facts, story, who made it, guest stars. */
+export function episodeView(season: number, episode: InfoEpisode | undefined, now: Date = new Date()): EpisodeView {
+  const view: EpisodeView = { hasDetails: false, code: '', title: '', meta: [], badges: [], overview: '', credits: [], guests: [] };
+  if (!episode) return view;
+  const row = episodeRowView(season, episode, now);
+  view.code = row.code;
+  view.title = row.title;
+  view.meta = row.meta ? row.meta.split(' · ') : [];
+  if (episode.filler) view.badges.push('Filler');
+  if (episode.recap) view.badges.push('Recap');
+  view.overview = episode.overview || '';
+  if (episode.directors && episode.directors.length) view.credits.push({ label: episode.directors.length > 1 ? 'Directors' : 'Director', names: episode.directors.join(', ') });
+  if (episode.writers && episode.writers.length) view.credits.push({ label: episode.writers.length > 1 ? 'Writers' : 'Writer', names: episode.writers.join(', ') });
+  view.guests = episode.guestStars || [];
+  view.hasDetails = Boolean(view.overview || view.credits.length || view.guests.length || episode.stillUrl);
   return view;
 }
