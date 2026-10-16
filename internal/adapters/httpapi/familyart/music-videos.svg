@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-label="Music videos">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#47204a"/>
+      <stop offset="0.55" stop-color="#1d1228"/>
+      <stop offset="1" stop-color="#0e0a15"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.76" cy="0.36" r="0.55">
+      <stop offset="0" stop-color="#ffab2e" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ffab2e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#base)"/>
+  <rect width="1280" height="720" fill="url(#glow)"/>
+  <g fill="none" stroke="#ffab2e" stroke-opacity="0.7" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" transform="translate(790 150)">
+    <circle cx="170" cy="200" r="150"/>
+    <circle cx="170" cy="200" r="52"/>
+    <path d="M150 170l50 30-50 30z" fill="#ffab2e" fill-opacity="0.4"/>
+    <path d="M330 90v190M330 90l60 24" />
+    <ellipse cx="305" cy="285" rx="28" ry="20" fill="#ffab2e" fill-opacity="0.35"/>
+  </g>
+</svg>

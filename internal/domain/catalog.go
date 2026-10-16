@@ -87,8 +87,12 @@ type CatalogTitle struct {
 }
 
 type CatalogQuery struct {
-	Search     string
-	Category   string
+	Search   string
+	Category string
+	// Family limits results to one Category family (its key). The service
+	// resolves it to Categories; repositories only see Categories.
+	Family     string
+	Categories []string
 	TrackerIDs []string
 	Kind       MediaKind
 	Resolution string

@@ -56,6 +56,9 @@ type Service struct {
 	titleInfoCalls   map[string]*titleInfoCall
 	mediaInfoMu      sync.Mutex
 	mediaInfoCache   map[string]cachedMediaInfo
+	familyMu         sync.Mutex
+	families         familyCache
+	familyNow        func() time.Time
 	providerMu       sync.Mutex
 	providerCtx      context.Context
 	providerCancel   context.CancelFunc

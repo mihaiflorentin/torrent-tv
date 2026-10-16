@@ -472,6 +472,12 @@ func catalogFilter(q domain.CatalogQuery) (string, []any) {
 			args = append(args, f.value)
 		}
 	}
+	if len(q.Categories) > 0 {
+		where = append(where, "r.category COLLATE NOCASE IN ("+strings.TrimRight(strings.Repeat("?,", len(q.Categories)), ",")+")")
+		for _, value := range q.Categories {
+			args = append(args, value)
+		}
+	}
 	if q.MinSeeders > 0 {
 		where = append(where, "r.seeders>=?")
 		args = append(args, q.MinSeeders)

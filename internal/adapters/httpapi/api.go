@@ -86,6 +86,9 @@ func New(service *application.Service, settings *config.Store, log *slog.Logger,
 	mux.HandleFunc("GET /api/v1/catalog/status", a.catalogStatus)
 	mux.HandleFunc("POST /api/v1/metadata/ensure", a.ensureMetadata)
 	mux.HandleFunc("GET /api/v1/catalog/facets", a.catalogFacets)
+	mux.HandleFunc("GET /api/v1/catalog/families", a.catalogFamilies)
+	mux.HandleFunc("GET /api/v1/catalog/families/{key}/art.svg", a.familyArtSVG)
+	mux.HandleFunc("GET /api/v1/library/families", a.libraryFamilies)
 	mux.HandleFunc("GET /api/v1/artwork/{titleId}/{kind}", a.artwork)
 	mux.HandleFunc("POST /api/v1/releases/{id}/prepare", a.prepare)
 	mux.HandleFunc("POST /api/v1/releases/{id}/prepare-season", a.prepareSeason)
@@ -425,6 +428,13 @@ func (a *API) catalogTitles(w http.ResponseWriter, r *http.Request) {
 		Kind: domain.MediaKind(r.URL.Query().Get("kind")), Resolution: r.URL.Query().Get("resolution"), HDR: r.URL.Query().Get("hdr"),
 		Quality: r.URL.Query().Get("quality"), Codec: r.URL.Query().Get("codec"), MinSeeders: integer(r, "minSeeders", 0),
 		Sort: r.URL.Query().Get("sort"), Limit: integer(r, "pageSize", 24), Offset: offset,
+		Family: strings.TrimSpace(r.URL.Query().Get("family")),
+	}
+	if q.Family != "" {
+		if _, ok := domain.CategoryFamilyByKey(q.Family); !ok {
+			problem(w, http.StatusBadRequest, fmt.Errorf("unknown category family"))
+			return
+		}
 	}
 	if q.Kind != "" && q.Kind != domain.MediaMovie && q.Kind != domain.MediaSeries {
 		problem(w, http.StatusBadRequest, fmt.Errorf("kind must be movie or series"))
@@ -821,26 +831,7 @@ func (a *API) library(w http.ResponseWriter, r *http.Request) {
 		write(w, http.StatusOK, state)
 		return
 	case "categories":
-		bySource := map[string]domain.HouseholdItem{}
-		for _, group := range [][]domain.HouseholdItem{state.Favorites, state.ContinueWatching, state.Watched, state.Recent} {
-			for _, item := range group {
-				titleID := item.TitleID
-				if titleID == "" && item.Catalog != nil {
-					titleID = item.Catalog.ID
-				}
-				key := ""
-				if titleID != "" {
-					key = "title:" + titleID + "|category:" + strings.ToLower(item.Release.Category)
-				} else if item.SourceID != "" {
-					key = "source:" + item.SourceID
-				} else {
-					key = "release:" + item.Release.ID
-				}
-				if current, exists := bySource[key]; !exists || item.UpdatedAt.After(current.UpdatedAt) {
-					bySource[key] = item
-				}
-			}
-		}
+		bySource := application.DedupeLibraryItems(state)
 		selected := strings.TrimSpace(r.URL.Query().Get("category"))
 		if selected != "" {
 			items = []domain.HouseholdItem{}
