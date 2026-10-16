@@ -205,6 +205,37 @@ button.primary.active {
  background: linear-gradient(var(--tt-scrim-top), var(--tt-scrim-bottom))
 }
 
+/* Title page art (backdrop.tsx `sharp`): the picture the viewer opened, shown as it is. One full-resolution layer,
+   no blur and no scale, so there is nothing for an old GPU to filter; a change is still only an opacity fade. The
+   scrim darkens from the left (under the title block) and the bottom (under the rows) and leaves the rest clear. */
+.tv-backdrop.sharp .tv-backdrop-art {
+ width: 1920px;
+ height: 1080px;
+ -webkit-filter: none;
+ filter: none;
+ transform: none
+}
+
+.tv-backdrop.sharp .tv-backdrop-art.on {
+ opacity: 1
+}
+
+.tv-backdrop.sharp .tv-backdrop-scrim {
+ background: linear-gradient(0deg, var(--tt-scrim-bottom) 0, transparent 38%), linear-gradient(90deg, var(--tt-scrim-text) 0, var(--tt-scrim-top) 46%, transparent 86%)
+}
+
+/* A poster with no backdrop: full height at the right edge, never cropped into a stretched slice. The scrim holds
+   over the empty left and fades out across the poster's edge. */
+.tv-backdrop.sharp.poster-only .tv-backdrop-art {
+ background-size: auto 100%;
+ background-position: right center;
+ background-repeat: no-repeat
+}
+
+.tv-backdrop.sharp.poster-only .tv-backdrop-scrim {
+ background: linear-gradient(0deg, var(--tt-scrim-bottom) 0, transparent 38%), linear-gradient(90deg, var(--tt-scrim-text) 0, var(--tt-scrim-text) 58%, transparent 100%)
+}
+
 /* App shell ------------------------------------------------------------ */
 .tv-app {
  display: block;

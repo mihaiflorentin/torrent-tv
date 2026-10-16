@@ -1207,7 +1207,7 @@ function TitleDetail({ api, detail, target, message, resume, favorite, onClose, 
   try { await api.refreshTitle(detail.title.id, detail.title.title, true) } catch (e) { setRefreshNote((e as Error).message) } finally { setRefreshing(false) }
  };
  return <main class="detail-screen">
-  <Backdrop initial={artURL(api, detail.title)} follow={false} />
+  <Backdrop initial={artURL(api, detail.title)} follow={false} sharp posterOnly={!detail.title.backdropUrl && !!detail.title.posterUrl} />
   <button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}>Back</button>
   <div class="detail-copy">
    <span class="eyebrow">{heroFacts(detail.title).join(' · ')}</span>

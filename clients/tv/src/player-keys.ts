@@ -132,9 +132,11 @@ export class PlayerKeyController {
       return;
     }
 
-    // Wake: the first directional or OK press only brings the controls back to the last-used control.
+    // Wake: the first directional or OK press only brings the controls back. Left/Right mean "move in the
+    // film", so they land on the timeline (the next press seeks); Up, Down and OK return to the last-used control.
     if (hidden) {
       p.reveal(false);
+      if (action === 'left' || action === 'right') return p.focusControl('timeline');
       const key = this.#restoreKey();
       p.focusControl(key);
       if (action === 'enter') p.activateControl(key);

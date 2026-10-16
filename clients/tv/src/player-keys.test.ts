@@ -65,7 +65,7 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('Wake: hidden controls', () => {
-  for (const action of ['left', 'right', 'up', 'down'] as const) {
+  for (const action of ['up', 'down'] as const) {
     it(`${action} wakes the controls, restores Control focus and never seeks`, () => {
       const { calls, controls, keys, seekCalls, state } = setupHidden('audio');
       keys.handle(action);
@@ -76,9 +76,20 @@ describe('Wake: hidden controls', () => {
     });
   }
 
+  for (const action of ['left', 'right'] as const) {
+    it(`${action} wakes the controls on the timeline and never seeks on that first press`, () => {
+      const { calls, controls, keys, seekCalls, state } = setupHidden('audio');
+      keys.handle(action);
+      expect(controls.visible).toBe(true);
+      expect(calls).toEqual(['reveal', 'focus(timeline)']);
+      expect(seekCalls()).toEqual([]);
+      expect(state.remembered).toBe('audio');
+    });
+  }
+
   it('restores to play by default', () => {
-    const { calls, controls, keys } = setupHidden();
-    keys.handle('left');
+    const { calls, keys } = setupHidden();
+    keys.handle('up');
     expect(calls).toContain('focus(play)');
   });
 
