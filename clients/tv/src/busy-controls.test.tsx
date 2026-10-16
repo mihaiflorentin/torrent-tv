@@ -130,10 +130,6 @@ async function openSeriesDetail(container: HTMLElement, api: Partial<API>, overr
 }
 
 async function openSeasonPack(container: HTMLElement) {
-  container.querySelector<HTMLButtonElement>('[data-focus-key^="packs-toggle-"]')!.click();
-  await settle();
-  control(container, 'season-pack-rel-pack-1')!.click();
-  await settle();
 }
 
 const activeDownload: Download = {

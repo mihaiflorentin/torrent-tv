@@ -215,7 +215,7 @@ describe('TV title page', () => {
       mount(container, { title: async () => data } as unknown as Partial<API>, { titles: [title()], initialNav: nav({ titleId: 'a', titleName: 'Alpha', target: { season: 2, episode: 2 } }) });
       await wait(80);
       expect(key('season-2')!.className).toContain('active');
-      expect(key('episode-2:2')!.getAttribute('aria-expanded')).toBe('true');
+      expect(key('episode-2:2')!.getAttribute('aria-current')).toBe('true');
     });
 
     it('restores the list route and focuses the saved card when it is still there', async () => {

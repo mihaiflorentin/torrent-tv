@@ -491,18 +491,6 @@ describe('Setup and link handoff behavioral regressions', () => {
     heroBtn?.click();
     await new Promise(r => setTimeout(r, 40));
 
-    // Expand the collapsed Complete season versions section, then the card
-    const packsToggle = container.querySelector<HTMLButtonElement>('[data-focus-key^="packs-toggle-"]');
-    expect(packsToggle).not.toBeNull();
-    packsToggle?.click();
-    await new Promise(r => setTimeout(r, 20));
-
-    // Expand season pack card
-    const packBtn = container.querySelector<HTMLButtonElement>('[data-focus-key="season-pack-rel-pack-1"]');
-    expect(packBtn).not.toBeNull();
-    packBtn?.click();
-    await new Promise(r => setTimeout(r, 20));
-
     // Click download season button with manageOutcome = false (failed prepare)
     const downloadBtn = container.querySelector<HTMLButtonElement>('[data-focus-key="season-pack-rel-pack-1-download"]');
     expect(downloadBtn).not.toBeNull();

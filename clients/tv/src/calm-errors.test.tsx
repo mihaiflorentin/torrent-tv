@@ -141,10 +141,6 @@ describe('calm action errors', () => {
 
     key('hero-series-1')?.click();
     await wait(40);
-    key('packs-toggle-1')?.click();
-    await wait();
-    container.querySelector<HTMLButtonElement>('[data-focus-key="season-pack-rel-pack-1"]')?.click();
-    await wait();
     key('season-pack-rel-pack-1-toggle')?.click();
     await wait(40);
 
