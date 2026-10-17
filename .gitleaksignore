@@ -1,0 +1,6 @@
+# Fake keys in leak tests and env-validator fixtures (not secrets). One gitleaks fingerprint per line.
+f134beb117ad929c5a23c373e16a009c34e7d917:internal/adapters/tmdb/leak_test.go:generic-api-key:14
+f134beb117ad929c5a23c373e16a009c34e7d917:internal/adapters/subtitles/leak_test.go:generic-api-key:43
+f134beb117ad929c5a23c373e16a009c34e7d917:internal/adapters/subtitles/leak_test.go:generic-api-key:70
+5b9ef960365e33cceace3aa4d26416fc58e0600d:tools/tests/test_docker_env_validate.py:generic-api-key:200
+5b9ef960365e33cceace3aa4d26416fc58e0600d:tools/tests/test_docker_env_validate.py:generic-api-key:201
