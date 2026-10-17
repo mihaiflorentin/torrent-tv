@@ -613,7 +613,9 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  useEffect(() => { if (!restoreFocus) landing.arm() }, []);
  useEffect(() => { const again = () => landing.arm(); window.addEventListener(LANDING_REQUEST_EVENT, again); return () => window.removeEventListener(LANDING_REQUEST_EVENT, again) }, []);
  const detailRef = useRef<CatalogDetail | null>(null);
- const detailJSON = useRef<{ object: CatalogDetail; json: string } | null>(null);
+ // ETag of the open detail: the 3-second poll sends it back and a 304 skips the download, the parse and the re-render.
+ const detailETag = useRef({ id: '', etag: '' });
+ const loadDetail = async (id: string) => { const loaded = (await api.titleIfChanged(id, ''))!; detailETag.current = { id, etag: loaded.etag }; return loaded.detail };
  const refreshDownloadsRef = useRef(onRefreshDownloads);
  detailRef.current = detail;
  refreshDownloadsRef.current = onRefreshDownloads;
@@ -657,22 +659,21 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  const runRecent = (term: string) => { setDraftQuery(term); setQuery(term); setRecent(recordRecentSearch(deviceStorage(), term)); focusSearchField() };
  const forgetRecent = () => { clearRecentSearches(deviceStorage()); setRecent([]); focusSearchField() };
  const loadMore = () => { if (loadingMore.current || !nextCursor) return; loadingMore.current = true; api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor: nextCursor }).then(page => { setRemoteTitles(current => [...current, ...page.items]); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); }).catch(() => { }).then(() => { loadingMore.current = false; }); };
- useEffect(() => { const updated = (event: Event) => { const titleId = String((event as CustomEvent).detail?.titleId || ''); if (!titleId || detailRef.current?.title.id !== titleId) return; void api.title(titleId).then(next => { setDetail(next); setDetailMessage(needsEpisodeExpansion(next) ? 'Preparing the individual episode list…' : '') }).catch(error => setDetailMessage((error as Error).message)) }; window.addEventListener('catalog-title-updated', updated); return () => window.removeEventListener('catalog-title-updated', updated) }, [api]);
+ useEffect(() => { const updated = (event: Event) => { const titleId = String((event as CustomEvent).detail?.titleId || ''); if (!titleId || detailRef.current?.title.id !== titleId) return; void loadDetail(titleId).then(next => { setDetail(next); setDetailMessage(needsEpisodeExpansion(next) ? 'Preparing the individual episode list…' : '') }).catch(error => setDetailMessage((error as Error).message)) }; window.addEventListener('catalog-title-updated', updated); return () => window.removeEventListener('catalog-title-updated', updated) }, [api]);
  useEffect(() => {
   const titleId = detail?.title.kind === 'series' ? detail.title.id : ''; if (!titleId) return; let stopped = false; let running = false; const refresh = async () => {
    if (stopped || running) return; running = true; try {
-    const next = await api.title(titleId); if (!stopped && detailRef.current?.title.id === titleId) { // The 3-second poll re-renders the whole detail screen; skip the state update when nothing changed so focus survives idle cycles.
-     // Serialize each payload once: the open detail's text is cached against its object, so a poll costs one stringify, not two.
-     const nextJSON = JSON.stringify(next); const cached = detailJSON.current; const currentJSON = cached && cached.object === detailRef.current ? cached.json : JSON.stringify(detailRef.current);
-     if (nextJSON === currentJSON) return;
-     detailJSON.current = { object: next, json: nextJSON };
-     setDetail(next); setDetailMessage(needsEpisodeExpansion(next) ? 'Preparing the individual episode list…' : '')
+    const known = detailETag.current; const loaded = await api.titleIfChanged(titleId, known.id === titleId ? known.etag : '');
+    // Unchanged (304): nothing to parse or render, so focus survives idle cycles.
+    if (loaded && !stopped && detailRef.current?.title.id === titleId) {
+     detailETag.current = { id: titleId, etag: loaded.etag };
+     setDetail(loaded.detail); setDetailMessage(needsEpisodeExpansion(loaded.detail) ? 'Preparing the individual episode list…' : '')
     }
    } catch (error) { if (!stopped) setDetailMessage((error as Error).message) } finally { running = false }
   }; const timer = window.setInterval(() => void refresh(), 3000); return () => { stopped = true; window.clearInterval(timer) }
  }, [api, detail?.title.id]);
  useEffect(() => { if (route !== 'downloads') return; let stopped = false; let running = false; const refresh = async () => { if (stopped || running) return; running = true; try { await refreshDownloadsRef.current() } finally { running = false } }; void refresh(); const timer = window.setInterval(() => void refresh(), 3000); return () => { stopped = true; window.clearInterval(timer) } }, [route]);
- const openTitle = async (title: CatalogTitle, target: DetailTarget = {}) => { setDetailMessage('Loading versions…'); setNotice('Loading versions…'); setDetailTarget(target); try { const next = await api.title(title.id); setNotice(''); setDetail(next); if (needsEpisodeExpansion(next)) { setDetailMessage('Preparing the individual episode list…'); void api.refreshTitle(title.id, title.title).catch(error => setDetailMessage((error as Error).message)) } else setDetailMessage(''); } catch (error) { setDetailMessage((error as Error).message); setNotice(`Could not open ${title.title}: ${(error as Error).message}. Check the server connection and press OK to try again.`); } };
+ const openTitle = async (title: CatalogTitle, target: DetailTarget = {}) => { setDetailMessage('Loading versions…'); setNotice('Loading versions…'); setDetailTarget(target); try { const next = await loadDetail(title.id); setNotice(''); setDetail(next); if (needsEpisodeExpansion(next)) { setDetailMessage('Preparing the individual episode list…'); void api.refreshTitle(title.id, title.title).catch(error => setDetailMessage((error as Error).message)) } else setDetailMessage(''); } catch (error) { setDetailMessage((error as Error).message); setNotice(`Could not open ${title.title}: ${(error as Error).message}. Check the server connection and press OK to try again.`); } };
  const openTitleStable = useStableCallback(openTitle);
  useEffect(() => { if (detail) landing.cancel() }, [detail]);
  const openLibraryItem = useStableCallback(async (item: HouseholdItem) => { const id = item.titleId || item.catalog?.id; if (!id) { setDetailMessage('This library item is not linked to a catalog title yet. Refresh the catalog and try again.'); return } const title = item.catalog || { id, title: item.release.name, kind: 'movie', trackers: item.release.trackerId ? [{ id: item.release.trackerId, name: item.release.trackerName }] : [], categories: [], resolutions: [], sourceCount: 1, bestSeeders: item.release.seeders, largestSizeBytes: item.release.sizeBytes } as CatalogTitle; await openTitle(title, { season: item.seasonNumber, episode: item.episodeNumber }) });
@@ -686,7 +687,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
    const ok = await onManageSeasonPack(source, season, action);
    if (ok === false) return;
    if (detailRef.current) {
-    const next = await api.title(detailRef.current.title.id).catch(() => null);
+    const next = await loadDetail(detailRef.current.title.id).catch(() => null);
     // Keep the detail target: it is part of the TitleDetail key, and a new key
     // would remount the screen and drop focus from the pressed control.
     if (next) setDetail(next);

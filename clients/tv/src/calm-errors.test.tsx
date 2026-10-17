@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, Download } from '@torrent-tv/shared';
+import { withETag } from './test-api';
 // Static import cannot work here: main.tsx bootstraps and asserts the presence
 // of document.getElementById('app') during module evaluation. The #app container
 // must be mounted to the DOM before main.tsx evaluates.
@@ -43,7 +44,7 @@ type Overrides = Partial<Record<'onManageDownload' | 'onManageSeasonPack', (...a
 function mount(container: HTMLElement, api: Partial<API>, props: { titles?: CatalogTitle[]; downloads?: Download[] } & Overrides = {}) {
   const view = (titles: CatalogTitle[]) => (
     <Catalog
-      api={{ titles: async () => ({ items: [], nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), ...api } as unknown as API}
+      api={withETag({ titles: async () => ({ items: [], nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), ...api } as unknown as API)}
       status="Online"
       titles={titles}
       facets={{} as CatalogFacets}

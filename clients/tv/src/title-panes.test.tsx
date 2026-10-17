@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
 import type { NavSnapshot } from './nav-snapshot';
 import type { API, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSource, CatalogTitle, HouseholdItem, HouseholdState } from '@torrent-tv/shared';
+import { withETag } from './test-api';
 
 // The series title page on the TV: the season bar on top, then either the episode list or, after OK on an episode,
 // that episode's full-width Versions view. These tests drive the D-pad (keydown on the focused element) and pin every move.
@@ -52,7 +53,7 @@ type MountProps = { seasonInfo?: (id: string, season: number) => Promise<unknown
 function mount(container: HTMLElement, data: () => CatalogDetail, props: MountProps = {}) {
   render(
     <Catalog
-      api={{ titles: async () => ({ items: [series], nextCursor: null, total: 0 }), title: async () => data(), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }), ...(props.seasonInfo ? { seasonInfo: props.seasonInfo } : {}) } as unknown as API}
+      api={withETag({ titles: async () => ({ items: [series], nextCursor: null, total: 0 }), title: async () => data(), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }), ...(props.seasonInfo ? { seasonInfo: props.seasonInfo } : {}) } as unknown as API)}
       status="Online"
       titles={[series]}
       facets={{ categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] } as CatalogFacets}

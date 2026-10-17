@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, HouseholdState, PortalState, UpdateStatus } from '@torrent-tv/shared';
+import { withETag } from './test-api';
 import type { TVPlatformHooks } from './platform';
 // Static import cannot work here: main.tsx bootstraps and asserts the presence
 // of document.getElementById('app') during module evaluation. The #app container
@@ -168,7 +169,7 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     render(
       <Catalog
-        api={mockApi}
+        api={withETag(mockApi)}
         status="Online"
         titles={[]}
         facets={{} as CatalogFacets}
@@ -244,7 +245,7 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     render(
       <TVSettings
-        api={mockApi}
+        api={withETag(mockApi)}
         onChangeServer={() => { }}
         onForgetServer={() => { }}
         updateStatus={mockUpdateStatus}
@@ -287,7 +288,7 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     render(
       <Catalog
-        api={mockApi}
+        api={withETag(mockApi)}
         status="Online"
         titles={[]}
         facets={{} as CatalogFacets}
@@ -341,7 +342,7 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     render(
       <Catalog
-        api={mockApi}
+        api={withETag(mockApi)}
         status="Online"
         titles={[]}
         facets={{} as CatalogFacets}
@@ -460,7 +461,7 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     render(
       <Catalog
-        api={mockApi}
+        api={withETag(mockApi)}
         status="Online"
         titles={[titleItem]}
         facets={{} as CatalogFacets}

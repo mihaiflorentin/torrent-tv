@@ -30,7 +30,7 @@ const titleRow = { id: 'a', title: 'Alpha', kind: 'movie', year: 2019, resolutio
 const detailBody = { title: titleRow, seasons: [], sources: [{ release: rel, parsed: { title: 'Alpha', sortTitle: 'alpha', kind: 'movie', resolution: '1080p', quality: 'WEB-DL' }, fileIndex: 0, filePath: 'a.mkv', fileSizeBytes: 4e9 }] };
 const download = { id: 'dl-1', releaseId: 'rel-1', trackerId: 'filelist', trackerName: 'FileList', displayTitle: 'Alpha', engineId: 'e', fileIndex: 0, filePath: 'a.mkv', mimeType: 'video/x-matroska', streamUrl: '/s/dl-1', sizeBytes: 4e9, downloadedBytes: 4e9, progress: 1, state: 'completed', playbackMode: 'local', speedBytesPerSecond: 0, etaSeconds: 0, peers: 0, seeds: 0, leased: false };
 
-function respond(body: unknown) { return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) }; }
+function respond(body: unknown) { return { ok: true, status: 200, headers: new Headers(), json: async () => body, text: async () => JSON.stringify(body) }; }
 
 describe('App returns to the title page after the Player closes', () => {
   let container: HTMLDivElement;

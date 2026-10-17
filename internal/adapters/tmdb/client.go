@@ -216,7 +216,7 @@ func (c *Client) OpenArtwork(ctx context.Context, path, kind string) (io.ReadClo
 	if !strings.HasPrefix(path, "/") || strings.Contains(path, "..") {
 		return nil, "", fmt.Errorf("invalid TMDB artwork path")
 	}
-	size := "w500"
+	size := "w342"
 	switch kind {
 	case "backdrop":
 		size = "w1280"

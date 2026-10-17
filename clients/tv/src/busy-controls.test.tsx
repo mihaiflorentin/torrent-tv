@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, Download, MediaState, UpdateStatus } from '@torrent-tv/shared';
+import { withETag } from './test-api';
 import type { TVPlatformHooks } from './platform';
 // main.tsx asserts #app during module evaluation, so the container exists first.
 if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage.getItem) {
@@ -49,13 +50,13 @@ type CatalogProps = Parameters<typeof Catalog>[0];
 
 function catalogProps(api: Partial<API>, overrides: Partial<CatalogProps> = {}): CatalogProps {
   return {
-    api: {
+    api: withETag({
       titles: async () => ({ items: [], nextCursor: null }),
       ensureMetadata: async () => ({ queued: 0 }),
       streamURL: (path: string) => path,
       call: async () => ({}),
       ...api,
-    } as unknown as API,
+    } as unknown as API),
     status: 'Online',
     titles: [],
     facets: {} as CatalogFacets,

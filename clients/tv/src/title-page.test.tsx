@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
 import type { NavSnapshot } from './nav-snapshot';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, HouseholdItem, HouseholdState } from '@torrent-tv/shared';
+import { withETag } from './test-api';
 
 // Title page behavior on the TV: the primary action targets the best-ranked version, the page opens
 // on it, episode tiles show progress. main.tsx bootstraps against #app during module evaluation.
@@ -33,7 +34,7 @@ const resumeItem = (over: Partial<HouseholdItem> = {}): HouseholdItem => ({ prof
 function mount(container: HTMLElement, api: Partial<API>, props: { titles: CatalogTitle[]; household?: HouseholdState; onPlay?: (...args: unknown[]) => void; initialNav?: NavSnapshot; onNav?: (snapshot: NavSnapshot) => void; restoreFocus?: string | null }) {
   render(
     <Catalog
-      api={{ titles: async () => ({ items: props.titles, nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }), ...api } as unknown as API}
+      api={withETag({ titles: async () => ({ items: props.titles, nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }), ...api } as unknown as API)}
       status="Online"
       titles={props.titles}
       facets={{ categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] } as CatalogFacets}
@@ -265,6 +266,35 @@ describe('TV title page', () => {
       await wait();
       const last = onNav.mock.calls[onNav.mock.calls.length - 1][0] as NavSnapshot;
       expect(last).toMatchObject({ route: 'home', titleId: 'a', titleName: 'Alpha', query: '' });
+    });
+  });
+
+  describe('series detail poll', () => {
+    const series = (name = 'Alpha'): CatalogDetail => ({ title: title({ kind: 'series', title: name }), sources: [], seasons: [{ number: 1, title: 'Season 1', episodeCount: 1, episodes: [{ number: 1, title: 'Pilot', season: 1, sourceCount: 1, sources: [source('s1')] }] }] });
+    afterEach(() => vi.useRealTimers());
+
+    it('sends the last ETag; a 304 does not re-render the screen or move focus, a new ETag does', async () => {
+      let current = { detail: series(), etag: '"e1"' };
+      const titleIfChanged = vi.fn(async (_id: string, etag: string) => etag === current.etag ? null : current);
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      mount(container, { titleIfChanged } as unknown as Partial<API>, { titles: [title({ kind: 'series' })] });
+      await wait();
+      key('hero-a')!.click();
+      await wait();
+      expect(titleIfChanged).toHaveBeenLastCalledWith('a', '');
+      const screen = container.querySelector('.detail-screen')!;
+      const focused = document.activeElement;
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(titleIfChanged).toHaveBeenCalledTimes(3);
+      expect(titleIfChanged).toHaveBeenLastCalledWith('a', '"e1"');
+      expect(container.querySelector('.detail-screen')).toBe(screen);
+      expect(document.activeElement).toBe(focused);
+      current = { detail: series('Alpha Reloaded'), etag: '"e2"' };
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(titleIfChanged).toHaveBeenLastCalledWith('a', '"e2"');
+      expect(container.textContent).toContain('Alpha Reloaded');
     });
   });
 });

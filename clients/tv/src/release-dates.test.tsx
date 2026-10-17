@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sleep } from './test-wait';
 import { episodePageView } from '@torrent-tv/shared';
+import { withETag } from './test-api';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, HouseholdState } from '@torrent-tv/shared';
 import { cardMeta, episodeMeta, heroFacts } from './display';
 
@@ -59,7 +60,7 @@ describe('TV title page episode air dates', () => {
     const detail: CatalogDetail = { title: show, sources: [], seasons: [{ number: 1, title: 'Season 1', episodeCount: 1, episodes: [{ number: 1, title: 'Pilot', season: 1, airDate: '2019-01-02', sourceCount: 1, sources: [] }] }] } as unknown as CatalogDetail;
     render(
       <Catalog
-        api={{ titles: async () => ({ items: [show], nextCursor: null, total: 0 }), title: async () => detail, ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }) } as unknown as API}
+        api={withETag({ titles: async () => ({ items: [show], nextCursor: null, total: 0 }), title: async () => detail, ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }) } as unknown as API)}
         status="Online" titles={[show]} facets={{ categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] } as CatalogFacets}
         household={empty} downloads={[]} jobs={[]} restoreFocus={null} portal={null} updateStatus={null}
         onUpdateStatus={() => { }} onFocus={() => { }} onRetry={() => { }} onChangeServer={() => { }} onForgetServer={() => { }} onPlay={() => { }} onPlayDownload={() => { }}

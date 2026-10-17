@@ -139,7 +139,8 @@ func New(service *application.Service, settings *config.Store, log *slog.Logger,
 	mux.HandleFunc("GET /api/v1/streams/{id}/browser", a.browserStream)
 	mux.HandleFunc("GET /api/v1/streams/{id}/snap", a.streamSnap)
 	mux.Handle("/", appShell(webFS))
-	return recoverer(log, access(log, internalFetch(a.internalToken, mux, trusted(settings, guard(newTrustPolicy(os.Getenv), mux)))))
+	encoded := jsonEncoding(mux)
+	return recoverer(log, access(log, internalFetch(a.internalToken, encoded, trusted(settings, guard(newTrustPolicy(os.Getenv), encoded)))))
 }
 
 // appShell serves the embedded web build. A GET outside /api/ that matches no

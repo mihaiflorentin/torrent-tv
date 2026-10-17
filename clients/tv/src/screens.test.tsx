@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, HouseholdItem, HouseholdState, Job } from '@torrent-tv/shared';
+import { withETag } from './test-api';
 
 // DESIGN.md "Information priorities", checked on what the TV screens really render: the primary
 // facts are on the screen, the technical ones are not until a details control opens them.
@@ -37,7 +38,7 @@ interface Props { titles?: CatalogTitle[]; household?: HouseholdState; downloads
 function mount(container: HTMLElement, api: Partial<API> = {}, props: Props = {}) {
   render(
     <Catalog
-      api={{ titles: async () => ({ items: props.titles || [], nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: props.jobs || [], nextCursor: null, total: 0 }), ...api } as unknown as API}
+      api={withETag({ titles: async () => ({ items: props.titles || [], nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: props.jobs || [], nextCursor: null, total: 0 }), ...api } as unknown as API)}
       status="Online"
       titles={props.titles || []}
       facets={{ categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] } as CatalogFacets}

@@ -226,6 +226,8 @@ export class API {
  refreshTitle(titleId: string, query = '', force = false) { return this.call<Job>(`/catalog/titles/${encodeURIComponent(titleId)}/refresh`, { method: 'POST', body: JSON.stringify({ query, force }) }) }
  titles(query: Record<string, string | number | boolean | undefined> = {}) { const params = new URLSearchParams(); for (const [key, value] of Object.entries(query)) { if (value !== undefined && value !== '') params.set(key, String(value)) } return this.call<Page<CatalogTitle>>('/catalog/titles?' + params.toString()) }
  title(id: string) { return this.call<CatalogDetail>(`/catalog/titles/${encodeURIComponent(id)}`) }
+ // Conditional detail fetch: null when the server answers 304 for the given ETag, so a poll of an unchanged title costs no body, no parse.
+ async titleIfChanged(id: string, etag: string): Promise<{ detail: CatalogDetail; etag: string } | null> { const r = await fetch(`${this.base}/api/v1/catalog/titles/${encodeURIComponent(id)}`, { headers: { 'Content-Type': 'application/json', ...(etag ? { 'If-None-Match': etag } : {}) } }); if (r.status === 304) return null; if (!r.ok) { const p = await r.json().catch(() => ({ detail: r.statusText })); throw Object.assign(new Error(p.detail || r.statusText), { status: r.status }) } return { detail: await r.json() as CatalogDetail, etag: r.headers.get('ETag') || '' } }
  titleInfo(id: string) { return this.call<TitleInfo>(`/catalog/titles/${encodeURIComponent(id)}/info`) }
  titleSeasons(id: string) { return this.call<InfoSeasons>(`/catalog/titles/${encodeURIComponent(id)}/info/seasons`) }
  seasonInfo(id: string, season: number) { return this.call<InfoSeasonDetail>(`/catalog/titles/${encodeURIComponent(id)}/info/seasons/${season}`) }

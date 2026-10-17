@@ -246,7 +246,7 @@ func TestGuardPreflight(t *testing.T) {
 	if rec.Code != 204 || rec.Header().Get("Access-Control-Allow-Origin") != "null" {
 		t.Fatalf("client preflight = %d %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"))
 	}
-	if rec.Header().Get("Access-Control-Allow-Headers") != "Content-Type" || rec.Header().Get("Access-Control-Allow-Methods") == "" {
+	if rec.Header().Get("Access-Control-Allow-Headers") != "Content-Type, If-None-Match"|| rec.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Fatalf("preflight headers missing: %v", rec.Header())
 	}
 	if rec := do(h, "OPTIONS", "/api/v1/settings", host, "null", pf); rec.Code != 204 {

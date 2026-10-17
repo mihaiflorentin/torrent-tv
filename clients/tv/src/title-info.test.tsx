@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, HouseholdState, TitleInfo } from '@torrent-tv/shared';
+import { withETag } from './test-api';
 
 // The Info panel on the TV: an Info button on the title page and on the Home hero opens a
 // focus-trapped panel (own focus region) that loads TitleInfo, scrolls its cast by D-pad rows,
@@ -37,7 +38,7 @@ const info = (over: Partial<TitleInfo> = {}): TitleInfo => ({
 function mount(container: HTMLElement, api: Partial<API>, titles: CatalogTitle[]) {
   render(
     <Catalog
-      api={{ titles: async () => ({ items: titles, nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }), ...api } as unknown as API}
+      api={withETag({ titles: async () => ({ items: titles, nextCursor: null, total: 0 }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => ({ items: [], nextCursor: null, total: 0 }), ...api } as unknown as API)}
       status="Online" titles={titles} facets={{ categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] } as CatalogFacets}
       household={empty} downloads={[]} jobs={[]} restoreFocus={null} portal={null} updateStatus={null}
       onUpdateStatus={() => { }} onFocus={() => { }} onRetry={() => { }} onChangeServer={() => { }} onForgetServer={() => { }} onPlay={() => { }} onPlayDownload={() => { }}
