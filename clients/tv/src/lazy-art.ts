@@ -3,11 +3,19 @@ import { useEffect, useState } from 'preact/hooks';
 // Poster artwork follows focus. Chromium before 76 ignores loading="lazy" and IntersectionObserver clips at
 // scroll containers, so every poster of every rail would be requested and decoded at once. Instead the focused
 // grid position is published here (Catalog, on content focus) and each rail loads artwork only for the rails
-// next to the focused one and the cards around the focused column. The window never shrinks while a rail is
-// mounted, so artwork already on screen is never dropped. Nothing here touches focus or the DOM.
+// next to the focused one and the cards around the focused column.
+//
+// The loaded window slides with focus and has hysteresis. Cards within a LOAD distance of the focus always load
+// (wider than a 1920px screen shows, so art on screen is never dropped). Cards that already loaded stay loaded
+// until they are more than a wider KEEP distance away, so small back-and-forth moves never drop and re-request
+// art, while a long walk releases what it left behind (decoded posters are GPU texture memory on a TV). A rail
+// more than one rail away from the focused one drops all its art. A hook only sets state when its range changes.
+// Nothing here touches focus or the DOM.
 
 /** Cards loaded either side of the focused column; a 1920px screen shows about six. */
-export const ART_COLUMN_REACH = 9;
+export const ART_COLUMN_REACH = 8;
+/** Loaded cards further than this from the focused column are dropped. */
+export const ART_COLUMN_KEEP = 14;
 
 interface FocusPoint { row: number; col: number }
 let point: FocusPoint = { row: -1, col: -1 };
@@ -36,34 +44,46 @@ export function railNear(span: RailWindow, row: number): boolean { return row >=
 
 export type ArtReach = [number, number] | null;
 
-function reachFor(span: RailWindow, current: FocusPoint, previous: ArtReach): ArtReach {
-  if (!railNear(span, current.row)) return previous;
-  return growReach(previous, Math.max(0, current.col), ART_COLUMN_REACH);
+function sameReach(a: ArtReach, b: ArtReach): boolean { return a === b || (a !== null && b !== null && a[0] === b[0] && a[1] === b[1]); }
+
+/**
+ * The window around `center` that was `previous`: always `center` +/- `load`, plus whatever of `previous` still lies
+ * within `keep` of the center. Returns `previous` itself when nothing changes, so a state setter can bail out.
+ */
+export function slideReach(previous: ArtReach, center: number, load: number, keep: number, floor = 0): ArtReach {
+  const loadLo = Math.max(floor, center - load);
+  const loadHi = center + load;
+  const lo = previous && previous[0] >= center - keep && previous[0] <= loadLo ? previous[0] : loadLo;
+  const hi = previous && previous[1] <= center + keep && previous[1] >= loadHi ? previous[1] : loadHi;
+  return previous && previous[0] === lo && previous[1] === hi ? previous : [lo, hi];
 }
 
-/** The reach around `center`, merged into `previous` so it only ever grows. */
-function growReach(previous: ArtReach, center: number, reach: number): ArtReach {
-  const lo = Math.max(0, center - reach);
-  const hi = center + reach;
-  if (previous && previous[0] <= lo && previous[1] >= hi) return previous;
-  return previous ? [Math.min(previous[0], lo), Math.max(previous[1], hi)] : [lo, hi];
+function reachFor(span: RailWindow, current: FocusPoint, previous: ArtReach): ArtReach {
+  if (!railNear(span, current.row)) return null;
+  return slideReach(previous, Math.max(0, current.col), ART_COLUMN_REACH, ART_COLUMN_KEEP);
 }
 
 /** Rows loaded either side of the focused row of a long vertical list (the Info panel's seasons, episodes and cast). */
 export const ART_LIST_REACH = 8;
+/** Loaded rows further than this from the focused row are dropped. */
+export const ART_LIST_KEEP = 16;
 
-/** Grows the loaded window of a vertical list to cover `focused`; never shrinks, so artwork on screen stays. */
-export function growListReach(previous: ArtReach, focused: number): ArtReach {
-  return growReach(previous, Math.max(0, focused), ART_LIST_REACH);
+/** Slides the loaded window of a vertical list to `focused`: it loads around it and keeps earlier rows until they are far. */
+export function slideListReach(previous: ArtReach, focused: number): ArtReach {
+  return slideReach(previous, Math.max(0, focused), ART_LIST_REACH, ART_LIST_KEEP);
 }
 
-/** The loaded window of one vertical list: starts at the top rows, grows with `focus(index)`, restarts with `reset()` when the list changes. */
+/** The loaded window of one vertical list: starts at the top rows, slides with `focus(index)`, restarts with `reset()` when the list changes. Sets state only when the window changes. */
 export function useListArtReach(): { reach: ArtReach; focus: (index: number) => void; reset: () => void } {
-  const [reach, setReach] = useState<ArtReach>(() => growListReach(null, 0));
-  return { reach, focus: (index: number) => setReach(previous => growListReach(previous, index)), reset: () => setReach(growListReach(null, 0)) };
+  const [reach, setReach] = useState<ArtReach>(() => slideListReach(null, 0));
+  return {
+    reach,
+    focus: (index: number) => setReach(previous => slideListReach(previous, index)),
+    reset: () => setReach(previous => { const top = slideListReach(null, 0); return sameReach(previous, top) ? previous : top }),
+  };
 }
 
-/** The inclusive column range of a rail whose artwork should be loaded, or null while focus is far away. Re-renders only when the range grows. */
+/** The inclusive column range of a rail whose artwork should be loaded, or null while focus is far away. Re-renders only when the range changes: it follows the focused column, keeps what is still near, and is null once focus is more than one rail away. */
 export function useArtReach(span: RailWindow): ArtReach {
   const [reach, setReach] = useState<ArtReach>(() => reachFor(span, point, null));
   useEffect(() => {
@@ -79,17 +99,15 @@ export const inReach = (reach: ArtReach, col: number): boolean => reach !== null
 
 /** Grid rows loaded either side of the focused row for a wrapped grid (Category tiles, library cards). */
 export const ART_ROW_REACH = 2;
+/** Loaded grid rows further than this from the focused row are dropped. */
+export const ART_ROW_KEEP = 4;
 export type RowReach = [number, number];
 
 function rowReachFor(firstRow: number, current: FocusPoint, previous: RowReach | null): RowReach {
-  const row = current.row < 0 ? firstRow : current.row;
-  const lo = row - ART_ROW_REACH;
-  const hi = row + ART_ROW_REACH;
-  if (previous && previous[0] <= lo && previous[1] >= hi) return previous;
-  return previous ? [Math.min(previous[0], lo), Math.max(previous[1], hi)] : [lo, hi];
+  return slideReach(previous, current.row < 0 ? firstRow : current.row, ART_ROW_REACH, ART_ROW_KEEP, -Infinity) as RowReach;
 }
 
-/** The inclusive row range of a grid whose artwork should be loaded. Starts around `firstRow` and only ever grows. */
+/** The inclusive row range of a grid whose artwork should be loaded. Starts around `firstRow`, slides with focus, and sets state only when it changes. */
 export function useRowReach(firstRow: number): RowReach {
   const [reach, setReach] = useState<RowReach>(() => rowReachFor(firstRow, point, null));
   useEffect(() => {

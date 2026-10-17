@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 // The series page's card surfaces and episode column, read as text the way chromium53-css.test.ts reads the sheet:
 // no layout engine runs here, so these pin the declarations that carry the design (translucent token surfaces so the
-// title's sharp backdrop shows, a narrow centred list) and the limits of the Chromium 53 TV floor.
+// title's sharp backdrop shows, a full-width left-aligned list) and the limits of the Chromium 53 TV floor.
 const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'tv.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 // The declarations of every rule whose selector list contains exactly this selector.
@@ -47,17 +47,34 @@ describe('TV series page surfaces', () => {
     expect(value('.episode-tile.selected small', 'color')).toBe('var(--tt-text)');
   });
 
-  it('centres a list column narrower than the old 760px pane', () => {
-    expect(value('.season-panes', 'justify-content')).toBe('center');
-    expect(declarationsOf('.episode-pane')).not.toMatch(/flex\s*:\s*0 0 760px/);
-    expect(value('.episode-column', 'flex')).toBe('0 1 auto');
+  it('spans the card width, left-aligned like the Versions view, with no content-sized centred column', () => {
+    expect(value('.season-panes', 'justify-content')).toBeUndefined();
+    expect(value('.season-panes', 'display')).toBe('block');
     expect(value('.episode-column', 'width')).toBe('100%');
-    const cap = Number(/^(\d+)px$/.exec(value('.episode-column', 'max-width') ?? '')?.[1]);
-    expect(cap).toBeGreaterThan(0);
-    expect(cap).toBeLessThanOrEqual(760);
+    expect(value('.episode-column', 'max-width')).toBeUndefined();
+    expect(declarationsOf('.episode-column')).not.toMatch(/margin\s*:[^;]*auto/);
   });
 
-  it('lets the episode name and facts truncate and the progress bar shrink inside the capped column', () => {
+  it('gives each row a 16:9 still of at least 256x144 and keeps the list scroll within 1080p', () => {
+    const width = Number(/^(\d+)px$/.exec(value('.episode-tile .info-still-small', 'width') ?? '')?.[1]);
+    const height = Number(/^(\d+)px$/.exec(value('.episode-tile .info-still-small', 'height') ?? '')?.[1]);
+    expect(width).toBeGreaterThanOrEqual(256);
+    expect(Math.abs(width / height - 16 / 9)).toBeLessThan(0.01);
+    const cap = Number(/^(\d+)px$/.exec(value('.episode-pane', 'max-height') ?? '')?.[1]);
+    expect(cap).toBeGreaterThanOrEqual(height * 3);
+    expect(cap).toBeLessThanOrEqual(800);
+  });
+
+  it('clamps the synopsis to two muted lines, with a max-height fallback and full text colour on the selected row', () => {
+    expect(value('.episode-tile .episode-synopsis', 'color')).toBe('var(--tt-text-muted)');
+    expect(value('.episode-tile .episode-synopsis', 'overflow')).toBe('hidden');
+    expect(value('.episode-tile .episode-synopsis', '-webkit-line-clamp')).toBe('2');
+    expect(value('.episode-tile .episode-synopsis', 'max-height')).toBe('2.8em');
+    expect(value('.episode-tile .episode-synopsis', 'line-height')).toBe('1.4');
+    expect(value('.episode-tile.selected .episode-synopsis', 'color')).toBe('var(--tt-text)');
+  });
+
+  it('lets the episode name and facts truncate and the progress bar shrink inside the row', () => {
     expect(value('.info-row-copy', 'min-width')).toBe('0');
     for (const selector of ['.info-row-copy b', '.info-row-copy small']) {
       expect(declarationsOf(selector), selector).toMatch(/text-overflow:\s*ellipsis/);
