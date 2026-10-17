@@ -58,7 +58,7 @@ describe('shared design tokens', () => {
       '--tt-radius-sm', '--tt-radius-md', '--tt-radius-lg', '--tt-radius-pill',
       '--tt-dur-fast', '--tt-dur-base', '--tt-dur-slow', '--tt-ease-out',
       '--tt-scrim-top', '--tt-scrim-text', '--tt-backdrop-blur-web', '--tt-backdrop-blur-tv',
-      '--tt-card-surface', '--tt-controls-surface', '--tt-menu-surface', '--tt-tv-timeline-height', '--tt-controls-fade',
+      '--tt-card-surface', '--tt-text-shade', '--tt-text-shade-core', '--tt-controls-surface', '--tt-menu-surface', '--tt-tv-timeline-height', '--tt-controls-fade',
     ];
     expect(required.filter(name => !t.has(name))).toEqual([]);
   });
@@ -73,8 +73,10 @@ describe('shared design tokens', () => {
   });
 
   // Translucent card surfaces let the title's sharp backdrop show on the series page. The backdrop is any picture, so
-  // the guarantee is checked against the brightest one there is (white), with the selected-row tint on top.
-  it('keeps text at WCAG AA on the translucent card surface over the brightest possible backdrop', () => {
+  // the guarantee is checked against the brightest one there is (white). At 58% the card alone cannot hold 4.5:1 over
+  // white, so the text carries a dark halo (--tt-text-shade). A halo around thin strokes never reaches its full alpha,
+  // so the check uses only half of --tt-text-shade-core's alpha, with the selected-row tint under it.
+  describe('translucent card surface', () => {
     const rgba = (name: string) => {
       const match = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(t.get(name) ?? '');
       expect(match, `${name} is an rgba() color`).not.toBeNull();
@@ -82,13 +84,41 @@ describe('shared design tokens', () => {
     };
     const over = (top: { rgb: number[]; alpha: number }, under: number[]) => top.rgb.map((channel, i) => channel * top.alpha + under[i] * (1 - top.alpha));
     const hex = (channels: number[]) => '#' + channels.map(channel => Math.round(channel).toString(16).padStart(2, '0')).join('');
+    const WHITE = [255, 255, 255];
+    const MID_GREY = [128, 128, 128];
+    const HALO_REACH = 0.5;
     const card = rgba('--tt-card-surface');
-    expect(card.alpha, 'translucent enough for the art to show').toBeLessThanOrEqual(0.85);
-    expect(card.alpha, 'not so clear that text loses its ground').toBeGreaterThanOrEqual(0.6);
-    const panel = over(card, [255, 255, 255]);
-    for (const name of ['--tt-text', '--tt-text-muted']) expect(contrast(color(name), hex(panel)), `${name} on the card over white`).toBeGreaterThanOrEqual(4.5);
-    const selected = over(rgba('--tt-accent-soft'), panel);
-    expect(contrast(color('--tt-text'), hex(selected)), 'text on the selected row over white').toBeGreaterThanOrEqual(4.5);
+    const core = rgba('--tt-text-shade-core');
+    const shaded = (ground: number[]) => over({ rgb: core.rgb, alpha: core.alpha * HALO_REACH }, ground);
+
+    it('is clearly translucent but not clear', () => {
+      expect(card.alpha, 'below 80%, so the art shows').toBeLessThan(0.7);
+      expect(card.alpha, 'not so clear that the picture takes over').toBeGreaterThanOrEqual(0.5);
+    });
+
+    it('keeps text at WCAG AA on the halo over the card over the brightest possible backdrop', () => {
+      const ground = shaded(over(card, WHITE));
+      for (const name of ['--tt-text', '--tt-text-muted']) expect(contrast(color(name), hex(ground)), `${name} on the shaded card over white`).toBeGreaterThanOrEqual(4.5);
+      const selected = shaded(over(rgba('--tt-accent-soft'), over(card, WHITE)));
+      expect(contrast(color('--tt-text'), hex(selected)), 'text on the shaded selected row over white').toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('keeps text at WCAG AA on the card alone over a mid-grey picture, so a lost halo still reads', () => {
+      const ground = over(card, MID_GREY);
+      for (const name of ['--tt-text', '--tt-text-muted']) expect(contrast(color(name), hex(ground)), `${name} on the bare card over grey`).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('draws the halo as at most two small static layers of the shade core', () => {
+      const layers = (t.get('--tt-text-shade') ?? '').split(/,(?![^()]*\))/).map(layer => layer.trim());
+      expect(layers.length).toBeLessThanOrEqual(2);
+      for (const layer of layers) {
+        const match = /^(-?\d+)(?:px)?\s+(-?\d+)(?:px)?\s+(\d+)px\s+var\(--tt-text-shade-core\)$/.exec(layer);
+        expect(match, `"${layer}" is x y blur var(--tt-text-shade-core), with no spread`).not.toBeNull();
+        expect(Number(match![3]), 'small blur, cheap on a TV').toBeLessThanOrEqual(12);
+      }
+      expect(core.alpha, 'a dark core').toBeGreaterThanOrEqual(0.85);
+      expect(Math.max(...core.rgb), 'darker than the page ink').toBeLessThanOrEqual(14);
+    });
   });
 
   it('keeps the focus ring and control boundaries at 3:1 against every surface', () => {

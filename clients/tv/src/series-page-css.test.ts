@@ -25,6 +25,16 @@ describe('TV series page surfaces', () => {
     expect(value('.season-browser', 'background')).toBe('var(--tt-card-surface)');
   });
 
+  it('puts a static dark halo behind the card text and none on text over a saffron fill', () => {
+    expect(value('.season-browser', 'text-shadow')).toBe('var(--tt-text-shade)');
+    // Buttons do not inherit text-shadow, so the transparent episode rows take it directly.
+    expect(value('.season-browser .info-stop', 'text-shadow')).toBe('var(--tt-text-shade)');
+    for (const selector of ['.season-browser button.primary', '.season-browser .source-best', '.season-browser .danger-button:focus']) {
+      expect(value(selector, 'text-shadow'), selector).toBe('none');
+    }
+    expect(css).not.toMatch(/transition[^;]*text-shadow/);
+  });
+
   it('draws no blur and no extra shadow on the series page cards', () => {
     for (const selector of series) {
       const body = declarationsOf(selector);

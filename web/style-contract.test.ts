@@ -173,6 +173,20 @@ describe('series page surfaces', () => {
     for (const selector of ['.season-tabs', '.episode-column', '.versions-view']) expect(prop(selector, 'background'), selector).toBe('var(--tt-card-surface)');
   });
 
+  // The text on those cards carries the --tt-text-shade halo (a button does not inherit text-shadow, so the transparent
+  // episode rows take it directly); text on a saffron fill stays crisp.
+  const shadeOf = (selector: string) => rules(css).filter(item => item.selector.split(',').map(part => part.trim()).includes(selector)).map(item => new RegExp('(?:^|[;\\s])text-shadow\\s*:\\s*([^;]+)').exec(item.body)?.[1].trim()).filter(Boolean).pop();
+
+  it('puts a dark halo behind the text on the cards, and none on text over a saffron fill', () => {
+    for (const selector of ['.season-tabs', '.episode-column', '.versions-view', '.episode-column .episode-select']) expect(shadeOf(selector), selector).toBe('var(--tt-text-shade)');
+    for (const selector of ['.versions-view button.primary', '.versions-view .best-match', '.versions-view .source-action > b']) expect(shadeOf(selector), selector).toBe('none');
+  });
+
+  it('draws the halo statically: no transition or animation on text-shadow', () => {
+    expect(css).not.toMatch(/transition[^;]*text-shadow/);
+    expect(css).not.toMatch(/animation[^;]*text-shadow/);
+  });
+
   it('leaves episode rows transparent inside their card, never a second solid layer', () => {
     expect(prop('.episode-list article', 'background')).toBe('transparent');
   });

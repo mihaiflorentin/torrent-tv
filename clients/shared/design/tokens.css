@@ -114,8 +114,12 @@
  --tt-backdrop-art-opacity: 0.55;
 
  /* Card surface: the series page's panels over the title's sharp backdrop, so the picture shows through.
-    Rgba only (no backdrop-filter). Clears 4.5:1 for --tt-text and --tt-text-muted even over a pure white picture. */
- --tt-card-surface: rgba(23, 17, 31, 0.8);
+    Rgba only (no backdrop-filter). At 58% the card alone no longer holds 4.5:1 over a white picture, so the text sits
+    on a shade: a dark halo around the glyphs (--tt-text-shade, two static layers of --tt-text-shade-core) that the
+    cards' text carries. Text on a saffron fill (--tt-on-accent) takes no shade. */
+ --tt-card-surface: rgba(23, 17, 31, 0.58);
+ --tt-text-shade-core: rgba(8, 5, 12, 0.9);
+ --tt-text-shade: 0 0 3px var(--tt-text-shade-core), 0 0 10px var(--tt-text-shade-core);
 
  /* Player controls: a solid-enough bar and menus (no backdrop-filter), sized for 3 m, faded in and out as one layer. */
  --tt-controls-surface: rgba(23, 17, 31, 0.92);

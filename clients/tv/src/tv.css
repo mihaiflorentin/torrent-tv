@@ -1108,10 +1108,30 @@ button.primary.active {
  background: var(--tt-surface)
 }
 
-/* The series card is translucent (a token, no blur) so the title's sharp backdrop shows through it. */
+/* The series card is translucent (a token, no blur) so the title's sharp backdrop shows through it. Its text carries
+   a dark halo (--tt-text-shade: two static layers, never animated) so it stays readable over a bright picture.
+   A button does not inherit text-shadow, so the transparent episode rows take it directly; text on a saffron fill
+   (--tt-on-accent) and the filled danger focus stay crisp. */
 .season-browser {
  width: 100%;
- background: var(--tt-card-surface)
+ background: var(--tt-card-surface);
+ text-shadow: var(--tt-text-shade)
+}
+
+.season-browser .info-stop {
+ text-shadow: var(--tt-text-shade)
+}
+
+.season-browser button.primary,
+.season-browser .source-best,
+.season-browser .danger-button:focus {
+ text-shadow: none
+}
+
+/* Old engines repaint a scrolling episode list on every frame: one tight layer keeps the shade at a fraction of the cost. */
+.lean-graphics .season-browser,
+.lean-graphics .season-browser .info-stop {
+ text-shadow: 0 0 4px var(--tt-text-shade-core)
 }
 
 .season-browser h2,

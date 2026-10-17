@@ -1457,6 +1457,22 @@ dl .tracker-badge,
  flex: none;
 }
 
+/* Text on the translucent cards carries a dark halo (--tt-text-shade: two static layers, never animated) so it stays
+   readable over a bright picture. A button does not inherit text-shadow, so the transparent episode rows take it
+   directly; text on a saffron fill (--tt-on-accent) stays crisp. */
+.season-tabs,
+.episode-column,
+.versions-view,
+.episode-column .episode-select {
+ text-shadow: var(--tt-text-shade);
+}
+
+.versions-view button.primary,
+.versions-view .best-match,
+.versions-view .source-action > b {
+ text-shadow: none;
+}
+
 .season-tabs button.selected {
  border-color: var(--tt-accent);
  background: var(--tt-accent-soft);
