@@ -179,11 +179,18 @@ describe('TV series page: episode list, then full-screen Versions', () => {
       await open(() => detail({}));
       key('season-2').click();
       await wait();
-      key('episode-2:4').focus();
-      await wait(40);
-      expect(selectedEpisode()).toBe('episode-2:3');
-      await wait(200);
-      expect(selectedEpisode()).toBe('episode-2:4');
+      // Fake timers from here on: the 150 ms debounce is stepped exactly, so machine load cannot move the assertions.
+      vi.useFakeTimers();
+      try {
+        key('episode-2:4').focus();
+        vi.advanceTimersByTime(149);
+        expect(selectedEpisode()).toBe('episode-2:3');
+        vi.advanceTimersByTime(1);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(selectedEpisode()).toBe('episode-2:4');
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('changing season selects that season\'s first unwatched episode', async () => {

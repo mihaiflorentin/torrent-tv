@@ -910,7 +910,7 @@ async function runCleanAndFatal(state, session, errors, appBase, browser, output
   reportErrors('connect', errors);
   throw new SmokeFailure(`case clean FAILED — Home render produced ${errors.length} page / console error(s)`);
  }
- const homeView = home.last?.view ?? {};
+ const homeView = home.view ?? {};
  const homeFile = await screenshot(session, outputDir, 'clean-02-home.png');
  artifacts.screenshots.push(homeFile);
  artifacts.audits.homeLayout = await evaluate(session, LAYOUT_AUDIT_JS);
