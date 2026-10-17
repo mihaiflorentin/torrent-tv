@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -98,7 +99,13 @@ func TestCatalogFamiliesColdBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("cold CatalogFamilies over 10k titles: %v (%d families)", took, len(items))
-	if took > 2*time.Second {
-		t.Fatalf("cold computation took %v; budget is 2s on a dev machine", took)
+	// Shared CI runners are several times slower than a dev machine and noisy;
+	// there the budget only catches a return to per-family queries (~20 s).
+	budget := 2 * time.Second
+	if os.Getenv("CI") != "" {
+		budget = 8 * time.Second
+	}
+	if took > budget {
+		t.Fatalf("cold computation took %v; budget is %v", took, budget)
 	}
 }
