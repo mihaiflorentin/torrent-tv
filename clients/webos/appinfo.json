@@ -1,6 +1,6 @@
 {
   "id": "com.torrenttv.app",
-  "version": "0.10.7",
+  "version": "0.10.8",
   "vendor": "torrent-tv",
   "type": "web",
   "main": "index.html",

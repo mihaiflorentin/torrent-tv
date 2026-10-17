@@ -1,10 +1,10 @@
 {
 	"fixed": {
-		"file_version": "0.10.7"
+		"file_version": "0.10.8"
 	},
 	"info": {
 		"0000": {
-			"ProductVersion": "0.10.7",
+			"ProductVersion": "0.10.8",
 			"CompanyName": "Torrent TV",
 			"FileDescription": "Torrent TV media server",
 			"LegalCopyright": "© 2026 Torrent TV",
