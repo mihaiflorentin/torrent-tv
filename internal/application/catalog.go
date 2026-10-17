@@ -857,7 +857,8 @@ func errorsIsNoRows(err error) bool { return err == sql.ErrNoRows }
 func (s *Service) Artwork(ctx context.Context, titleID, kind string) (string, string, error) {
 	isCast := strings.HasPrefix(kind, "cast-")
 	isSeason := strings.HasPrefix(kind, "season-")
-	if kind != "poster" && kind != "backdrop" && !isCast && !isSeason {
+	// backdrop-small is the same picture at TMDB w780, for the TV's focus-following backdrop (drawn at half resolution).
+	if kind != "poster" && kind != "backdrop" && kind != "backdrop-small" && !isCast && !isSeason {
 		return "", "", fmt.Errorf("invalid artwork kind")
 	}
 	var remotePath string
@@ -880,14 +881,19 @@ func (s *Service) Artwork(ctx context.Context, titleID, kind string) (string, st
 			return "", "", err
 		}
 		remotePath = metadata.PosterPath
-		if kind == "backdrop" {
+		if kind == "backdrop" || kind == "backdrop-small" {
 			remotePath = metadata.BackdropPath
 		}
 	}
 	if remotePath == "" || s.metadata == nil {
 		return "", "", fmt.Errorf("artwork is unavailable")
 	}
-	sum := sha256.Sum256([]byte(titleID + "\x00" + kind + "\x00" + remotePath))
+	// The cache key names the fetched size where it changed, so posters cached at the old w500 are fetched again at w342.
+	cacheKind := kind
+	if kind == "poster" {
+		cacheKind = "poster\x00w342"
+	}
+	sum := sha256.Sum256([]byte(titleID + "\x00" + cacheKind + "\x00" + remotePath))
 	base := base64.RawURLEncoding.EncodeToString(sum[:18])
 	root := s.settings.Get().ArtworkCachePath
 	for _, ext := range []string{".jpg", ".png", ".webp"} {

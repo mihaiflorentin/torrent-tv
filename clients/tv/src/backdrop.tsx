@@ -13,8 +13,8 @@ import { detectLeanGraphics } from './capability';
 
 /** Settle time before the art follows focus, so a held D-pad key loads only where it stops. */
 export const BACKDROP_FOLLOW_MS = 180;
-/** The same settle on an old TV engine: its decode and fade are slower, so wait for the key repeat to really stop. */
-export const BACKDROP_FOLLOW_LEAN_MS = 450;
+/** The same settle on a TV (lean path): a new backdrop costs a TV a few hundred ms to decode and draw, so it waits for a real pause, not the gap between two presses. */
+export const BACKDROP_FOLLOW_LEAN_MS = 700;
 /** A slow image must not stall the crossfade forever. */
 const PRELOAD_GUARD_MS = 1500;
 
@@ -54,7 +54,8 @@ export function Backdrop({ initial = '', follow = true, lean = detectLeanGraphic
       let done = false;
       const finish = () => { if (!done) { done = true; apply(url, token); } };
       const image = new Image();
-      image.onload = finish;
+      // Decode off the main thread where the engine can (Chromium 64+), so the swap does not decode during paint.
+      image.onload = () => { if (typeof image.decode === 'function') image.decode().then(finish, finish); else finish(); };
       // A dead URL is never shown: keep the art already on screen until focus reaches something that loads.
       image.onerror = () => { if (!done) { done = true; if (token === generation) window.clearTimeout(guard); } };
       guard = window.setTimeout(finish, PRELOAD_GUARD_MS);
