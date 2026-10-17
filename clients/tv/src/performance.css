@@ -21,3 +21,12 @@ input:focus,
 select:focus {
  transform: none
 }
+
+/* Every TV (capability.ts) snaps: measured on a 2023 Samsung, each animated frame costs a TV hundreds of ms, so a
+   120-260 ms transition turns into visible stutter after every key. The end states (focus ring, scale, open
+   sidebar, new backdrop) are the same; they just appear in one frame. */
+.lean-graphics *,
+.lean-graphics *::before,
+.lean-graphics *::after {
+ transition: none !important
+}

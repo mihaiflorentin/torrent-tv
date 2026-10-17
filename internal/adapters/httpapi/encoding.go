@@ -58,6 +58,9 @@ func (j *jsonWriter) Write(p []byte) (int, error) {
 	return j.ResponseWriter.Write(p)
 }
 
+// Unwrap lets http.ResponseController reach the underlying writer (deadlines, hijack).
+func (j *jsonWriter) Unwrap() http.ResponseWriter { return j.ResponseWriter }
+
 func (j *jsonWriter) Flush() {
 	if j.buffered {
 		return
