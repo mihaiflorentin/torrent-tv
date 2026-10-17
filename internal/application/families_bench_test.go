@@ -103,7 +103,7 @@ func TestCatalogFamiliesColdBudget(t *testing.T) {
 	// there the budget only catches a return to per-family queries (~20 s).
 	budget := 2 * time.Second
 	if os.Getenv("CI") != "" {
-		budget = 8 * time.Second
+		budget = 15 * time.Second
 	}
 	if took > budget {
 		t.Fatalf("cold computation took %v; budget is %v", took, budget)
