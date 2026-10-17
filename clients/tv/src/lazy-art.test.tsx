@@ -3,7 +3,7 @@ import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
 import type { API, CatalogFacets, CatalogTitle, HouseholdState } from '@torrent-tv/shared';
-import { ART_COLUMN_KEEP, ART_COLUMN_REACH, ART_LIST_KEEP, ART_LIST_REACH, ART_ROW_KEEP, ART_ROW_REACH, inReach, inRowReach, railNear, railWindows, resetFocusPoint, setFocusPoint, slideListReach, slideReach, useArtReach, useRowReach, type ArtReach, type RowReach } from './lazy-art';
+import { ART_COLUMN_KEEP, ART_SETTLE_MS, ART_COLUMN_REACH, ART_LIST_KEEP, ART_LIST_REACH, ART_ROW_KEEP, ART_ROW_REACH, inReach, inRowReach, railNear, railWindows, resetFocusPoint, setFocusPoint, slideListReach, slideReach, useArtReach, useRowReach, type ArtReach, type RowReach } from './lazy-art';
 
 if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage.getItem) {
   const store = new Map<string, string>();
@@ -104,6 +104,24 @@ describe('hooks', () => {
   let host: HTMLDivElement;
   beforeEach(() => { resetFocusPoint(); host = document.createElement('div'); document.body.appendChild(host); });
   afterEach(() => { render(null, host); host.remove(); resetFocusPoint(); });
+  const settle = () => sleep(ART_SETTLE_MS + 20);
+
+  it('waits for focus to rest before a mounted rail follows it, so a held key mounts no artwork per press', async () => {
+    const [span] = railWindows([10]);
+    let renders = 0;
+    let reach: ArtReach = null;
+    const Probe = () => { renders++; reach = useArtReach(span); return null; };
+    render(<Probe />, host);
+    await settle();
+    setFocusPoint(10, 0);
+    await settle();
+    const base = renders;
+    for (let col = 1; col <= 12; col++) { setFocusPoint(10, col); await sleep(ART_SETTLE_MS / 3); }
+    expect(renders).toBe(base);
+    await settle();
+    expect(renders).toBe(base + 1);
+    expect(reach).toEqual([Math.max(0, 12 - ART_COLUMN_KEEP), 12 + ART_COLUMN_REACH]);
+  });
 
   it('drops a rail to null once focus is more than one rail away and reloads it when focus comes back', async () => {
     const windows = railWindows([10, 11, 12, 13, 14]);
@@ -115,17 +133,17 @@ describe('hooks', () => {
     };
     render(<Probe />, host);
     const latest = () => seen[seen.length - 1];
-    await sleep(20);
+    await settle();
     expect(latest().map(reach => reach !== null)).toEqual([true, true, false, false, false]);
     setFocusPoint(12, 3);
-    await sleep(20);
+    await settle();
     expect(latest().map(reach => reach !== null)).toEqual([false, true, true, true, false]);
     expect(latest()[2]).toEqual([0, 3 + ART_COLUMN_REACH]);
     setFocusPoint(10, 3);
-    await sleep(20);
+    await settle();
     expect(latest().map(reach => reach !== null)).toEqual([true, true, false, false, false]);
     setFocusPoint(14, 3);
-    await sleep(20);
+    await settle();
     expect(latest().map(reach => reach !== null)).toEqual([false, false, false, true, true]);
   });
 
@@ -134,16 +152,16 @@ describe('hooks', () => {
     let renders = 0;
     const Probe = () => { renders++; useArtReach(span); return null; };
     render(<Probe />, host);
-    await sleep(20);
+    await settle();
     setFocusPoint(10, 20);
-    await sleep(20);
+    await settle();
     const base = renders;
     setFocusPoint(10, 21);
-    await sleep(20);
+    await settle();
     const afterSlide = renders;
     setFocusPoint(10, 20);
     setFocusPoint(10, 21);
-    await sleep(20);
+    await settle();
     expect(afterSlide).toBe(base + 1);
     expect(renders).toBe(afterSlide);
   });
@@ -153,23 +171,23 @@ describe('hooks', () => {
     let renders = 0;
     const Probe = () => { renders++; reach = useRowReach(1); return null; };
     render(<Probe />, host);
-    await sleep(20);
+    await settle();
     expect(reach).toEqual([1 - ART_ROW_REACH, 1 + ART_ROW_REACH]);
     setFocusPoint(9, 0);
-    await sleep(20);
+    await settle();
     expect(reach).toEqual([9 - ART_ROW_REACH, 9 + ART_ROW_REACH]);
     expect(inRowReach(reach, 1)).toBe(false);
     const settled = renders;
     setFocusPoint(8, 1);
-    await sleep(20);
+    await settle();
     expect(inRowReach(reach, 9 + ART_ROW_REACH)).toBe(true);
     expect(reach[0]).toBe(8 - ART_ROW_REACH);
     setFocusPoint(9, 0);
-    await sleep(20);
+    await settle();
     expect(reach).toEqual([8 - ART_ROW_REACH, 9 + ART_ROW_REACH]);
     expect(renders).toBe(settled + 1);
     setFocusPoint(9 + ART_ROW_KEEP + 1, 0);
-    await sleep(20);
+    await settle();
     expect(inRowReach(reach, 8 - ART_ROW_REACH)).toBe(false);
   });
 });
@@ -178,7 +196,7 @@ describe('lazy poster artwork in the catalog', () => {
   let container: HTMLDivElement;
   const make = (id: string): CatalogTitle => ({ id, title: id.toUpperCase(), kind: 'movie', year: 2020, trackers: [], categories: [], resolutions: ['1080p'], sourceCount: 1, bestSeeders: 5, largestSizeBytes: 1, posterUrl: `/art/${id}.jpg` });
   const many = Array.from({ length: 30 }, (_, index) => make(`t${index}`));
-  const wait = (ms = 40) => sleep(ms);
+  const wait = (ms = ART_SETTLE_MS + 40) => sleep(ms);
   const images = () => Array.from(container.querySelectorAll('.poster-card img')).map(node => node.getAttribute('src'));
   const empty: HouseholdState = { favorites: [], continueWatching: [], recent: [], watched: [] };
   const mount = () => render(

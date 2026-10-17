@@ -17,16 +17,32 @@ export const ART_COLUMN_REACH = 8;
 /** Loaded cards further than this from the focused column are dropped. */
 export const ART_COLUMN_KEEP = 14;
 
+/** Mounted rails follow focus only once it rests this long. A held D-pad key repeats faster, so a walk along a rail
+    mounts and decodes no new artwork per press (measured on a 2023 Samsung: each new poster cost 50-280 ms there);
+    the cards LOAD-distance ahead were loaded before the walk began, and the window catches up when focus stops. */
+export const ART_SETTLE_MS = 180;
+
 interface FocusPoint { row: number; col: number }
 let point: FocusPoint = { row: -1, col: -1 };
 const listeners = new Set<() => void>();
+let settle: ReturnType<typeof setTimeout> | undefined;
 
+function notify(): void { settle = undefined; Array.from(listeners).forEach(listener => listener()); }
+
+/** Publishes the focused grid position. Rails that mount read it at once; mounted ones hear of it after ART_SETTLE_MS of rest. */
 export function setFocusPoint(row: number, col: number): void {
   if (!Number.isFinite(row) || !Number.isFinite(col) || (point.row === row && point.col === col)) return;
   point = { row, col };
-  Array.from(listeners).forEach(listener => listener());
+  if (settle !== undefined) clearTimeout(settle);
+  settle = setTimeout(notify, ART_SETTLE_MS);
 }
-export const resetFocusPoint = () => setFocusPoint(-1, -1);
+/** Forgets the focus position (route change, unmount) and tells mounted rails at once. */
+export const resetFocusPoint = () => {
+  if (point.row === -1 && point.col === -1) return;
+  point = { row: -1, col: -1 };
+  if (settle !== undefined) clearTimeout(settle);
+  notify();
+};
 export const focusPoint = (): FocusPoint => point;
 
 export interface RailWindow { from: number; until: number }

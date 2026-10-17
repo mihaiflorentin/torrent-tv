@@ -22,6 +22,17 @@ select:focus {
  transform: none
 }
 
+/* The big scrollers get their own compositor layer, so a D-pad scroll moves already-drawn tiles instead of
+   repainting every poster on the main thread. Measured on a 2023 Samsung holding Right along a rail at remote
+   repeat speed: the backlog after 14 presses fell from 0.8-1.5 s to 0.05-0.2 s and long tasks by 75-99%. */
+.poster-rail,
+.tv-content,
+.detail-screen,
+.episode-pane,
+.info-scroll {
+ will-change: scroll-position
+}
+
 /* Every TV (capability.ts) snaps: measured on a 2023 Samsung, each animated frame costs a TV hundreds of ms, so a
    120-260 ms transition turns into visible stutter after every key. The end states (focus ring, scale, open
    sidebar, new backdrop) are the same; they just appear in one frame. */
