@@ -178,8 +178,9 @@ func TestRunActionEnabledToggleStarts(t *testing.T) {
 	sup := newTestSupervisor(t, &fakeApp{serve: serve, closed: make(chan struct{})}, nil, nil)
 	tctrl := &trayController{sup: sup}
 	tctrl.runAction(trayItem{Label: "Start server", Action: trayActionToggleServer})
-	if got := sup.State(); got != StateStarting {
-		t.Fatalf("enabled toggle left state %q, want starting", got)
+	// The serve goroutine may already have reported running by the time the state is read.
+	if got := sup.State(); got != StateStarting && got != StateRunning {
+		t.Fatalf("enabled toggle left state %q, want starting or running", got)
 	}
 	// Let the serve goroutine finish and shut the supervisor down cleanly.
 	close(serve)

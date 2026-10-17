@@ -160,11 +160,18 @@ func TestSyncRefreshesFamilyCountsButKeepsTheArtPick(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForJobTerminal(t, f.service, job.ID)
-	after, err := f.service.CatalogFamilies(ctx)
-	if err != nil {
-		t.Fatal(err)
+	// The sync refreshes the tiles in the background and callers keep the previous ones until the new ones land,
+	// so poll: on a slow runner the first read after the job settles can still be the old tiles.
+	var got domain.FamilySummary
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		after, err := f.service.CatalogFamilies(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got = familyByKey(t, after, "movies"); got.Count == movies.Count+1 || time.Now().After(deadline) {
+			break
+		}
 	}
-	got := familyByKey(t, after, "movies")
 	if got.Count != movies.Count+1 {
 		t.Fatalf("count after sync = %d, want %d", got.Count, movies.Count+1)
 	}
