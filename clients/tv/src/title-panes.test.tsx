@@ -340,6 +340,21 @@ describe('TV series page: episode list, then full-screen Versions', () => {
       expect(row.querySelectorAll('button, a, input')).toHaveLength(0);
     });
 
+    it('shows no synopsis line on a row without detailed info, and never the series overview', async () => {
+      await open(() => detail({}));
+      key('season-2').click();
+      await wait();
+      expect(container.querySelector('.episode-synopsis')).toBeNull();
+    });
+
+    it('adds a synopsis line to the rows whose season info has one', async () => {
+      await open(() => detail({}), { seasonInfo: vi.fn(async () => season2()) });
+      key('season-2').click();
+      await wait(600);
+      expect(rowOf('2:4').querySelector('.info-row-copy .episode-synopsis')!.textContent).toBe('They land.');
+      expect(rowOf('2:3').querySelector('.episode-synopsis')).toBeNull();
+    });
+
     it('shows the title\'s own backdrop as the still when there is no detailed info, and never errors', async () => {
       await open(() => detail({}));
       key('season-2').click();

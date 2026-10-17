@@ -1178,22 +1178,16 @@ button.primary.active {
  border-top: 1px solid var(--tt-line)
 }
 
-/* One column under the season bar: an "Episodes" heading over the list, centred and only as wide as its rows need.
-   The list scrolls on its own; flexbox only (no grid, no gap) for Chromium 53. */
+/* One column under the season bar: an "Episodes" heading over the list, left-aligned and as wide as the card, the same
+   edge as the Versions view. The list scrolls on its own; flexbox only (no grid, no gap) for Chromium 53. */
 .season-panes {
- display: -webkit-box;
- display: flex;
- justify-content: center;
- align-items: flex-start
+ display: block
 }
 
 .episode-column {
- -webkit-box-flex: 0;
- flex: 0 1 auto;
  box-sizing: border-box;
  width: 100%;
- min-width: 0;
- max-width: 720px
+ min-width: 0
 }
 
 .episode-heading {
@@ -1213,7 +1207,7 @@ button.primary.active {
 
 .episode-pane {
  box-sizing: border-box;
- max-height: 600px;
+ max-height: 720px;
  overflow-y: auto;
  padding: var(--tt-space-1) var(--tt-space-4) var(--tt-space-1) var(--tt-space-2)
 }
@@ -1323,6 +1317,30 @@ button.primary.active {
  align-items: center;
  justify-content: space-between;
  text-align: left
+}
+
+/* The full-width row: a 16:9 still, then name, facts and a short synopsis, with the badges and the chevron at the right edge.
+   The still is bigger than the Info panel's 160x90 (the row has the room); the synopsis clamps to two lines, with a
+   max-height fallback for engines without -webkit-line-clamp. */
+.episode-tile .info-still-small {
+ width: 256px;
+ height: 144px
+}
+
+.episode-tile .episode-synopsis {
+ display: -webkit-box;
+ max-height: 2.8em;
+ margin-top: var(--tt-space-2);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ line-height: 1.4;
+ overflow: hidden;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2
+}
+
+.episode-tile.selected .episode-synopsis {
+ color: var(--tt-text)
 }
 
 /* Episode progress: a static bar whose width is set by state, never animated. */

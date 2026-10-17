@@ -263,7 +263,7 @@ describe('TV Info season drill-down', () => {
     expect(episodeInfo).toHaveBeenCalledTimes(1);
   });
 
-  it('loads artwork only for rows near focus in a long episode list, and more as focus moves down', async () => {
+  it('loads artwork only for rows near focus in a long episode list and slides the window as focus moves', async () => {
     await open({ seasonInfo: async () => season(60) });
     key('info-seasons')!.focus();
     key('info-seasons')!.click();
@@ -278,6 +278,16 @@ describe('TV Info season drill-down', () => {
     key('info-episode-40')!.focus();
     await wait();
     expect(hasImage(40)).toBe(true);
+    // The top rows are far behind now and are released.
+    expect(hasImage(1)).toBe(false);
+    // A step back keeps what is near, and a long way back releases the far end.
+    key('info-episode-39')!.focus();
+    await wait();
+    expect(hasImage(40)).toBe(true);
+    expect(hasImage(39)).toBe(true);
+    key('info-episode-1')!.focus();
+    await wait();
     expect(hasImage(1)).toBe(true);
+    expect(hasImage(40)).toBe(false);
   });
 });

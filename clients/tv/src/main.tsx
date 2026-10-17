@@ -1402,7 +1402,7 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
       return <article key={key} role="listitem" class="episode-row">
        <button class={`info-stop info-row episode-tile ${chosen ? 'selected' : ''}`} aria-current={chosen ? 'true' : undefined} data-episode-key={key} data-art-index={index} data-focus-region="episodes" data-focus-row={index} data-focus-col="0" data-focus-key={`episode-${key}`} onFocus={() => scheduleSelect(key)} onClick={() => openVersions(key)}>
         <span class="info-still-small" aria-hidden="true">{still && inReach(art.reach, index) && <img src={api.streamURL(still)} alt="" onError={hideImage} />}</span>
-        <span class="info-row-copy"><b>{episode.number ? `E${episode.number < 10 ? '0' : ''}${episode.number} · ` : ''}{episode.title}</b><small>{episodeMeta(episode, page, progress)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
+        <span class="info-row-copy"><b>{episode.number ? `E${episode.number < 10 ? '0' : ''}${episode.number} · ` : ''}{episode.title}</b><small>{episodeMeta(episode, page, progress)}</small>{page.overview && <span class="episode-synopsis">{page.overview}</span>}{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
         <TVStateBadges state={episode.libraryState} />
         <span class="info-chevron" aria-hidden="true">›</span>
        </button>
