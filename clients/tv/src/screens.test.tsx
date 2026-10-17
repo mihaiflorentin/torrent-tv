@@ -147,6 +147,15 @@ describe('TV screens show what helps the next decision', () => {
     expect(key('download-d1-details')!.getAttribute('aria-expanded')).toBe('true');
   });
 
+  it('draws a long download list in steps after a route change, so the screen opens without a long task', async () => {
+    const many = Array.from({ length: 20 }, (_, index) => download({ id: `d${index}`, engineId: `e${index}`, displayTitle: `Title ${index}` }));
+    mount(container, {}, { titles: [title()], downloads: many });
+    await route('downloads');
+    await wait(120);
+    expect(container.querySelectorAll('.tv-download-row')).toHaveLength(20);
+    expect(container.querySelector('.tv-download-count')!.textContent).toBe('20 downloads');
+  });
+
   it('tells an empty Downloads screen how to fill it', async () => {
     mount(container, {}, { titles: [title()], downloads: [] });
     await route('downloads');

@@ -104,14 +104,14 @@ async function launchChrome(userDir) {
 }
 
 // The page side: a trusted-keydown hook that stamps a trace mark and its own clock, and a rAF clock for frame gaps.
-const PAGE_HOOK = (serverUrl, storageKey) => `
+const PAGE_HOOK = (serverUrl, storageKey, frameClock = true) => `
 (() => {
   try { if (!localStorage.getItem(${JSON.stringify(storageKey)})) localStorage.setItem(${JSON.stringify(storageKey)}, ${JSON.stringify(serverUrl)}); } catch (e) {}
   const perf = window.__tvperf = { n: 0, keys: [], frames: [], errors: [] };
   addEventListener('keydown', event => { if (!event.isTrusted) return; const n = perf.n++; perf.keys[n] = performance.now(); performance.mark('tvperf:key:' + n); }, true);
   addEventListener('error', event => perf.errors.push(String(event.message)));
   const tick = t => { perf.frames.push(t); requestAnimationFrame(tick); };
-  requestAnimationFrame(tick);
+  if (${frameClock}) requestAnimationFrame(tick);
 })();`;
 
 const MENU_GROUP = 'Left toward the menu, Up/Down in the menu';
@@ -137,7 +137,12 @@ async function main() {
     await cdp.opened;
     await Promise.all(['Page', 'Runtime', 'Performance', 'Log'].map(domain => cdp.send(`${domain}.enable`)));
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
-    await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: PAGE_HOOK(apiBase, STORAGE_KEY) });
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: PAGE_HOOK(apiBase, STORAGE_KEY, !args['no-frame-clock']) });
+    if (args.css) {
+      // Experiment hook: append a stylesheet after load so a CSS variant can be measured without rebuilding.
+      const css = fs.readFileSync(path.resolve(args.css), 'utf8');
+      await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `document.addEventListener('DOMContentLoaded', function () { var s = document.createElement('style'); s.textContent = ${JSON.stringify(css)}; document.head.appendChild(s); });` });
+    }
     const consoleErrors = [];
     cdp.on('Runtime.exceptionThrown', event => consoleErrors.push(event.exceptionDetails.exception?.description || event.exceptionDetails.text));
 

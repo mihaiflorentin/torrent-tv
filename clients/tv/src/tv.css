@@ -182,7 +182,6 @@ button.primary.active {
  filter: blur(18px);
  transform: scale(2);
  transform-origin: 0 0;
- will-change: opacity;
  transition: opacity var(--tt-dur-slow) var(--tt-ease-out)
 }
 
@@ -253,13 +252,14 @@ button.primary.active {
  padding: 24px 24px 24px;
  background: var(--tt-surface);
  border-right: 1px solid var(--tt-line);
- box-shadow: 16px 0 48px var(--tt-veil);
  overflow-x: hidden;
  overflow-y: auto;
  contain: layout paint;
- /* Compact rail: clip paints only the icon strip; open paints the whole panel. Paint-only, no layout. */
- clip: rect(0, 120px, 1080px, 0);
- transition: clip var(--tt-dur-base) var(--tt-ease-out)
+ /* Compact rail: clip paints only the icon strip; open paints the whole panel. Paint-only, no layout.
+     The clip snaps (it is not compositor-driven, so animating it cost a main-thread frame per tick and held every
+     route change open for the length of the transition); the labels fade instead. The panel's outer shadow was
+     removed because contain: paint clipped it away anyway. */
+ clip: rect(0, 120px, 1080px, 0)
 }
 
 .tv-sidebar::-webkit-scrollbar {
@@ -343,8 +343,7 @@ button.primary.active {
 .tv-sidebar button span,
 .tv-brand>b,
 .tv-menu-group>small {
- opacity: 0;
- transition: opacity var(--tt-dur-base)
+ opacity: 0
 }
 
 .tv-sidebar button span {
@@ -537,8 +536,7 @@ button.primary.active {
  overflow: hidden;
  text-align: left;
  background: var(--tt-raised);
- contain: layout paint style;
- transition: transform var(--tt-dur-fast) var(--tt-ease-out)
+ contain: layout paint style
 }
 
 .poster-card img,
