@@ -1384,6 +1384,8 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
      {packs.length > 0 && <div class="season-pack-downloads"><h4>Complete season</h4><p class="supporting">Download every episode of season {selected!.number} at once.</p>{packs.map((source, index) => <TVSeasonPackCard key={source.release.id} source={source} season={selected!.number} row={packBase + index} onAction={onPackAction} onDelete={() => setPendingPack(source)} />)}</div>}
     </div>
    </section> : <div class="season-panes">
+    <div class="episode-column">
+    <h3 class="episode-heading"><span class="episode-heading-label">Episodes</span> · Season {season}</h3>
     <div class="episode-pane" role="list" aria-label={`Season ${season} episodes`}>
      {selected && selected.episodes.length === 0 && !unknownKey ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates by itself when it is ready.</p> : selected?.episodes.map((episode, index) => {
       const key = episodeKeyOf(episode);
@@ -1408,6 +1410,7 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
        <span class="info-chevron" aria-hidden="true">›</span>
       </button>
      </article>}
+    </div>
     </div>
    </div>}
   </section>}

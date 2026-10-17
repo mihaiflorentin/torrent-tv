@@ -1421,11 +1421,35 @@ dl .tracker-badge,
  font-size: var(--tt-text-sm);
 }
 
+/* The series body carries the title's backdrop on below the hero. Its cards (season bar, episode column, Versions view)
+   sit on --tt-card-surface, so the picture shows around and faintly through them. */
+.series-body {
+ position: relative;
+ isolation: isolate;
+}
+
+.series-art {
+ position: absolute;
+ inset: 0;
+ z-index: -1;
+ overflow: hidden;
+ background: var(--tt-raised);
+}
+
+.series-art img {
+ display: block;
+ width: 100%;
+ height: 100%;
+ object-fit: cover;
+ object-position: center top;
+}
+
 .season-tabs {
  display: flex;
  gap: var(--tt-space-2);
  padding: var(--tt-space-3) var(--tt-space-6);
  border-bottom: 1px solid var(--tt-line);
+ background: var(--tt-card-surface);
  overflow-x: auto;
 }
 
@@ -1537,7 +1561,7 @@ dl .tracker-badge,
  min-width: 0;
  border: 1px solid var(--tt-line);
  border-radius: var(--tt-radius-md);
- background: var(--tt-raised);
+ background: transparent;
  overflow: hidden;
 }
 
@@ -1547,11 +1571,16 @@ dl .tracker-badge,
  box-shadow: inset 4px 0 0 var(--tt-accent);
 }
 
-/* Two panes under the season tabs: episodes left, the selected episode's versions right. */
+/* The tint lifts the surface under the facts line, so it takes the full text colour, not the muted one. */
+.episode-list article.selected .info-row-copy small {
+ color: var(--tt-text);
+}
+
+/* One column under the season tabs, centred: an "Episodes" heading over the list, as wide as its rows need. */
 .season-panes {
  display: flex;
+ justify-content: center;
  align-items: flex-start;
- gap: var(--tt-space-5);
  padding: var(--tt-space-4) var(--tt-space-6) var(--tt-space-6);
 }
 
@@ -1562,8 +1591,29 @@ dl .tracker-badge,
  margin: 0;
 }
 
+.episode-column {
+ flex: 0 1 auto;
+ min-width: min(100%, 480px);
+ max-width: 760px;
+ padding: var(--tt-space-3) var(--tt-space-4) var(--tt-space-4);
+ border: 1px solid var(--tt-line);
+ border-radius: var(--tt-radius-lg);
+ background: var(--tt-card-surface);
+}
+
+.episode-heading {
+ margin: 0 0 var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-text-lg);
+ font-weight: var(--tt-weight-black);
+ overflow-wrap: anywhere;
+}
+
+.episode-heading-label {
+ color: var(--tt-accent);
+}
+
 .episode-pane {
- flex: 0 0 min(42%, 420px);
  min-width: 0;
  max-height: 560px;
  overflow-y: auto;
@@ -1576,7 +1626,11 @@ dl .tracker-badge,
 
 /* Versions view: clicking an episode swaps the list for that episode's versions, full width, with a way back. */
 .versions-view {
+ margin: var(--tt-space-4);
  padding: var(--tt-space-4) var(--tt-space-6) var(--tt-space-6);
+ border: 1px solid var(--tt-line);
+ border-radius: var(--tt-radius-lg);
+ background: var(--tt-card-surface);
 }
 
 .versions-bar {
@@ -3311,8 +3365,12 @@ dl .tracker-badge,
 
 /* Narrow windows: the episode list takes the full width. */
 @media (max-width: 959px) {
- .episode-pane {
+ .episode-column {
   flex: 1 1 auto;
+  max-width: none;
+ }
+
+ .episode-pane {
   max-height: none;
   overflow: visible;
  }
