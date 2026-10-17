@@ -38,6 +38,17 @@ Offline validation cannot prove certificate/DUID acceptance or runtime behavior.
 4. Install it. Apps2Samsung can request a Samsung account login the first time it needs to create signing material; later installs reuse the certificate. Do not copy that signing material into the repository.
 5. Launch **Torrent TV**, select the discovered server or choose **Manual address**, and exercise the physical-TV checks above.
 
+### Install from the command line
+
+Once Apps2Samsung has created its certificate profile (step 4, done once per TV), later installs need no GUI:
+
+```sh
+make tizen-wgt                       # or `make frontend` for a full rebuild
+make install-tizen TV=192.168.50.86  # WGT=path/to/other.wgt to install a different package
+```
+
+`tools/tizen_install` is a small .NET 10 program that reuses the Apps2Samsung "Public" certificate profile under `~/.config/Apps2Samsung/Certificate/`, re-signs a copy of the WGT for the TV and installs it over SDB. It builds against a local Apps2Samsung Release build (MIT licensed; default path `~/Downloads/Apps2Samsung/Jellyfin2Samsung-CrossOS/bin/Release/net10.0/linux-x64/Apps2Samsung.Core.dll`, override with `APPS2SAMSUNG_CORE`). The first run downloads `tizensdb` from github.com/PatrickSt1991/tizen-sdb into the git-ignored `tools/tizen_install/.cache/` (`make tizen-sdb`, or point `TIZEN_SDB` at your own copy). It never starts a Samsung login: when the certificate does not yet cover the TV's DUID it stops with exit code 6, and you install once from the Apps2Samsung GUI to regenerate it. Exit codes: 0 installed, 3 TV unreachable or Developer Mode off, 4 TV below the package's Tizen version, 5 no certificate profile, 6 TV not covered by the certificate, 7 re-sign failed, 8 certificate mismatch with the installed copy (uninstall it first), 9 install not confirmed.
+
 If Apps2Samsung cannot discover or connect to the TV, verify Developer Mode after reboot, the authorized computer IP, same-LAN routing and firewall rules, and the TV's IP. A Samsung `1010` installation error commonly indicates a signing/certificate problem; retry Apps2Samsung certificate setup before changing the WGT.
 
 ## Startup compatibility and diagnostics

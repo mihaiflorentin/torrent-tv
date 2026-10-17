@@ -1,4 +1,4 @@
-.PHONY: help check test build build-arm64 build-arm64-headless build-amd64-headless build-all desktop-assets package-darwin wails-cross web frontend tizen-wgt validate-tizen-wgt smoke-tizen-engine webos-ipk validate-webos-ipk smoke-webos-engine perf-tv torrenttv-apk deploy-pi bootstrap-server-dry-run
+.PHONY: help check test build build-arm64 build-arm64-headless build-amd64-headless build-all desktop-assets package-darwin wails-cross web frontend tizen-wgt validate-tizen-wgt smoke-tizen-engine webos-ipk validate-webos-ipk smoke-webos-engine perf-tv tizen-sdb install-tizen torrenttv-apk deploy-pi bootstrap-server-dry-run
 
 VERSION ?= $(shell tr -d '[:space:]' < VERSION)
 PI_HOST ?=
@@ -7,6 +7,8 @@ TIZEN_TARGET ?= 7.0
 TIZEN_WGT := clients/tizen/.build/artifacts/torrent-tv-$(TIZEN_VERSION)-samsung-tizen.wgt
 WEBOS_VERSION ?= $(VERSION)
 WEBOS_IPK := clients/webos/.build/artifacts/torrent-tv-$(WEBOS_VERSION)-webos.ipk
+TIZEN_SDB_VERSION ?= v1.1.5
+TIZEN_SDB := tools/tizen_install/.cache/tizensdb
 GO_CACHE ?= /tmp/torrent-tv-go-cache
 GO_LDFLAGS := -s -w -X github.com/mihaiflorentin/torrent-tv/internal/composition.Version=$(VERSION)
 
@@ -199,6 +201,18 @@ validate-tizen-wgt:
 	python3 tools/tizen_wgt.py validate \
 		--file "$(TIZEN_WGT)" \
 		--target-tizen "$(TIZEN_TARGET)"
+## tizen-sdb: download tizensdb (github.com/PatrickSt1991/tizen-sdb, linux-x64) for install-tizen -> tools/tizen_install/.cache/
+tizen-sdb:
+	mkdir -p tools/tizen_install/.cache
+	curl -fsSL -o "$(TIZEN_SDB).part" "https://github.com/PatrickSt1991/tizen-sdb/releases/download/$(TIZEN_SDB_VERSION)/TizenSdb_$(TIZEN_SDB_VERSION)_linux-x64"
+	chmod +x "$(TIZEN_SDB).part" && mv "$(TIZEN_SDB).part" "$(TIZEN_SDB)"
+
+## install-tizen: re-sign and install the packed WGT on a TV with the Apps2Samsung certificate (make install-tizen TV=192.168.1.20 [WGT=path])
+install-tizen:
+	@test -n "$(TV)" || { echo "install-tizen: set TV=<ip>"; exit 2; }
+	@test -x "$(TIZEN_SDB)" || [ -n "$$TIZEN_SDB" ] || $(MAKE) tizen-sdb
+	dotnet run --project tools/tizen_install -- --tv "$(TV)" --wgt "$(or $(WGT),$(TIZEN_WGT))"
+
 ## webos-ipk: pack the webOS TV app -> clients/webos/.build/artifacts/torrent-tv-$(WEBOS_VERSION)-webos.ipk
 webos-ipk:
 	python3 tools/webos_ipk.py pack \

@@ -91,3 +91,7 @@ server
 
 # TV performance harness output (tools/tv_perf)
 tools/tv_perf/.out/
+
+# Tizen command-line installer build output and downloaded tizensdb
+tools/tizen_install/obj/
+tools/tizen_install/.cache/

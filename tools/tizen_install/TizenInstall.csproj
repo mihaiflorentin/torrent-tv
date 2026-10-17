@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Headless Tizen installer: re-signs and installs a .wgt on a Samsung TV with an existing Apps2Samsung
+       certificate profile. Builds against a local Apps2Samsung build (MIT, github.com/Apps2Samsung/Apps2Samsung);
+       nothing from it is vendored here. See docs/TIZEN.md "Install from the command line". -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>tizen-install</AssemblyName>
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+    <UseAppHost>false</UseAppHost>
+    <NuGetAudit>false</NuGetAudit>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Override with -p:Apps2SamsungCore=... or the APPS2SAMSUNG_CORE environment variable. -->
+    <Apps2SamsungCore Condition="'$(Apps2SamsungCore)' == '' and '$(APPS2SAMSUNG_CORE)' != ''">$(APPS2SAMSUNG_CORE)</Apps2SamsungCore>
+    <Apps2SamsungCore Condition="'$(Apps2SamsungCore)' == ''">$(HOME)/Downloads/Apps2Samsung/Jellyfin2Samsung-CrossOS/bin/Release/net10.0/linux-x64/Apps2Samsung.Core.dll</Apps2SamsungCore>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- A prebuilt Core, not a ProjectReference: referencing the project would write obj/bin into the Apps2Samsung checkout. -->
+    <Reference Include="Apps2Samsung.Core">
+      <HintPath>$(Apps2SamsungCore)</HintPath>
+    </Reference>
+    <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
+  </ItemGroup>
+  <Target Name="CheckApps2SamsungCore" BeforeTargets="ResolveAssemblyReferences" Condition="!Exists('$(Apps2SamsungCore)')">
+    <Error Text="Apps2Samsung.Core.dll not found at '$(Apps2SamsungCore)'. Build Apps2Samsung (Release, linux-x64) or set APPS2SAMSUNG_CORE." />
+  </Target>
+</Project>
