@@ -2732,6 +2732,7 @@ func (s *Service) HouseholdState(ctx context.Context) (domain.HouseholdState, er
 			titleIDs = append(titleIDs, id)
 		}
 	}
+	sort.Strings(titleIDs)
 	for _, favorite := range favorites {
 		if !seenTitles[favorite.TitleID] {
 			seenTitles[favorite.TitleID] = true

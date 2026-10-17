@@ -18,22 +18,25 @@ const (
 )
 
 type ParsedRelease struct {
-	Title        string    `json:"title"`
-	SortTitle    string    `json:"sortTitle"`
-	Kind         MediaKind `json:"kind"`
-	Year         int       `json:"year,omitempty"`
-	SeasonStart  int       `json:"seasonStart,omitempty"`
-	SeasonEnd    int       `json:"seasonEnd,omitempty"`
-	EpisodeStart int       `json:"episodeStart,omitempty"`
-	EpisodeEnd   int       `json:"episodeEnd,omitempty"`
-	EpisodeTitle string    `json:"episodeTitle,omitempty"`
-	Resolution   string    `json:"resolution,omitempty"`
-	Quality      string    `json:"quality,omitempty"`
-	VideoCodec   string    `json:"videoCodec,omitempty"`
-	Audio        string    `json:"audio,omitempty"`
-	HDR          string    `json:"hdr,omitempty"`
-	Edition      string    `json:"edition,omitempty"`
-	ReleaseGroup string    `json:"releaseGroup,omitempty"`
+	Title       string    `json:"title"`
+	SortTitle   string    `json:"sortTitle"`
+	Kind        MediaKind `json:"kind"`
+	Year        int       `json:"year,omitempty"`
+	SeasonStart int       `json:"seasonStart,omitempty"`
+	SeasonEnd   int       `json:"seasonEnd,omitempty"`
+	// SeasonExplicit marks a season number written in the name, so an explicit
+	// S00 differs from no season at all.
+	SeasonExplicit bool   `json:"-"`
+	EpisodeStart   int    `json:"episodeStart,omitempty"`
+	EpisodeEnd     int    `json:"episodeEnd,omitempty"`
+	EpisodeTitle   string `json:"episodeTitle,omitempty"`
+	Resolution     string `json:"resolution,omitempty"`
+	Quality        string `json:"quality,omitempty"`
+	VideoCodec     string `json:"videoCodec,omitempty"`
+	Audio          string `json:"audio,omitempty"`
+	HDR            string `json:"hdr,omitempty"`
+	Edition        string `json:"edition,omitempty"`
+	ReleaseGroup   string `json:"releaseGroup,omitempty"`
 }
 
 type CatalogSource struct {
@@ -362,6 +365,7 @@ func ParseRelease(release TorrentRelease) ParsedRelease {
 		p.Kind = MediaSeries
 		p.SeasonStart, _ = strconv.Atoi(name[m[2]:m[3]])
 		p.SeasonEnd = p.SeasonStart
+		p.SeasonExplicit = true
 		p.EpisodeStart, _ = strconv.Atoi(name[m[4]:m[5]])
 		p.EpisodeEnd = p.EpisodeStart
 		if m[6] >= 0 {
@@ -375,6 +379,7 @@ func ParseRelease(release TorrentRelease) ParsedRelease {
 		p.Kind = MediaSeries
 		p.SeasonStart, _ = strconv.Atoi(name[m[2]:m[3]])
 		p.SeasonEnd = p.SeasonStart
+		p.SeasonExplicit = true
 		p.EpisodeStart, _ = strconv.Atoi(name[m[4]:m[5]])
 		p.EpisodeEnd = p.EpisodeStart
 		boundary = m[0]
@@ -383,6 +388,7 @@ func ParseRelease(release TorrentRelease) ParsedRelease {
 		p.Kind = MediaSeries
 		p.SeasonStart, _ = strconv.Atoi(name[m[2]:m[3]])
 		p.SeasonEnd = p.SeasonStart
+		p.SeasonExplicit = true
 		if m[4] >= 0 {
 			p.SeasonEnd, _ = strconv.Atoi(name[m[4]:m[5]])
 		}
@@ -391,6 +397,7 @@ func ParseRelease(release TorrentRelease) ParsedRelease {
 		p.Kind = MediaSeries
 		p.SeasonStart, _ = strconv.Atoi(name[m[2]:m[3]])
 		p.SeasonEnd = p.SeasonStart
+		p.SeasonExplicit = true
 		if m[4] >= 0 {
 			p.SeasonEnd, _ = strconv.Atoi(name[m[4]:m[5]])
 		}

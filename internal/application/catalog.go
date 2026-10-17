@@ -222,9 +222,12 @@ func buildSeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPa
 	// align resolves the provider season and provider-relative episode for a
 	// parsed (season, number) pair: first the claimed season's own window,
 	// then the absolute numbering window across ordered seasons.
-	align := func(seasonNumber, n int) (int, int, bool) {
+	align := func(seasonNumber, n int, explicit bool) (int, int, bool) {
 		if entry, known := seasonByNumber[seasonNumber]; known && n >= 1 && n <= entry.EpisodeCount {
 			return seasonNumber, n, true
+		}
+		if explicit {
+			return 0, 0, false
 		}
 		for _, season := range providerSeasons.Seasons {
 			// Absolute numbering may only land in the claimed season
@@ -241,22 +244,53 @@ func buildSeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPa
 	aligned := map[int]map[int][]domain.CatalogSource{}
 	unknown := map[int][]domain.CatalogEpisode{}
 	seasonNumbers := map[int]bool{}
-	for key, sources := range episodes {
-		claimed := key.season
-		seasonNumbers[claimed] = true
-		if seasonNumber, episodeNumber, ok := align(claimed, key.episode); ok {
-			if aligned[seasonNumber] == nil {
-				aligned[seasonNumber] = map[int][]domain.CatalogSource{}
+	// Keys are visited in sorted order so merged episodes never depend on map
+	// iteration order.
+	keys := make([]seasonEpisodeKey, 0, len(episodes))
+	for key := range episodes {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].season != keys[j].season {
+			return keys[i].season < keys[j].season
+		}
+		return keys[i].episode < keys[j].episode
+	})
+	for _, key := range keys {
+		// A release that explicitly says S00Exx is a special: it is matched
+		// inside the provider's season 0 only and never by absolute number.
+		var explicitSpecials, rest []domain.CatalogSource
+		for _, source := range episodes[key] {
+			if key.season == 0 && source.Parsed.SeasonExplicit {
+				explicitSpecials = append(explicitSpecials, source)
+			} else {
+				rest = append(rest, source)
 			}
-			aligned[seasonNumber][episodeNumber] = append(aligned[seasonNumber][episodeNumber], sources...)
-			seasonNumbers[seasonNumber] = true
-			continue
 		}
-		name := sources[0].Parsed.EpisodeTitle
-		if name == "" {
-			name = fmt.Sprintf("Episode %d", key.episode)
+		for _, group := range []struct {
+			sources  []domain.CatalogSource
+			explicit bool
+		}{{rest, false}, {explicitSpecials, true}} {
+			sources := group.sources
+			if len(sources) == 0 {
+				continue
+			}
+			claimed := key.season
+			seasonNumbers[claimed] = true
+			if seasonNumber, episodeNumber, ok := align(claimed, key.episode, group.explicit); ok {
+				if aligned[seasonNumber] == nil {
+					aligned[seasonNumber] = map[int][]domain.CatalogSource{}
+				}
+				aligned[seasonNumber][episodeNumber] = append(aligned[seasonNumber][episodeNumber], sources...)
+				seasonNumbers[seasonNumber] = true
+				continue
+			}
+			name := sources[0].Parsed.EpisodeTitle
+			if name == "" {
+				name = fmt.Sprintf("Episode %d", key.episode)
+			}
+			unknown[claimed] = append(unknown[claimed], domain.CatalogEpisode{Number: key.episode, Season: claimed, Title: name, SourceCount: len(sources), Sources: sources})
 		}
-		unknown[claimed] = append(unknown[claimed], domain.CatalogEpisode{Number: key.episode, Season: claimed, Title: name, SourceCount: len(sources), Sources: sources})
 	}
 	for number := range seasonPacks {
 		seasonNumbers[number] = true
@@ -296,6 +330,7 @@ func buildSeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPa
 		sort.Ints(relative)
 		for _, episodeNumber := range relative {
 			items := aligned[number][episodeNumber]
+			sortSources(items)
 			title := names[episodeNumber]
 			if title == "" {
 				title = fmt.Sprintf("Episode %d", episodeNumber)
@@ -315,6 +350,36 @@ func buildSeasons(episodes map[seasonEpisodeKey][]domain.CatalogSource, seasonPa
 		seasons = append(seasons, season)
 	}
 	return seasons
+}
+
+// sortSources orders an episode's sources newest upload first, then release
+// id and file index, which is the repository's own order made total so merged
+// groups render identically on every request.
+func sortSources(sources []domain.CatalogSource) {
+	sort.SliceStable(sources, func(i, j int) bool {
+		a, b := sources[i], sources[j]
+		var at, bt int64
+		if a.Release.UploadedAt != nil {
+			at = a.Release.UploadedAt.UnixNano()
+		}
+		if b.Release.UploadedAt != nil {
+			bt = b.Release.UploadedAt.UnixNano()
+		}
+		if at != bt {
+			return at > bt
+		}
+		if a.Release.ID != b.Release.ID {
+			return a.Release.ID > b.Release.ID
+		}
+		var ai, bi int
+		if a.FileIndex != nil {
+			ai = *a.FileIndex
+		}
+		if b.FileIndex != nil {
+			bi = *b.FileIndex
+		}
+		return ai < bi
+	})
 }
 
 // firstSourcePath gives the unknown-group sort a deterministic tiebreak for
@@ -354,6 +419,7 @@ func buildTorrentOnlySeasons(episodes map[seasonEpisodeKey][]domain.CatalogSourc
 		sort.Slice(keys, func(i, j int) bool { return keys[i].episode < keys[j].episode })
 		for _, key := range keys {
 			items := episodes[key]
+			sortSources(items)
 			name := items[0].Parsed.EpisodeTitle
 			if name == "" {
 				name = fmt.Sprintf("Episode %d", key.episode)
