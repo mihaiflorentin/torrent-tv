@@ -3,7 +3,7 @@
 // that ranking so the components only lay the result out. Nothing here fetches
 // data. An unknown fact is left out of the result instead of becoming a
 // placeholder such as "codec unknown" or "—".
-import { episodeAirLabel, formatBytes, releaseLine, type CatalogSource, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind } from '@torrent-tv/shared';
+import { formatBytes, releaseLine, type CatalogSource, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind } from '@torrent-tv/shared';
 
 const pad2 = (value: number) => String(value).padStart(2, '0');
 const plural = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
@@ -26,12 +26,6 @@ export function kindLabel(title: Pick<CatalogTitle, 'kind' | 'seasonCount'>): st
 
 // Hero and detail header line: the full release date (a series: 'Since <year>') and kind. Seeders and trackers stay out.
 export const titleFacts = (title: CatalogTitle): string[] => [releaseLine(title), kindLabel(title)].filter(Boolean);
-
-// Episode row second line: versions, then the air date ('Upcoming' when it is ahead).
-// `facts` replaces the air date when cached episode info supplies air date, runtime and rating.
-export function episodeFacts(episode: { sourceCount: number; airDate?: string }, now?: Date, facts?: string): string {
-  return [plural(episode.sourceCount, 'version'), facts === undefined ? episodeAirLabel(episode.airDate, now) : facts].filter(Boolean).join(' · ');
-}
 
 // Poster card caption: release (month and year; a series 'Since <year>'), best resolution, the rating once when it has votes.
 // Seeders appear only on a row defined by seeders ("Strong swarms").

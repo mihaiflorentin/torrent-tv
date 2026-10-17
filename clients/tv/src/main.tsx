@@ -14,7 +14,7 @@ import { captureNav, type NavSnapshot } from './nav-snapshot';
 import { cardMeta, episodeMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
 import { appIdentity } from './app-name';
 import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL, registerMediaKeys } from './platform';
-import { detectCapabilities } from './capability';
+import { applyGraphicsClass, detectCapabilities } from './capability';
 import { memo, useStableCallback } from './memo';
 import { createStatusStore, useStatus, type StatusStore } from './status-store';
 import { inReach, inRowReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach, useListArtReach, useRowReach } from './lazy-art';
@@ -1246,7 +1246,9 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
   const timer = window.setTimeout(() => {
    if (seasonInfo.current.has(season)) return;
    seasonInfo.current.set(season, null);
-   try { Promise.resolve(api.seasonInfo(detail.title.id, season)).then(answer => { if (answer && answer.available) { seasonInfo.current.set(season, answer); setInfoTick(count => count + 1) } }, () => { /* no detailed info: the rows keep their basics */ }) } catch { /* an API without season info */ }
+   // A failed fetch is forgotten, so coming back to the season asks again; an unavailable answer is a real answer and stays.
+   const forget = () => { if (seasonInfo.current.get(season) === null) seasonInfo.current.delete(season) };
+   try { Promise.resolve(api.seasonInfo(detail.title.id, season)).then(answer => { if (answer && answer.available) { seasonInfo.current.set(season, answer); setInfoTick(count => count + 1) } }, forget) } catch { forget() }
   }, 400);
   return () => window.clearTimeout(timer);
  }, [season]);
@@ -1363,7 +1365,7 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
    <h2>Seasons</h2>
    <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { window.clearTimeout(timer.current); setSeason(item.number); setPicked(''); setOpened('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
    {versionsShown ? <section class="versions-view" aria-label="Versions">
-    <header class="versions-head"><h3 class="versions-title"><span class="versions-label">Versions</span> · {paneTitle}</h3>{openedValid && <small class="versions-hint">Back returns to the episodes</small>}</header>
+    <header class="versions-head"><h3 class="versions-title"><span class="versions-label">Versions</span> · {paneTitle}</h3></header>
     {openedValid && <p class="info-crumbs" aria-label="You are here">{(openedEpisode ? infoCrumbs(detail.title.title, [{ kind: 'episode', season: openedEpisode.season, episode: openedEpisode.number }]) : [detail.title.title, `Season ${selected!.number}`, 'Unknown episodes']).join(' › ')}</p>}
     {openedEpisode && <div class="versions-episode">
      {(openedPage!.stillUrl || titleArt) && <span class="info-still" aria-hidden="true"><img src={api.streamURL(openedPage!.stillUrl || titleArt)} alt="" onError={hideImage} /></span>}
@@ -1398,7 +1400,7 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
       return <article key={key} role="listitem" class="episode-row">
        <button class={`info-stop info-row episode-tile ${chosen ? 'selected' : ''}`} aria-current={chosen ? 'true' : undefined} data-episode-key={key} data-art-index={index} data-focus-region="episodes" data-focus-row={index} data-focus-col="0" data-focus-key={`episode-${key}`} onFocus={() => scheduleSelect(key)} onClick={() => openVersions(key)}>
         <span class="info-still-small" aria-hidden="true">{still && inReach(art.reach, index) && <img src={api.streamURL(still)} alt="" onError={hideImage} />}</span>
-        <span class="info-row-copy"><b>{episode.number ? `E${episode.number < 10 ? '0' : ''}${episode.number} · ` : ''}{episode.title}</b><small>{episodeMeta(episode, progress, undefined, page.rowMeta)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
+        <span class="info-row-copy"><b>{episode.number ? `E${episode.number < 10 ? '0' : ''}${episode.number} · ` : ''}{episode.title}</b><small>{episodeMeta(episode, page, progress)}</small>{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
         <TVStateBadges state={episode.libraryState} />
         <span class="info-chevron" aria-hidden="true">›</span>
        </button>
@@ -1646,6 +1648,7 @@ export function App() {
 try {
  const root = document.getElementById('app');
  if (!root) throw new Error('The application root element is missing.');
+ applyGraphicsClass();
  render(<App />, root);
  window.FileListBoot?.ready();
 } catch (error) {

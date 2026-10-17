@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sleep } from './test-wait';
+import { episodePageView } from '@torrent-tv/shared';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, HouseholdState } from '@torrent-tv/shared';
 import { cardMeta, episodeMeta, heroFacts } from './display';
 
@@ -25,14 +26,15 @@ describe('card and hero release lines', () => {
 
 describe('episodeMeta', () => {
   const now = new Date(2026, 5, 15);
+  const page = (airDate?: string) => episodePageView(1, { number: 2, title: 'Two', airDate }, undefined, '', now);
   it('adds the air date after the version count', () => {
-    expect(episodeMeta({ sourceCount: 2, airDate: '2017-05-06' }, 0, now)).toBe('2 versions · May 6, 2017');
+    expect(episodeMeta({ sourceCount: 2 }, page('2017-05-06'), 0)).toBe('2 versions · May 6, 2017');
   });
   it('marks a future air date Upcoming and keeps watch progress last', () => {
-    expect(episodeMeta({ sourceCount: 1, airDate: '2026-07-01' }, 40, now)).toBe('1 version · Upcoming · Jul 1, 2026 · 40% watched');
+    expect(episodeMeta({ sourceCount: 1 }, page('2026-07-01'), 40)).toBe('1 version · Upcoming · Jul 1, 2026 · 40% watched');
   });
   it('omits an unknown date', () => {
-    expect(episodeMeta({ sourceCount: 1 }, 0, now)).toBe('1 version');
+    expect(episodeMeta({ sourceCount: 1 }, page(), 0)).toBe('1 version');
   });
 });
 

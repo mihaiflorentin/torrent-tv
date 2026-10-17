@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { API, castInitials, episodeAirLabel, episodePageView, episodeRowView, episodeView, formatRuntime, formatShortDate, infoCrumbs, infoEpisodeCode, infoView, releaseLine, seasonCardView, seasonDetailView, seasonLabel } from '@torrent-tv/shared';
+import { API, castInitials, episodeAirLabel, episodePageView, episodeRowLine, episodeRowView, episodeView, formatRuntime, formatShortDate, infoCrumbs, infoEpisodeCode, infoView, releaseLine, seasonCardView, seasonDetailView, seasonLabel } from '@torrent-tv/shared';
 import type { TitleInfo } from '@torrent-tv/shared';
 
 // Info panel and listing release-date decisions both clients share. Manual month names: Tizen 5 and webOS 4 ship limited Intl.
@@ -181,7 +181,6 @@ describe('episodePageView', () => {
     expect(view.overview).toBe('A series overview.');
     expect(view.stillUrl).toBeUndefined();
     expect(view.credits).toEqual([]);
-    expect(view.rowMeta).toBe(episodeAirLabel('2012-04-22', now));
   });
 
   it('with provider info adds runtime, rating, the synopsis, the still and the credits', () => {
@@ -197,5 +196,22 @@ describe('episodePageView', () => {
     const view = episodePageView(2, { number: 4, title: 'Four' }, undefined, '', now);
     expect(view.meta).toEqual([]);
     expect(view.overview).toBe('');
+  });
+});
+
+describe('episodeRowLine', () => {
+  const now = new Date(2026, 5, 15);
+  const page = (airDate: string | undefined, info?: Parameters<typeof episodePageView>[2]) => episodePageView(1, { number: 2, title: 'Two', airDate }, info, '', now);
+  it('puts the version count before the air date', () => {
+    expect(episodeRowLine({ sourceCount: 2 }, page('2017-05-06'))).toBe('2 versions · May 6, 2017');
+  });
+  it('marks a future date Upcoming and says 1 version in the singular', () => {
+    expect(episodeRowLine({ sourceCount: 1 }, page('2026-07-01'))).toBe('1 version · Upcoming · Jul 1, 2026');
+  });
+  it('adds the runtime and rating that cached info supplies', () => {
+    expect(episodeRowLine({ sourceCount: 3 }, page('2017-05-06', { number: 2, runtimeMinutes: 55, rating: 8.5 }))).toBe('3 versions · May 6, 2017 · 55 min · 8.5 / 10');
+  });
+  it('omits an unknown date', () => {
+    expect(episodeRowLine({ sourceCount: 1 }, page(undefined))).toBe('1 version');
   });
 });

@@ -24,7 +24,20 @@ export function navSort(value: string): NavSort {
   return value === 'seeders' || value === 'title' || value === 'rating' ? value : 'newest';
 }
 
-export function captureNav(state: { route: string; detail: { id: string; title: string } | null; target: NavTarget; query: string; category: string; sort: string; family?: string; familyCategory?: string; versions?: string }): NavSnapshot {
+/** What the catalog hands over when playback starts; captureNav turns it into the stored snapshot. */
+export interface NavState {
+  route: string;
+  detail: { id: string; title: string } | null;
+  target: NavTarget;
+  query: string;
+  category: string;
+  sort: string;
+  family?: string;
+  familyCategory?: string;
+  versions?: string;
+}
+
+export function captureNav(state: NavState): NavSnapshot {
   const snapshot: NavSnapshot = {
     route: state.route,
     titleId: state.detail ? state.detail.id : '',

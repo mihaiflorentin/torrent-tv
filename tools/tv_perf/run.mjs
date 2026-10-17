@@ -4,7 +4,11 @@
  * Development only: never packaged, no npm dependencies (Node >= 22: native
  * fetch + WebSocket speak the DevTools protocol).
  *
- *   node tools/tv_perf/run.mjs [--server URL] [--throttle 6] [--dist DIR] [--out FILE]
+ *   node tools/tv_perf/run.mjs [--lean | --capable] [--server URL] [--throttle 6] [--dist DIR] [--out FILE]
+ *
+ * --lean (the default) reports the user agent of a 2019 TV (Chromium 69), so the app takes its lean-graphics path
+ * (clients/tv/src/capability.ts) and the budgets are enforced: it proxies the Tizen 5 set. --capable keeps the
+ * engine's own user agent, so motion plays; budgets are reported but do not fail the run (--enforce makes them).
  *
  * It serves the built TV bundle (clients/tv/dist, from `npm run build:tv`) on
  * localhost together with a synthetic household API (fixture.mjs), or points the
@@ -12,7 +16,7 @@
  * under Emulation.setCPUThrottlingRate and a Chrome trace; analysis.mjs turns
  * the trace into per-step main-thread time and checks the budgets.
  *
- * Exit codes: 0 budgets held, 1 a budget was exceeded, 2 harness failure.
+ * Exit codes: 0 budgets held (or capable mode without --enforce), 1 a budget was exceeded, 2 harness failure.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -38,7 +42,10 @@ const options = {
   railPresses: Number(args['rail-presses'] ?? 20),
   downPresses: Number(args['down-presses'] ?? 8),
   verbose: Boolean(args.verbose),
+  lean: !args.capable,
+  enforce: !args.capable || Boolean(args.enforce),
 };
+const LEAN_USER_AGENT = 'Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.106 TV Safari/537.36';
 
 function parseArgs(list) {
   const out = {};
@@ -138,6 +145,8 @@ async function main() {
     await Promise.all(['Page', 'Runtime', 'Performance', 'Log'].map(domain => cdp.send(`${domain}.enable`)));
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: PAGE_HOOK(apiBase, STORAGE_KEY, !args['no-frame-clock']) });
+    if (options.lean) await cdp.send('Emulation.setUserAgentOverride', { userAgent: LEAN_USER_AGENT });
+    if (args.init) await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: fs.readFileSync(path.resolve(args.init), 'utf8') }); // experiment hook: a page script run before the app (stub a suspect, count calls)
     if (args.css) {
       // Experiment hook: append a stylesheet after load so a CSS variant can be measured without rebuilding.
       const css = fs.readFileSync(path.resolve(args.css), 'utf8');
@@ -235,7 +244,7 @@ async function main() {
     await cdp.send('Tracing.end');
     await traceDone;
     if (args.trace) fs.writeFileSync(path.resolve(args.trace), JSON.stringify(events));
-    const page = await cdp.eval(`({ keys: window.__tvperf.keys, frames: window.__tvperf.frames, errors: window.__tvperf.errors })`);
+    const page = await cdp.eval(`({ keys: window.__tvperf.keys, frames: window.__tvperf.frames, errors: window.__tvperf.errors, probe: window.__tvprobe || null })`);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 
     const results = analyzeSteps(events, steps).map((result, index) => {
@@ -245,12 +254,14 @@ async function main() {
       return { ...result, slowFrames: countSlowFrames(page.frames, start, end) };
     });
     const violations = evaluateBudgets(results, BUDGETS);
-    const report = { generatedAt: new Date().toISOString(), chrome: options.chrome, throttle: options.throttle, api: options.server || 'synthetic fixture', cadenceMs: options.cadenceMs, budgets: BUDGETS, steps: results, totals: totals(results), violations, pageErrors: [...page.errors, ...consoleErrors] };
+    const lean = await cdp.eval(`document.documentElement.classList.contains('lean-graphics')`);
+    if (lean !== options.lean) log(`WARN: asked for ${options.lean ? 'lean' : 'capable'} mode but the page ran ${lean ? 'lean' : 'capable'} (is the bundle older than the lean-graphics root class?)`);
+    const report = { generatedAt: new Date().toISOString(), mode: lean ? 'lean' : 'capable', enforced: options.enforce, chrome: options.chrome, throttle: options.throttle, api: options.server || 'synthetic fixture', cadenceMs: options.cadenceMs, budgets: BUDGETS, steps: results, totals: totals(results), violations, pageErrors: [...page.errors, ...consoleErrors], probe: page.probe };
     fs.mkdirSync(path.dirname(options.out), { recursive: true });
     fs.writeFileSync(options.out, JSON.stringify(report, null, 2));
     printReport(report);
     log(`report: ${options.out}`);
-    return violations.length ? 1 : 0;
+    return violations.length && options.enforce ? 1 : 0;
   } finally {
     cleanup();
   }
@@ -279,16 +290,21 @@ function printReport(report) {
   });
   const widths = cols.map((col, i) => Math.max(col.length, ...rows.map(row => String(row[i]).length)));
   const line = row => row.map((cell, i) => i < 2 ? String(cell).padEnd(widths[i]) : String(cell).padStart(widths[i])).join('  ');
-  console.log(`\nTV performance at ${report.throttle}x CPU throttle. ms of main-thread time per step: group rows average script/style/layout/paint/other over their n presses; busy max and settle max are the worst press (settle = keypress to end of work); over = steps beyond budget.`);
+  console.log(`\nTV performance, ${report.mode} graphics, at ${report.throttle}x CPU throttle. ms of main-thread time per step: group rows average script/style/layout/paint/other over their n presses; busy max and settle max are the worst press (settle = keypress to end of work); over = steps beyond budget.`);
   console.log(line(cols));
   for (const row of rows) console.log(line(row));
   const t = report.totals;
   console.log(`\nroute changes: ${t.route.steps}, worst settle ${t.route.worstSettleMs} ms (budget ${BUDGETS.routeSettleMs}), long tasks ${t.route.longTasks}, slow frames ${t.route.slowFrames}`);
   console.log(`D-pad moves:   ${t.move.steps}, worst busy ${t.move.worstBusyMs} ms (budget < ${BUDGETS.moveBusyMs}), long tasks ${t.move.longTasks}, slow frames ${t.move.slowFrames}`);
   console.log(`all steps: busy ${t.all.busyMs} ms, long tasks ${t.all.longTasks}, slow frames ${t.all.slowFrames}`);
+  if (report.probe && report.probe.handlerMs) {
+    const stat = list => list.length ? `avg ${(list.reduce((a, b) => a + b, 0) / list.length).toFixed(2)} ms, max ${Math.max(...list).toFixed(2)} ms` : 'no samples';
+    console.log(`probe key-scan (${report.probe.handlerMs.length} presses, throttled): keydown handler ${stat(report.probe.handlerMs)}; focusable scan alone ${stat(report.probe.scanMs)} over ${Math.max(0, ...report.probe.scanned)} elements at most`);
+  }
+  if (report.probe && report.probe.landingScans !== undefined) console.log(`probe landing-scans: ${report.probe.observerCallbacks} observer callbacks, ${report.probe.landingScans} landing scans (${report.probe.landingScanMs.toFixed(1)} ms in querySelectorAll alone), ${report.probe.keyScans} per-key scans`);
   if (report.pageErrors.length) console.log(`page errors: ${report.pageErrors.slice(0, 3).join(' | ')}`);
   if (report.violations.length) {
-    console.log(`\nFAIL: ${report.violations.length} budget violation(s)${options.verbose ? '' : ' (route changes listed; every step and violation is in the JSON report, --verbose prints them all)'}`);
+    console.log(`\n${report.enforced ? 'FAIL' : 'OVER (informational: the budgets apply to lean mode)'}: ${report.violations.length} budget violation(s)${options.verbose ? '' : ' (route changes listed; every step and violation is in the JSON report, --verbose prints them all)'}`);
     for (const violation of report.violations.filter(violation => options.verbose || violation.id.startsWith('route '))) console.log(`  ${violation.id}: ${violation.reason}`);
   } else console.log('\nPASS: all budgets held');
   if (options.verbose) { console.log('\nevery step:'); for (const step of report.steps) console.log(`  ${bad.has(step.id) ? '!' : ' '} ${step.id.padEnd(42)} busy ${step.busyMs}  settle ${step.settleMs}  script ${step.scriptMs}  style ${step.styleMs}  layout ${step.layoutMs}  paint ${step.paintMs}  long ${step.longTasks}  slowFr ${step.slowFrames}`); }

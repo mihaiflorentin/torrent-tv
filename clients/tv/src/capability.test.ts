@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { detectCapabilities } from './capability';
 
@@ -38,5 +39,18 @@ describe('lean graphics detection', () => {
     const { detectLeanGraphics } = await import('./capability');
     expect(detectLeanGraphics('Mozilla/5.0 (SMART-TV; Linux; Tizen 8.0) Chrome/108.0.0.0 TV Safari/537.36')).toBe(false);
     expect(detectLeanGraphics('')).toBe(false);
+  });
+});
+
+describe('lean graphics root class', () => {
+  const chromium = (major: number) => `Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 Chrome/${major}.0.0.0 Safari/537.36`;
+  it('marks the root on an old engine and leaves a capable one unmarked', async () => {
+    const { applyGraphicsClass, LEAN_GRAPHICS_CLASS } = await import('./capability');
+    const lean = document.createElement('html');
+    expect(applyGraphicsClass(lean, chromium(69))).toBe(true);
+    expect(lean.classList.contains(LEAN_GRAPHICS_CLASS)).toBe(true);
+    const capable = document.createElement('html');
+    expect(applyGraphicsClass(capable, chromium(108))).toBe(false);
+    expect(capable.classList.contains(LEAN_GRAPHICS_CLASS)).toBe(false);
   });
 });

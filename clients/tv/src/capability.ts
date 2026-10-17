@@ -19,3 +19,13 @@ export function detectLeanGraphics(userAgent: string = typeof navigator !== 'und
   const match = /(?:Chrome|Chromium)\/(\d+)/.exec(userAgent);
   return match ? Number(match[1]) < LEAN_GRAPHICS_BELOW_CHROMIUM : false;
 }
+
+/** The root class the stylesheet keys its cheap path on: motion plays on capable engines and snaps on lean ones. */
+export const LEAN_GRAPHICS_CLASS = 'lean-graphics';
+
+/** Marks the document root as lean (an old TV engine) or clears the mark; call once before the first render. */
+export function applyGraphicsClass(root: { classList: { toggle(name: string, force?: boolean): boolean } } = document.documentElement, userAgent?: string): boolean {
+  const lean = detectLeanGraphics(userAgent);
+  root.classList.toggle(LEAN_GRAPHICS_CLASS, lean);
+  return lean;
+}

@@ -1,4 +1,4 @@
-import { canonicalLanguage, episodeAirLabel, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogTitle, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
+import { canonicalLanguage, episodeRowLine, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogTitle, type EpisodePageView, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
 import { formatTime } from './player';
 
 // Display decisions for the TV screens (DESIGN.md "Information priorities"), kept as pure text
@@ -22,11 +22,9 @@ export function heroFacts(title: CatalogTitle): string[] {
   return [titleKind(title), releaseLine(title)].filter(Boolean);
 }
 
-/** Episode tile second line: versions, the air date ('Upcoming' when ahead), then watch progress. */
-export function episodeMeta(episode: { sourceCount: number; airDate?: string }, progress: number, now?: Date, facts?: string): string {
-  const versions = `${episode.sourceCount} version${episode.sourceCount === 1 ? '' : 's'}`;
-  // `facts` replaces the air line when cached episode info supplies air date, runtime and rating.
-  return joined([versions, facts === undefined ? episodeAirLabel(episode.airDate, now) : facts, progress > 0 ? `${progress}% watched` : '']);
+/** Episode tile second line: the shared versions-and-facts line, then watch progress. */
+export function episodeMeta(episode: { sourceCount: number }, page: EpisodePageView, progress: number): string {
+  return joined([episodeRowLine(episode, page), progress > 0 ? `${progress}% watched` : '']);
 }
 
 /**

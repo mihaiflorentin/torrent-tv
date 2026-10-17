@@ -367,6 +367,27 @@ describe('TV series page: episode list, then full-screen Versions', () => {
       expect(container.querySelector('.info-skeleton, [role="status"]')).toBeNull();
     });
 
+    it('retries a failed season info when the viewer comes back to that season, never on a focus move', async () => {
+      let attempts = 0;
+      const seasonInfo = vi.fn(async (_id: string, number: number) => { if (number === 2 && ++attempts === 1) throw new Error('offline'); return season2() });
+      await open(() => detail({}), { seasonInfo });
+      key('season-2').click();
+      await wait(600);
+      key('episode-2:3').focus();
+      key('episode-2:5').focus();
+      await wait(300);
+      expect(seasonInfo.mock.calls.filter(call => call[1] === 2)).toHaveLength(1);
+      expect(rowOf('2:4').querySelector('.info-still-small img')!.getAttribute('src')).toBe('/art/backdrop.jpg');
+      key('season-1').click();
+      await wait(200);
+      key('season-2').click();
+      await wait(600);
+      expect(seasonInfo.mock.calls.filter(call => call[1] === 2)).toHaveLength(2);
+      key('episode-2:4').focus();
+      await wait(200);
+      expect(rowOf('2:4').querySelector('.info-still-small img')!.getAttribute('src')).toBe('/still-4.jpg');
+    });
+
     it('the Versions view opens with the Info episode block: crumbs, still, facts, synopsis and credits above the versions', async () => {
       const seasonInfo = async () => season2();
       await open(() => detail({}), { seasonInfo });

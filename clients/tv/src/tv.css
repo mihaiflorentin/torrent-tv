@@ -250,24 +250,37 @@ button.primary.active {
  width: 400px;
  height: 1080px;
  padding: 24px 24px 24px;
- background: var(--tt-surface);
- border-right: 1px solid var(--tt-line);
  overflow-x: hidden;
  overflow-y: auto;
- contain: layout paint;
- /* Compact rail: clip paints only the icon strip; open paints the whole panel. Paint-only, no layout.
-     The clip snaps (it is not compositor-driven, so animating it cost a main-thread frame per tick and held every
-     route change open for the length of the transition); the labels fade instead. The panel's outer shadow was
-     removed because contain: paint clipped it away anyway. */
- clip: rect(0, 120px, 1080px, 0)
+ contain: layout paint
+}
+
+/* The rail's panel is a 400 px layer behind the buttons. Compact, it is slid left so only the 120 px icon strip shows;
+   open, it slides home. The slide is a transform on its own layer and the labels fade by opacity, so the compositor
+   does the work and the main thread only flips a class (animating clip or width would repaint or re-lay out every
+   frame, and held each route change open for the length of the transition). Lean engines snap: see the
+   .lean-graphics rules below. The panel's outer shadow is gone because contain: paint clipped it anyway. */
+.tv-sidebar::before {
+ content: '';
+ position: absolute;
+ left: 0;
+ top: 0;
+ z-index: -1;
+ box-sizing: border-box;
+ width: 400px;
+ height: 1080px;
+ background: var(--tt-surface);
+ border-right: 1px solid var(--tt-line);
+ transform: translateX(-280px);
+ transition: transform var(--tt-dur-base) var(--tt-ease-out)
+}
+
+.tv-app.menu-open .tv-sidebar::before {
+ transform: none
 }
 
 .tv-sidebar::-webkit-scrollbar {
  display: none
-}
-
-.tv-app.menu-open .tv-sidebar {
- clip: rect(0, 400px, 1080px, 0)
 }
 
 .tv-brand {
@@ -343,7 +356,8 @@ button.primary.active {
 .tv-sidebar button span,
 .tv-brand>b,
 .tv-menu-group>small {
- opacity: 0
+ opacity: 0;
+ transition: opacity var(--tt-dur-base)
 }
 
 .tv-sidebar button span {
@@ -536,7 +550,8 @@ button.primary.active {
  overflow: hidden;
  text-align: left;
  background: var(--tt-raised);
- contain: layout paint style
+ contain: layout paint style;
+ transition: transform var(--tt-dur-fast) var(--tt-ease-out)
 }
 
 .poster-card img,
@@ -560,6 +575,17 @@ button.primary.active {
 
 .poster-card:focus {
  transform: scale(var(--tt-focus-scale-tv))
+}
+
+/* Lean engines (Chromium before 70, set on the root by capability.ts) get the same end states with no motion:
+   the sidebar panel, its labels and the focus scale snap. Measured on the 2019 Tizen 5 proxy (ticket #49), the
+   transitions held each menu route change and D-pad move over budget there; capable engines keep them. */
+.lean-graphics .tv-sidebar::before,
+.lean-graphics .tv-sidebar button span,
+.lean-graphics .tv-brand>b,
+.lean-graphics .tv-menu-group>small,
+.lean-graphics .poster-card {
+ transition: none
 }
 
 .poster-copy {
@@ -1145,8 +1171,9 @@ button.primary.active {
  -webkit-box-flex: 0;
  flex: 0 1 auto;
  box-sizing: border-box;
- min-width: 720px;
- max-width: 1100px
+ width: 100%;
+ min-width: 0;
+ max-width: 720px
 }
 
 .episode-heading {
@@ -1199,14 +1226,6 @@ button.primary.active {
 
 .versions-label {
  color: var(--tt-accent)
-}
-
-.versions-hint {
- -webkit-box-flex: 0;
- flex: 0 0 auto;
- margin-left: var(--tt-space-5);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta)
 }
 
 .versions-list {
@@ -1290,6 +1309,7 @@ button.primary.active {
 .episode-tile .episode-progress {
  display: block;
  width: 360px;
+ max-width: 100%;
  margin-top: var(--tt-space-2);
  height: 10px;
  background: var(--tt-scrim-text);

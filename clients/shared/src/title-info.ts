@@ -224,8 +224,6 @@ export interface EpisodePageView {
   title: string;
   /** Air date, runtime, rating: only the facts that are known. */
   meta: string[];
-  /** The same facts as one line, for an episode row. */
-  rowMeta: string;
   badges: string[];
   overview: string;
   credits: EpisodeView['credits'];
@@ -241,5 +239,10 @@ export function episodePageView(season: number, listed: Pick<CatalogEpisode, 'nu
   const merged: InfoEpisode = { ...info, number: listed.number, name: listed.title || info?.name, airDate: info?.airDate || listed.airDate };
   const view = episodeView(season, merged, now);
   const meta = view.meta;
-  return { code: view.code, title: view.title, meta, rowMeta: meta.join(' · '), badges: view.badges, overview: view.overview || fallbackOverview, credits: view.credits, stillUrl: info?.stillUrl || undefined };
+  return { code: view.code, title: view.title, meta, badges: view.badges, overview: view.overview || fallbackOverview, credits: view.credits, stillUrl: info?.stillUrl || undefined };
+}
+
+/** The second line of an episode row on both clients: '2 versions', then the page's known facts (air date with 'Upcoming', runtime, rating). */
+export function episodeRowLine(episode: { sourceCount: number }, page: Pick<EpisodePageView, 'meta'>): string {
+  return [plural2(episode.sourceCount, 'version'), ...page.meta].join(' · ');
 }

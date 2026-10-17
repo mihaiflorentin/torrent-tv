@@ -37,12 +37,27 @@ describe('TV series page surfaces', () => {
     expect(value('.episode-tile.selected small', 'color')).toBe('var(--tt-text)');
   });
 
-  it('centres a list that is sized to its content, not a fixed 760px pane', () => {
+  it('centres a list column narrower than the old 760px pane', () => {
     expect(value('.season-panes', 'justify-content')).toBe('center');
     expect(declarationsOf('.episode-pane')).not.toMatch(/flex\s*:\s*0 0 760px/);
     expect(value('.episode-column', 'flex')).toBe('0 1 auto');
-    expect(value('.episode-column', 'max-width')).toMatch(/^\d+px$/);
-    expect(value('.episode-column', 'min-width')).toMatch(/^\d+px$/);
+    expect(value('.episode-column', 'width')).toBe('100%');
+    const cap = Number(/^(\d+)px$/.exec(value('.episode-column', 'max-width') ?? '')?.[1]);
+    expect(cap).toBeGreaterThan(0);
+    expect(cap).toBeLessThanOrEqual(760);
+  });
+
+  it('lets the episode name and facts truncate and the progress bar shrink inside the capped column', () => {
+    expect(value('.info-row-copy', 'min-width')).toBe('0');
+    for (const selector of ['.info-row-copy b', '.info-row-copy small']) {
+      expect(declarationsOf(selector), selector).toMatch(/text-overflow:\s*ellipsis/);
+      expect(declarationsOf(selector), selector).toMatch(/white-space:\s*nowrap/);
+    }
+    expect(value('.episode-tile .episode-progress', 'max-width')).toBe('100%');
+  });
+
+  it('draws no hint beside the Versions title', () => {
+    expect(css).not.toContain('versions-hint');
   });
 
   it('heads the list with a heading that matches the Versions title', () => {
