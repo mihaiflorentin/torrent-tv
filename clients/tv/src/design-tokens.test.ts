@@ -173,13 +173,26 @@ describe('TV stylesheets use the shared tokens', () => {
     expect(/\.source-button:focus \.source-filename\s*\{([^{}]*)\}/.exec(text)?.[1]).toMatch(/opacity:\s*1/);
   });
 
-  it('keeps the hero text on its scrim panel, and puts the title page text straight on the art under its scrims', () => {
+  it('puts the Home hero and the title page text straight on the art under their scrims', () => {
     const text = css('tv.css');
-    expect(/\.tv-hero-copy\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-scrim-text)');
+    // No hero panel on Home (#55): the Home scrims darken the left under the copy and the bottom under the rows,
+    // over the same base scrim as every other screen, so no corner of the art is lighter than before.
+    expect(/\.tv-hero\s*\{([^{}]*)\}/.exec(text)?.[1]).not.toMatch(/background/);
+    expect(text).not.toContain('.tv-hero-copy');
+    const home = /\.tv-app\[data-route="home"\] \.tv-backdrop-scrim\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(home).toMatch(/linear-gradient\(90deg,\s*var\(--tt-scrim-bottom\) 0,\s*var\(--tt-scrim-text\)/);
+    expect(home).toMatch(/linear-gradient\(0deg,\s*var\(--tt-scrim-bottom\) 0/);
+    expect(home.trim()).toMatch(/var\(--tt-scrim-top\)$/);
     // No boxed header on the title page (#56): the left and bottom scrims of the sharp backdrop carry the contrast.
     expect(/\.detail-copy\s*\{([^{}]*)\}/.exec(text)?.[1]).not.toMatch(/background/);
     const scrim = /\.tv-backdrop\.sharp \.tv-backdrop-scrim\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
     expect(scrim).toMatch(/linear-gradient\(90deg,\s*var\(--tt-scrim-bottom\) 0,\s*var\(--tt-scrim-text\) 38%/);
+  });
+
+  it('makes every poster rail a stacking context, so its cards paint into the rail layer instead of a layer each', () => {
+    const rule = /\.poster-rail\s*\{([^{}]*)\}/.exec(css('performance.css'))?.[1] ?? '';
+    expect(rule).toMatch(/position:\s*relative/);
+    expect(rule).toMatch(/z-index:\s*0/);
   });
 
   it('grows the focused timeline track to the token height without moving the controls below', () => {

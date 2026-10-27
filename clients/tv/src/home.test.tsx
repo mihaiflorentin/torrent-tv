@@ -15,6 +15,8 @@ const appRoot = document.createElement('div');
 appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { Catalog } = await import('./main');
+// main.tsx boots an App (the Setup screen) into #app; its key handler would move focus too, so unmount it.
+render(null, appRoot);
 
 const wait = (ms = 40) => sleep(ms);
 const make = (id: string, over: Partial<CatalogTitle> = {}): CatalogTitle => ({ id, title: id.toUpperCase(), kind: 'movie', year: 2020, trackers: [], categories: [], resolutions: ['1080p'], sourceCount: 1, bestSeeders: 5, largestSizeBytes: 1, ...over });
@@ -27,15 +29,16 @@ describe('TV home', () => {
   let container: HTMLDivElement;
   let titles: ReturnType<typeof vi.fn>;
   let onPlay: ReturnType<typeof vi.fn>;
+  let onFavorite: ReturnType<typeof vi.fn>;
   const key = (focusKey: string) => container.querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`);
   const heading = (name: string) => Array.from(container.querySelectorAll('.row-heading h2')).find(node => node.textContent === name);
   const mount = (household: HouseholdState = empty) => render(
     <Catalog
-      api={{ titles, ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}) } as unknown as API}
+      api={{ titles, ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), titleInfo: async () => ({ cast: [], genres: [] }) } as unknown as API}
       status="Online" titles={[newest]} facets={{ categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] } as CatalogFacets}
       household={household} downloads={[]} jobs={[]} restoreFocus={null} portal={null} updateStatus={null}
       onUpdateStatus={() => { }} onFocus={() => { }} onRetry={() => { }} onChangeServer={() => { }} onForgetServer={() => { }} onPlay={onPlay as unknown as () => void} onPlayDownload={() => { }}
-      onManageDownload={async () => { }} onManageSeasonPack={async () => { }} onRefreshDownloads={async () => { }} onFavorite={() => { }}
+      onManageDownload={async () => { }} onManageSeasonPack={async () => { }} onRefreshDownloads={async () => { }} onFavorite={onFavorite as unknown as () => void}
     />, container);
   const asked = (field: string, value: string) => titles.mock.calls.some(call => (call[0] as Record<string, unknown>)[field] === value);
 
@@ -43,6 +46,7 @@ describe('TV home', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     onPlay = vi.fn();
+    onFavorite = vi.fn();
     titles = vi.fn().mockImplementation(async (query: Record<string, unknown>) => {
       if (query.sort === 'rating') return { items: [make('r1', { rating: 8.1, ratingVotes: 50 }), make('r2')], nextCursor: null, total: 2 };
       if (query.kind === 'movie') return { items: [make('m1'), make('m2')], nextCursor: null, total: 2 };
@@ -51,7 +55,7 @@ describe('TV home', () => {
       return { items: [newest], nextCursor: 'next', total: 1 };
     });
   });
-  afterEach(() => { render(null, container); container.remove(); });
+  afterEach(() => { render(null, container); container.remove(); vi.restoreAllMocks(); });
 
   it('keeps the newest title and View versions when nothing is in progress', async () => {
     mount();
@@ -60,16 +64,77 @@ describe('TV home', () => {
     expect(key('hero-new1')?.textContent).toBe('View versions');
   });
 
-  it('makes the first Continue watching item the hero, with a Resume button and its progress', async () => {
+  it('makes the first Continue watching item the hero, with a Resume that says what is left', async () => {
     mount({ ...empty, continueWatching: [resumeItem] });
     await wait();
     const hero = container.querySelector('.tv-hero') as HTMLElement;
     expect(hero.querySelector('h2')?.textContent).toBe('Severance');
-    expect(hero.textContent).toContain('S02E04 · 41% watched');
+    expect(container.querySelector('.tv-hero-kind')?.textContent).toBe('Continue watching');
+    expect(hero.querySelector('.tv-hero-overview')?.textContent).toBe('Work and life.');
     const button = key('hero-show') as HTMLElement;
-    expect(button.textContent).toBe('Resume S02E04');
+    expect(button.textContent).toBe('Resume S02E04 · 10 min left');
     button.click();
     expect(onPlay).toHaveBeenCalledWith(release, 3, 410_000);
+  });
+
+  it('puts Info and My List beside the primary as icon buttons in the next columns', async () => {
+    mount({ ...empty, continueWatching: [resumeItem] });
+    await wait();
+    const cols = Array.from(container.querySelectorAll<HTMLElement>('.tv-hero [data-focus-row="1"]')).map(node => [node.dataset.focusCol, node.dataset.focusKey, node.getAttribute('aria-label') || node.textContent]);
+    expect(cols).toEqual([['0', 'hero-show', 'Resume S02E04 · 10 min left'], ['1', 'hero-info-show', 'Info'], ['2', 'hero-favorite-show', 'Add to My List']]);
+    key('hero-favorite-show')!.click();
+    expect(onFavorite).toHaveBeenCalledWith(resumeItem.catalog, true);
+    key('hero-info-show')!.click();
+    await wait();
+    expect(container.querySelector('.info-panel')).not.toBeNull();
+  });
+
+  it('shows the hero title as already on My List when it is', async () => {
+    mount({ ...empty, continueWatching: [resumeItem], favorites: [{ ...resumeItem, favorite: true } as HouseholdItem] });
+    await wait();
+    const list = key('hero-favorite-show')!;
+    expect(list.getAttribute('aria-pressed')).toBe('true');
+    expect(list.getAttribute('aria-label')).toBe('In My List');
+    list.click();
+    expect(onFavorite).toHaveBeenCalledWith(resumeItem.catalog, false);
+  });
+
+  it('walks the hero actions with Left and Right, stops at My List, and goes Down into Continue watching', async () => {
+    // happy-dom lays nothing out; give every control a size so the navigation counts it as visible.
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(40);
+    mount({ ...empty, continueWatching: [resumeItem] });
+    await wait();
+    const press = (name: string, keyCode: number) => document.dispatchEvent(new KeyboardEvent('keydown', { key: name, keyCode, bubbles: true, cancelable: true }));
+    const focused = () => (document.activeElement as HTMLElement | null)?.dataset.focusKey;
+    key('hero-show')!.focus();
+    press('ArrowRight', 39); await wait(10);
+    expect(focused()).toBe('hero-info-show');
+    press('ArrowRight', 39); await wait(10);
+    expect(focused()).toBe('hero-favorite-show');
+    press('ArrowRight', 39); await wait(10);
+    expect(focused()).toBe('hero-favorite-show');
+    press('ArrowDown', 40); await wait(10);
+    expect(focused()).toMatch(/^library-show-2-4-/);
+  });
+
+  it('splits a long title at its colon into a title and a subtitle line', async () => {
+    titles.mockResolvedValue({ items: [make('qe', { title: 'Quiet Echo: The Ember Archive' })], nextCursor: null, total: 1 });
+    mount();
+    await wait();
+    const h2 = container.querySelector('.tv-hero h2')!;
+    expect(h2.getAttribute('aria-label')).toBe('Quiet Echo: The Ember Archive');
+    expect(h2.querySelector('.tv-hero-title')?.textContent).toBe('Quiet Echo');
+    expect(h2.querySelector('.tv-hero-subtitle')?.textContent).toBe('The Ember Archive');
+  });
+
+  it('draws Continue watching as landscape cards with the episode code, the time left and a progress bar', async () => {
+    mount({ ...empty, continueWatching: [resumeItem] });
+    await wait();
+    const card = container.querySelector<HTMLElement>('[data-focus-key^="library-show-"]')!;
+    expect(card.classList.contains('landscape-card')).toBe(true);
+    expect(card.querySelector('.poster-copy')?.textContent).toBe('SeveranceS02E04 · 10 min left');
+    expect(card.querySelector('.tv-card-progress')?.getAttribute('aria-label')).toBe('41% watched');
   });
 
   it('loads no discovery row at mount, and only the next one as focus reaches the previous row', async () => {

@@ -13,15 +13,15 @@ const title = (over: Partial<CatalogTitle> = {}): CatalogTitle => ({ id: 'a', ti
 
 describe('card and hero release lines', () => {
   it('shortens a known movie date on poster cards and keeps the year without one', () => {
-    expect(cardMeta(title({ year: 2024, releaseDate: '2024-03-14', resolutions: ['1080p'] }))).toBe('Mar 2024 · 1080p');
+    expect(cardMeta(title({ year: 2024, releaseDate: '2024-03-14', resolutions: ['1080p'] }))).toBe('Mar 2024');
     expect(cardMeta(title({ year: 2024 }))).toBe('2024');
   });
   it('says Since <year> for a series card', () => {
     expect(cardMeta(title({ kind: 'series', year: 2019, releaseDate: '2019-01-02' }))).toBe('Since 2019');
   });
   it('gives the hero the full date for a movie and Since for a series', () => {
-    expect(heroFacts(title({ year: 2024, releaseDate: '2024-03-14' }))).toEqual(['Movie', 'Mar 14, 2024']);
-    expect(heroFacts(title({ kind: 'series', seasonCount: 3, year: 2019 }))).toEqual(['3 seasons', 'Since 2019']);
+    expect(heroFacts(title({ year: 2024, releaseDate: '2024-03-14' }))).toEqual(['Mar 14, 2024']);
+    expect(heroFacts(title({ kind: 'series', seasonCount: 3, year: 2019 }))).toEqual(['Since 2019']);
   });
 });
 

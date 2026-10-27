@@ -12,7 +12,7 @@ import { useEffect, useState } from 'preact/hooks';
 // more than one rail away from the focused one drops all its art. A hook only sets state when its range changes.
 // Nothing here touches focus or the DOM.
 
-/** Cards loaded either side of the focused column; a 1920px screen shows about six. */
+/** Cards loaded either side of the focused column; a 1920px screen shows about seven posters (#55) or four landscape cards. */
 export const ART_COLUMN_REACH = 8;
 /** Loaded cards further than this from the focused column are dropped. */
 export const ART_COLUMN_KEEP = 14;

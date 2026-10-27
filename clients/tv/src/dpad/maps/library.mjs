@@ -86,7 +86,7 @@ export const libraryFamily = {
   name: 'library-family',
   route: 'library-categories',
   ...LIBRARY,
-  notes: 'One Library category: the tab strip, back to the tiles, category chips, then the titles five to a line. Back closes it onto its tile, from any stop.',
+  notes: 'One Library category: the tab strip, back to the tiles, category chips, then the titles seven to a line (#55). Back closes it onto its tile, from any stop.',
   detect: [onRoute('library-categories'), '[data-focus-key="family-back"]'],
   reach: [{ go: 'library-categories' }, { focus: '[data-focus-key^="family-"]' }, { press: 'enter' }],
   landing: 'grid[first]',
@@ -98,7 +98,7 @@ export const libraryFamily = {
     chips: row('^family-chip-', { up: 'family-back', down: 'grid[same]' }),
     grid: lines('^library-item-', { up: 'chips[same]', down: 'stay' }),
   },
-  bursts: [{ from: 'grid[first]', key: 'down', presses: 4 }, { from: 'grid[first]', key: 'right', expect: 'grid[4]' }],
+  bursts: [{ from: 'grid[first]', key: 'down', presses: 4 }, { from: 'grid[first]', key: 'right', expect: 'grid[6]' }],
 };
 
 export const LIBRARY_MAPS = [library, continueWatching, myList, watched, downloadDelete, downloads, libraryFamily, libraryCategories];

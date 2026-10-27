@@ -51,7 +51,7 @@ export const seriesMore = moreSheet({
 });
 
 // The Info panel: a column of stops; Back (or Close) returns to the Info button.
-const infoPanel = ({ name, opener, reach, notes }) => ({
+export const infoPanel = ({ name, opener, reach, notes }) => ({
   name,
   notes,
   detect: '.info-panel',
