@@ -445,16 +445,23 @@ button>.tv-icon:first-child {
  font-variant-numeric: var(--tt-figures)
 }
 
-/* The server connection at the foot of the open rail: a dot (its shape does not change, the word does) and a line. */
+/* The server connection at the foot of the open rail: a dot (its shape does not change, the word does) and a line.
+   The line names host and port, so a long address ends in an ellipsis inside the open rail (520 px, 46 px in from each side). */
 .tv-rail-connection {
  position: absolute;
  left: 46px;
  bottom: var(--tt-tv-safe-y);
  display: flex;
  align-items: center;
+ max-width: 428px;
  color: var(--tt-text-subtle);
  font-size: var(--tt-tv-text-meta);
  white-space: nowrap
+}
+
+.tv-rail-connection>span {
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
 .tv-rail-connection>i {

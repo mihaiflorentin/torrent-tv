@@ -66,6 +66,21 @@ export function screenHeading(route: TVRoute): string {
   return hubOf(route).label;
 }
 
+// Route groups the Catalog screen draws alike.
+const CATALOG_ROUTES: TVRoute[] = ['home', 'search', 'browse', 'tracker'];
+const SORTED_ROUTES: TVRoute[] = ['tracker', 'browse', 'search'];
+const GRID_ROUTES: TVRoute[] = ['search', 'browse'];
+const SHELF_ROUTES: TVRoute[] = ['continue', 'favorites', 'watched'];
+
+/** Screens drawn from the catalog's list of titles (Home's Recently added, the Tracker rails, the Search and Browse grid). */
+export function showsCatalogTitles(route: TVRoute): boolean { return CATALOG_ROUTES.indexOf(route) >= 0; }
+/** Screens with the chip line of Sort chips (Search adds its recent searches to it). */
+export function hasSortChips(route: TVRoute): boolean { return SORTED_ROUTES.indexOf(route) >= 0; }
+/** Screens that draw their titles as the seven-wide poster grid rather than rails. */
+export function drawsTitleGrid(route: TVRoute): boolean { return GRID_ROUTES.indexOf(route) >= 0; }
+/** Library tabs that are one household rail, named by the tab, so the rail draws no heading. */
+export function isHouseholdShelf(route: TVRoute): boolean { return SHELF_ROUTES.indexOf(route) >= 0; }
+
 export type HubMemory = Partial<Record<HubId, TVRoute>>;
 const MEMORY_KEY = 'tv.hubTabs';
 

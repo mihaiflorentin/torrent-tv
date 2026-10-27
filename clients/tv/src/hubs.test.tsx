@@ -3,6 +3,7 @@ import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
 import { openRoute } from './test-nav';
+import { drawsTitleGrid, hasSortChips, HUBS, isHouseholdShelf, showsCatalogTitles, type TVRoute } from './hubs';
 
 // The six-hub rail (ticket #54) through the whole app: what the rail holds, the Library and Discover
 // tab strips, where the remote's keys go around them, and the chrome that left every screen.
@@ -238,7 +239,8 @@ describe('the six-hub rail', () => {
     await start();
     streams[streams.length - 1].onopen?.();
     await wait();
-    expect(container.querySelector('.tv-rail-connection')!.textContent).toBe('Connected to server.lan');
+    // Host and port, as Settings > Server names it: a LAN server is told apart by its port.
+    expect(container.querySelector('.tv-rail-connection')!.textContent).toBe('Connected to server.lan:8097');
     expect(container.querySelector('.tv-banner')).toBeNull();
     streams[streams.length - 1].onerror?.();
     await wait();
@@ -278,5 +280,15 @@ describe('the six-hub rail', () => {
     expect(currentRoute()).toBe('browse');
     expect(selectedTab()).toBe('Browse');
     expect(focusKey()).toBe('title-a');
+  });
+});
+
+describe('route groups', () => {
+  const routes = HUBS.reduce<TVRoute[]>((all, hub) => all.concat(hub.routes), []);
+  it('name the screens drawn from the catalog titles, with Sort chips, as the poster grid, and the untitled household shelves', () => {
+    expect(routes.filter(showsCatalogTitles)).toEqual(['home', 'search', 'tracker', 'browse']);
+    expect(routes.filter(hasSortChips)).toEqual(['search', 'tracker', 'browse']);
+    expect(routes.filter(drawsTitleGrid)).toEqual(['search', 'browse']);
+    expect(routes.filter(isHouseholdShelf)).toEqual(['continue', 'favorites', 'watched']);
   });
 });

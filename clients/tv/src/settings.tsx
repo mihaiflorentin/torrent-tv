@@ -7,6 +7,7 @@ import type { API, Job, SettingsField, TrackerStatus, UpdateStatus } from '@torr
 import { chooseStructuredTarget, focusElement, visibleFocusables, type Direction } from './navigation';
 import { REBUILD_DIALOG_REGION, UPDATE_DIALOG_REGION, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
 import { openExternalURL } from './platform';
+import { serverHost, trackerStatuses } from './server';
 import { Icon } from './icons';
 import { groupNote, settingsGroups, type SettingsGroupId } from './settings-groups';
 import type { TVRoute } from './hubs';
@@ -168,8 +169,7 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
  useEffect(() => () => { settingsMounted.current = false; }, []);
  const openReleaseLink = async (url: string) => { const launched = await openExternalURL(url); if (!settingsMounted.current) return; if (!launched) setUpdateMessage('Open this address on another device: ' + url); };
  const refreshTrackers = () => {
-  const promise = typeof api.trackers === 'function' ? api.trackers() : api.call<TrackerStatus[]>('/trackers');
-  return promise.then(list => { if (settingsMounted.current) setTrackers(Array.isArray(list) ? list : null); }).catch(() => { if (settingsMounted.current) setTrackers(null); });
+  return trackerStatuses(api).then(list => { if (settingsMounted.current) setTrackers(list); });
  };
  const loadSettings = () => {
   setLoadFailed(false);
@@ -233,7 +233,7 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
   } finally { setApplying(false); onConfirmClose() }
  }
  const allDisabled = Boolean(trackers && trackers.length > 0 && trackers.every(item => !item.enabled));
- const host = (() => { try { return new URL(api.base).host } catch { return '' } })();
+ const host = serverHost(api.base);
  const knownJobs = liveJobs || jobs;
  const running = knownJobs.filter(job => job.state === 'running').length;
  let next = FIRST_ROW; const at = () => next++;
