@@ -455,8 +455,8 @@ describe('TV series page: episode list, then full-screen Versions', () => {
     it('keep their rows and columns, and Down from the hero reaches the bar', async () => {
       await open(() => detail({}));
       const at = (name: string) => [name, key(name).dataset.focusRow, key(name).dataset.focusCol];
-      expect(['detail-back', 'detail-playback', 'detail-versions', 'detail-favorite', 'detail-refresh', 'detail-info', 'season-1', 'season-2', 'season-3'].map(at)).toEqual([
-        ['detail-back', '0', '0'], ['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-refresh', '1', '3'], ['detail-info', '1', '4'],
+      expect(['detail-back', 'detail-playback', 'detail-versions', 'detail-favorite', 'detail-info', 'detail-more', 'season-1', 'season-2', 'season-3'].map(at)).toEqual([
+        ['detail-back', '0', '0'], ['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-info', '1', '4'], ['detail-more', '1', '5'],
         ['season-1', '2', '0'], ['season-2', '2', '1'], ['season-3', '2', '2'],
       ]);
       expect(focused()).toBe('detail-playback');

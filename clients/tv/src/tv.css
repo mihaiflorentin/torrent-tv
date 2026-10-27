@@ -247,7 +247,8 @@ button>.tv-icon:first-child {
 
 /* Title page art (backdrop.tsx `sharp`): the picture the viewer opened, shown as it is. One full-resolution layer,
    no blur and no scale, so there is nothing for an old GPU to filter; a change is still only an opacity fade. The
-   scrim darkens from the left (under the title block) and the bottom (under the rows) and leaves the rest clear. */
+   scrim darkens from the left (under the title block, which has no panel of its own) and the bottom (under the
+   versions) and leaves the upper right of the picture clear. */
 .tv-backdrop.sharp .tv-backdrop-art {
  width: 1920px;
  height: 1080px;
@@ -261,7 +262,7 @@ button>.tv-icon:first-child {
 }
 
 .tv-backdrop.sharp .tv-backdrop-scrim {
- background: linear-gradient(0deg, var(--tt-scrim-bottom) 0, transparent 38%), linear-gradient(90deg, var(--tt-scrim-text) 0, var(--tt-scrim-top) 46%, transparent 86%)
+ background: linear-gradient(0deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-text) 32%, transparent 58%), linear-gradient(90deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-text) 38%, transparent 72%)
 }
 
 /* A poster with no backdrop: full height at the right edge, never cropped into a stretched slice. The scrim holds
@@ -1125,50 +1126,166 @@ button>.tv-icon:first-child {
  min-width: 320px
 }
 
-/* Title detail ---------------------------------------------------------- */
+/* Title detail ----------------------------------------------------------
+   The movie title page (#56, board "Movie title page"): kind, title, facts, overview and one row of actions straight on
+   the sharp backdrop, under its left and bottom scrims, with no boxed header. Then the versions as aligned rows. */
 .detail-screen {
  height: 1080px;
  overflow-y: auto;
  padding: var(--tt-tv-safe-y) var(--tt-tv-safe-x) var(--tt-space-9)
 }
 
+/* The on-screen Back stays for pointer-free certainty but steps back: no fill at rest, the quiet tone, meta type.
+   Focused it is a white pill like any control. */
+.detail-screen>[data-focus-key="detail-back"] {
+ padding: 0 var(--tt-space-5);
+ background: transparent;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium)
+}
+
+.detail-screen>[data-focus-key="detail-back"]:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
+.detail-screen>[data-focus-key="detail-back"]>.tv-icon:first-child {
+ width: 26px;
+ height: 26px;
+ flex: 0 0 26px;
+ margin: 0 10px 0 -6px
+}
+
 .detail-copy {
- width: 1000px;
- margin: var(--tt-space-6) 0 var(--tt-space-6);
- padding: var(--tt-space-5) var(--tt-space-6) var(--tt-space-6);
- background: var(--tt-scrim-text);
- border-radius: var(--tt-radius-lg)
+ width: 1100px;
+ margin: var(--tt-space-5) 0 var(--tt-space-7)
+}
+
+.detail-kind {
+ display: block;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ letter-spacing: .02em
 }
 
 .detail-copy h1 {
- margin: var(--tt-space-2) 0 var(--tt-space-3);
+ margin: 10px 0 0;
  font-size: var(--tt-tv-text-title);
  font-weight: var(--tt-weight-black);
- line-height: 1.08
+ line-height: var(--tt-leading-display);
+ letter-spacing: var(--tt-tracking-display)
+}
+
+/* Facts in one line: date, runtime, genres, the rated star and the certification, apart by faint dots. */
+.detail-facts {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ margin-top: var(--tt-space-5);
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ line-height: var(--tt-leading-tight)
+}
+
+.detail-dot {
+ margin: 0 var(--tt-space-4);
+ color: var(--tt-text-faint);
+ font-style: normal
+}
+
+.detail-facts .tv-rating {
+ display: flex;
+ align-items: center;
+ color: var(--tt-text)
+}
+
+.detail-facts .tv-rating .tv-icon {
+ width: 26px;
+ height: 26px;
+ flex: 0 0 26px;
+ margin: 0 var(--tt-space-2) 0 0
+}
+
+.detail-certification {
+ padding: var(--tt-space-1) var(--tt-space-3);
+ border: 2px solid var(--tt-line-strong);
+ border-radius: var(--tt-radius-sm);
+ color: var(--tt-text);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold)
 }
 
 .detail-copy .tv-state-badges {
- margin-top: var(--tt-space-3)
-}
-
-.detail-overview {
  margin-top: var(--tt-space-4)
 }
 
+/* Three lines at most; old engines without the line clamp stop at the same height. */
+.detail-overview {
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 3;
+ width: 900px;
+ max-height: 4.35em;
+ margin-top: var(--tt-space-5);
+ overflow: hidden;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body);
+ line-height: var(--tt-leading-body)
+}
+
+/* One row that never wraps: the primary, Choose version, then My List, Info and More as round icon buttons. */
 .detail-actions {
  display: flex;
- flex-wrap: wrap;
- margin-top: var(--tt-space-5)
+ flex-wrap: nowrap;
+ align-items: center;
+ margin-top: 36px
 }
 
-.detail-actions>* {
- margin: 0 var(--tt-space-4) var(--tt-space-2) 0
+.detail-actions>*+* {
+ margin-left: 20px
 }
 
-.resume-file {
- display: block;
- margin-top: var(--tt-space-3);
- color: var(--tt-text-muted);
+.detail-actions button {
+ flex: 0 0 auto;
+ height: 80px;
+ padding: 0 34px;
+ white-space: nowrap
+}
+
+.detail-actions button.primary {
+ padding: 0 40px 0 32px;
+ font-size: 32px
+}
+
+.detail-actions button.primary>.tv-icon:first-child {
+ width: 30px;
+ height: 30px;
+ flex: 0 0 30px;
+ margin: 0 14px 0 0
+}
+
+/* The position or the version, in the lighter weight after the action word; it fades with the pill's own text colour. */
+.detail-primary-note {
+ font-weight: var(--tt-weight-medium);
+ opacity: .72;
+ white-space: pre
+}
+
+.detail-actions button.detail-icon {
+ width: 80px;
+ padding: 0
+}
+
+.detail-actions button.detail-icon>.tv-icon:first-child {
+ margin: 0
+}
+
+/* What one press of the primary will play, in the quiet tone under the row. */
+.detail-plays {
+ margin-top: 22px;
+ color: var(--tt-text-subtle);
  font-size: var(--tt-tv-text-meta)
 }
 
@@ -1179,8 +1296,7 @@ button>.tv-icon:first-child {
  color: var(--tt-text-muted)
 }
 
-.season-browser,
-.source-list {
+.season-browser {
  width: 1500px;
  box-sizing: border-box;
  padding: var(--tt-space-5) var(--tt-space-6);
@@ -1188,8 +1304,26 @@ button>.tv-icon:first-child {
  border-radius: var(--tt-radius-lg)
 }
 
+/* The movie versions sit on the art like the copy above them: a heading with the count, then the rows. */
 .source-list {
- background: var(--tt-surface)
+ width: 1728px
+}
+
+.source-list-head {
+ display: flex;
+ align-items: baseline;
+ margin-bottom: 18px
+}
+
+.source-list-head h2 {
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold)
+}
+
+.source-list-head span {
+ margin-left: 18px;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta)
 }
 
 /* The series card is translucent (a token, no blur) so the title's sharp backdrop shows through it. Its text carries
@@ -1468,8 +1602,10 @@ button>.tv-icon:first-child {
  color: var(--tt-text-muted)
 }
 
-/* Version row, the decision point: resolution and chips lead, size and seeders follow, the action closes the line.
-   The release and file name is evidence: its line is always reserved and shows only while the row has focus. */
+/* Version row, the decision point, shared by the movie list and an episode's Versions view: one line of fixed columns
+   (resolution, the Best match slot, quality and codec, size, seeders, tracker, then state and the action) so rows
+   compare at a glance. The release and file name is evidence: its line is always reserved and shows only while the
+   row has focus. Rest: the quiet fill; focus: the lighter fill inside the white ring, never the white pill. */
 .source-button {
  display: flex;
  flex-direction: column;
@@ -1477,14 +1613,14 @@ button>.tv-icon:first-child {
  justify-content: flex-start;
  width: 100%;
  min-width: 0;
- margin: var(--tt-space-3) 0 0;
- padding: var(--tt-space-3) var(--tt-space-5);
- border-radius: var(--tt-radius-xl);
+ margin: 10px 0 0;
+ padding: var(--tt-space-3) 28px var(--tt-space-2);
+ border-radius: 18px;
  background: var(--tt-fill-quiet);
+ font-weight: var(--tt-weight-regular);
  text-align: left
 }
 
-/* A focused row keeps its own dark-on-light-text look: a lighter fill inside the white ring, never the white pill. */
 .source-button:focus {
  background: var(--tt-fill-selected);
  color: var(--tt-text)
@@ -1494,97 +1630,26 @@ button>.tv-icon:first-child {
  display: flex;
  align-items: center;
  min-width: 0;
+ min-height: 48px;
  overflow: hidden
 }
 
 .source-main>*+* {
- margin-left: var(--tt-space-4)
+ margin-left: var(--tt-space-5)
 }
 
-/* Fixed columns, so resolutions, chips and numbers line up from one row to the next. */
 .source-resolution {
  flex: 0 0 auto;
  min-width: 120px;
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-black)
-}
-
-.source-chip {
- flex: 0 1 auto;
- min-width: 0;
- padding: var(--tt-space-1) var(--tt-space-3);
- border: 0;
- border-radius: var(--tt-radius-sm);
- background: var(--tt-fill);
- font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-bold);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis
-}
-
-.source-facts {
- flex: 0 0 auto;
- min-width: 360px;
- margin-left: auto;
- font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-medium);
- font-variant-numeric: tabular-nums;
- text-align: right;
- white-space: nowrap
-}
-
-.source-action {
- display: flex;
- align-items: center;
- min-width: 270px;
- justify-content: flex-end
-}
-
-.source-action>*+* {
- margin-left: var(--tt-space-3)
-}
-
-.source-action-label {
- color: var(--tt-accent);
  font-size: var(--tt-tv-text-body);
  font-weight: var(--tt-weight-bold)
 }
 
-/* Tracker and audio, then the release name on the same line; the name truncates with an ellipsis. */
-.source-detail {
- display: flex;
- align-items: baseline;
- min-width: 0;
- margin-top: var(--tt-space-1)
-}
-
-.source-secondary {
- flex: 0 0 auto;
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta)
-}
-
-.source-filename {
- display: block;
- flex: 1 1 0;
- min-width: 0;
- min-height: 34px;
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis;
- opacity: 0;
- transition: opacity var(--tt-dur-fast)
-}
-
 .source-best,
 .source-best-slot {
- flex: 0 0 auto;
- box-sizing: border-box;
- width: 150px;
- text-align: center
+ flex: 0 0 170px;
+ width: 170px;
+ box-sizing: border-box
 }
 
 .source-best {
@@ -1593,15 +1658,92 @@ button>.tv-icon:first-child {
  background: var(--tt-accent);
  color: var(--tt-on-accent);
  font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-black)
+ font-weight: var(--tt-weight-bold);
+ text-align: center
+}
+
+.source-quality {
+ flex: 0 0 360px;
+ width: 360px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.source-size,
+.source-seeders {
+ flex: 0 0 auto;
+ font-size: 28px;
+ font-variant-numeric: tabular-nums;
+ text-align: right;
+ white-space: nowrap
+}
+
+.source-size {
+ width: 150px;
+ font-weight: var(--tt-weight-semibold)
+}
+
+.source-seeders {
+ width: 200px;
+ color: var(--tt-text-muted)
+}
+
+.source-tracker {
+ flex: 1 1 0;
+ min-width: 0;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.source-action {
+ display: flex;
+ flex: 0 0 auto;
+ align-items: center;
+ justify-content: flex-end
+}
+
+.source-action>*+* {
+ margin-left: var(--tt-space-3)
+}
+
+/* The action word is quiet at rest and full white on the focused row: what OK will do, where the cursor is. */
+.source-action-label {
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-bold)
+}
+
+.source-button:focus .source-action-label {
+ color: var(--tt-text)
+}
+
+.source-detail {
+ display: flex;
+ min-width: 0
+}
+
+.source-filename {
+ display: block;
+ flex: 1 1 0;
+ min-width: 0;
+ min-height: 34px;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ opacity: 0;
+ transition: opacity var(--tt-dur-fast)
 }
 
 .source-button:focus .source-filename {
  opacity: 1
-}
-
-.source-secondary+.source-filename {
- margin-left: var(--tt-space-4)
 }
 
 /* In the Versions view the name is part of the comparison, so it always shows. */
@@ -2791,6 +2933,90 @@ button>.tv-icon:first-child {
  color: var(--tt-text)
 }
 
+/* More menu (more-menu.tsx) ----------------------------------------------
+   A screen's secondary actions on a solid sheet in the Player-panel style: the menu surface, rows at the TV target
+   height, the lighter fill inside the white ring on focus. It owns its focus region; the veil behind it is static. */
+.tv-more {
+ position: fixed;
+ top: 0;
+ left: 0;
+ width: 1920px;
+ height: 1080px;
+ z-index: 60;
+ background: var(--tt-veil)
+}
+
+.tv-more-sheet {
+ position: absolute;
+ right: var(--tt-tv-safe-x);
+ top: var(--tt-tv-safe-y);
+ width: 700px;
+ max-height: 972px;
+ overflow-y: auto;
+ padding: var(--tt-space-5);
+ background: var(--tt-menu-surface);
+ border: 2px solid var(--tt-overlay);
+ border-radius: var(--tt-radius-lg);
+ box-shadow: 0 24px 64px var(--tt-veil)
+}
+
+.tv-more-sheet h2 {
+ margin: 0 0 var(--tt-space-3);
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-more-row {
+ display: block;
+ width: 100%;
+ margin: var(--tt-space-2) 0 0;
+ padding: var(--tt-space-3) var(--tt-space-5);
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet);
+ text-align: left
+}
+
+.tv-more-row:focus {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
+}
+
+.tv-more-row b {
+ display: block;
+ font-weight: var(--tt-weight-bold)
+}
+
+.tv-more-row small {
+ display: block;
+ margin-top: var(--tt-space-1);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-regular);
+ line-height: var(--tt-leading-body)
+}
+
+.tv-more-row.danger-button {
+ color: var(--tt-danger)
+}
+
+.tv-more-row.danger-button:focus {
+ background: var(--tt-danger);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-more-message {
+ margin: var(--tt-space-3) var(--tt-space-5) 0;
+ color: var(--tt-danger);
+ font-size: var(--tt-tv-text-meta)
+}
+
+.tv-more-close {
+ margin-top: var(--tt-space-4)
+}
+
 /* Info panel ----------------------------------------------------------
    A side sheet over a veil. It is its own focus region, so the D-pad stays inside: Close, the summary
    block, one row per cast member, the fine print. Everything is flex and block (no grid, no gap, no
@@ -2815,7 +3041,7 @@ button>.tv-icon:first-child {
  display: flex;
  flex-direction: column;
  background: var(--tt-overlay);
- border-left: 1px solid var(--tt-line-strong)
+ box-shadow: -24px 0 64px var(--tt-veil)
 }
 
 .info-head {
@@ -2864,10 +3090,16 @@ button>.tv-icon:first-child {
  display: block
 }
 
+/* The avatar is a span too, but a centred circle: without this the block rule above put the initials in its corner,
+   where the round clip cut them. */
+.info-stop>.info-avatar {
+ display: flex
+}
+
 .info-meta {
- color: var(--tt-accent);
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold)
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-semibold)
 }
 
 .info-tagline {
@@ -2927,10 +3159,11 @@ button>.tv-icon:first-child {
  justify-content: center;
  overflow: hidden;
  border-radius: var(--tt-radius-pill);
- background: var(--tt-line);
+ background: var(--tt-fill-strong);
  color: var(--tt-text);
  font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ line-height: 1
 }
 
 .info-avatar img {

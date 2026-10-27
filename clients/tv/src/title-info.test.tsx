@@ -63,10 +63,10 @@ describe('TV Info panel', () => {
     await wait();
   };
 
-  it('puts Info at the end of the actions row without moving the others', async () => {
+  it('keeps Info in its column of the actions row, with only More after it', async () => {
     await openDetail(async () => info());
-    const cols = ['detail-playback', 'detail-versions', 'detail-favorite', 'detail-refresh', 'detail-info'].map(name => [name, key(name)!.dataset.focusRow, key(name)!.dataset.focusCol]);
-    expect(cols).toEqual([['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-refresh', '1', '3'], ['detail-info', '1', '4']]);
+    const cols = ['detail-playback', 'detail-versions', 'detail-favorite', 'detail-info', 'detail-more'].map(name => [name, key(name)!.dataset.focusRow, key(name)!.dataset.focusCol]);
+    expect(cols).toEqual([['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-info', '1', '4'], ['detail-more', '1', '5']]);
   });
 
   it('shows a calm loading state, then the details in priority order', async () => {
