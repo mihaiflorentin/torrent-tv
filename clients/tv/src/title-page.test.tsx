@@ -327,8 +327,10 @@ describe('TV title page', () => {
     it('shows a progress bar and percent only on an episode that is in progress', async () => {
       await open(series(), { ...empty, continueWatching: [resumeItem({ seasonNumber: 2, episodeNumber: 2 })] });
       const tile = (name: string) => key(`episode-${name}`)!;
-      expect(tile('2:2').querySelector('.episode-progress b')!.getAttribute('style')).toContain('width: 41%');
-      expect(tile('2:2').textContent).toContain('41% watched');
+      // The bar sits on the episode's still (the "Series page" board); the percent is the row's state word.
+      expect(tile('2:2').querySelector('.info-still-small .episode-progress b')!.getAttribute('style')).toContain('width: 41%');
+      expect(tile('2:2').querySelector('.episode-state')!.textContent).toBe('41% watched');
+      expect(tile('2:2').querySelector('.info-row-copy small')!.textContent).not.toContain('watched');
       expect(tile('2:1').querySelector('.episode-progress')).toBeNull();
       expect(tile('2:3').querySelector('.episode-progress')).toBeNull();
     });

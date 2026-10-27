@@ -43,6 +43,32 @@ test('a series title page has seasons whose episodes each carry versions, and a 
   assert.ok(first.packSources.length >= 1, 'season 1 offers a complete-season pack');
 }));
 
+test('a series being watched has its episodes\' library states: earlier ones watched, the resumed one in progress, the next downloaded', () => withServer(async (server, fixture) => {
+  const watching = fixture.state.continueWatching.filter(item => item.catalog.kind === 'series' && item.episodeNumber > 1);
+  let checked = 0;
+  for (const resume of watching) {
+    const detail = await json(server, `/catalog/titles/${resume.titleId}`);
+    const episodes = detail.seasons[0].episodes;
+    // The household's saved episode can lie past a short fixture season; such a title is not a worked example.
+    if (episodes.length < resume.episodeNumber) continue;
+    checked += 1;
+    const at = number => episodes.find(episode => episode.number === number)?.libraryState;
+    assert.equal(at(1).watchState, 'watched');
+    assert.equal(at(resume.episodeNumber).watchState, 'partial');
+    assert.equal(at(resume.episodeNumber).positionMs, resume.positionMs);
+    assert.equal(at(resume.episodeNumber).durationMs, resume.durationMs);
+    if (episodes.length > resume.episodeNumber) {
+      assert.equal(at(resume.episodeNumber + 1).downloadState, 'downloaded');
+      assert.equal(at(resume.episodeNumber + 1).watchState, 'unwatched');
+    }
+  }
+  assert.ok(checked > 0, 'the household is part-way through a series');
+  // A series nobody is watching keeps no state on its episodes.
+  const idle = fixture.titles.find(title => title.kind === 'series' && !fixture.state.continueWatching.some(item => item.titleId === title.id));
+  const quiet = await json(server, `/catalog/titles/${idle.id}`);
+  assert.equal(quiet.seasons[0].episodes[0].libraryState, undefined);
+}));
+
 test('the Info panel data is available for a title, its seasons and an episode', () => withServer(async (server, fixture) => {
   const series = fixture.titles.find(title => title.kind === 'series');
   const info = await json(server, `/catalog/titles/${series.id}/info`);
