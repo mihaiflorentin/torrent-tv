@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-// Motion on the TV (spec #45: the Velvet Booth look stays on capable engines, a cheaper equivalent on old ones).
+// Motion on the TV (spec #45: the full look stays on capable engines, a cheaper equivalent on old ones).
 // Read as text like chromium53-css.test.ts: the sidebar slides and its labels fade, and a focused poster eases its
 // scale, all on compositor properties only; the lean-graphics root class (capability.ts) snaps every one of them.
 const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'tv.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

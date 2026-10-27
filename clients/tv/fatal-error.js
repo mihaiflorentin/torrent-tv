@@ -86,17 +86,17 @@
   // Boot-screen palette from the shared tokens (the fallbacks matter when app.css never loaded), sized for a 1080p TV (mirrors #startup in index.html).
   panel.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;'
    + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
-   + 'padding:100px;box-sizing:border-box;background:var(--tt-ink,#0e0a15);color:var(--tt-text,#f8f2ea);'
+   + 'padding:100px;box-sizing:border-box;background:var(--tt-ink,#0a0b0f);color:var(--tt-text,#f5f6f8);'
    + 'font-family:var(--tt-font-sans,Arial,sans-serif);text-align:center';
   appendText(panel, 'h1', 'Something went wrong',
-   'font-size:64px;margin:0 0 26px;color:var(--tt-danger,#ff7b86)');
+   'font-size:64px;margin:0 0 26px;color:var(--tt-danger,#ff8a8a)');
   appendText(panel, 'p', message,
    'font-size:28px;line-height:1.5;white-space:pre-wrap;max-width:1500px;'
    + 'margin:0 0 40px;word-break:break-word');
   appendText(panel, 'p', 'Please tell the household admin about this message.',
    'font-size:28px;line-height:1.6;margin:8px 0');
   appendText(panel, 'p', 'Press Back to exit.',
-   'font-size:28px;line-height:1.6;margin:8px 0;color:var(--tt-text-muted,#bdb3cc)');
+   'font-size:28px;line-height:1.6;margin:8px 0;color:var(--tt-text-muted,#c9cdd6)');
   document.body.appendChild(panel);
  }
 

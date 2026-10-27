@@ -34,11 +34,22 @@ describe('TV design token wiring', () => {
     expect(html).toMatch(/font-family:\s*var\(--tt-font-sans,\s*Arial,\s*sans-serif\)/);
     expect(html).not.toMatch(/font-family:\s*Arial/);
   });
+
+  // The boot screen and the fatal-error page paint before app.css loads (or when it never does), so their var()
+  // fallbacks are the palette the viewer sees first. They must be the token values, not a stale copy.
+  it.each(['../index.html', '../../webos/index.html', '../../android-tv/app/assets/index.html', '../fatal-error.js', '../startup.js'])('%s falls back to the current token values', name => {
+    const tokens = new Map<string, string>();
+    const sheet = readFileSync(resolve(here, '../../shared/design/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const declaration of sheet.matchAll(/(--tt-[\w-]+)\s*:\s*([^;]+);/g)) tokens.set(declaration[1], declaration[2].trim());
+    const fallbacks = Array.from(source(name).matchAll(/var\((--tt-[\w-]+),\s*(#[0-9a-fA-F]{3,6})\)/g), match => [match[1], match[2].toLowerCase()]);
+    expect(fallbacks.length, `${name} has colour fallbacks`).toBeGreaterThan(0);
+    for (const [token, fallback] of fallbacks) expect(fallback, `${token} fallback in ${name}`).toBe(tokens.get(token));
+  });
 });
 
 // The TV stylesheets read the shared tokens; screens never carry their own palette, the old teal
 // variables are gone, and nothing the viewer reads falls under the 26 px TV floor (DESIGN.md).
-describe('TV stylesheets use the Velvet Booth tokens', () => {
+describe('TV stylesheets use the shared tokens', () => {
   const sheets = ['tv.css', 'performance.css'];
   const css = (name: string) => source(name).replace(/\/\*[\s\S]*?\*\//g, '');
 

@@ -1,4 +1,4 @@
-/* Torrent TV browser app, direction "Velvet Booth" (DESIGN.md). Every color,
+/* Torrent TV browser app, direction "Night Screen" (DESIGN.md). Every color,
    size, radius and duration comes from the shared --tt- tokens in
    clients/shared/design/tokens.css, imported before this sheet; only layout
    locals are defined here, prefixed --w-. The desktop shell reuses this sheet
@@ -94,7 +94,7 @@ svg {
  stroke-linejoin: round;
 }
 
-/* ---------- Focus: a saffron-light ring outside an offset gap, plus a white edge on the control's own border ---------- */
+/* ---------- Focus: a white ring outside an offset gap, plus a white edge on the control's own border ---------- */
 
 :focus-visible {
  outline: var(--tt-focus-width-web) solid var(--tt-focus-ring);

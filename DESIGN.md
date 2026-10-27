@@ -2,12 +2,14 @@
 
 ## Direction
 
-**Velvet Booth.** The product is a private screening room: a dark house with one warm light. Aubergine-black surfaces, a saffron accent, one characterful variable typeface, and a blurred poster backdrop that follows focus. It is not a trademark clone of any streaming product. Static artwork, typography and selection state carry the experience; autoplay video backgrounds are intentionally excluded.
+**Night Screen.** The picture is the show; the interface steps back. A cool near-black ground, white type in one quiet variable face (Inter), translucent white pills instead of outlined boxes, and a single saffron accent kept for the few things that must stand out: progress, Best match, the selected marker, counts and badges. Depth comes from tonal fills and the backdrop scrims, not from hairlines or glass. It is not a trademark clone of any streaming product. Static artwork, typography and selection state carry the experience; autoplay video backgrounds are intentionally excluded.
 
-Decisions recorded for ticket #29 (parent spec `docs/superpowers/specs/2026-10-14-visual-redesign-design.md`; the three prototypes and the reasons two were rejected are in `docs/design/direction-prototypes.html`):
+Night Screen replaces "Velvet Booth" (ticket #29, aubergine-black with saffron as the primary-action fill and Bricolage Grotesque). Decisions recorded in spec #51 and its tickets (the approved 1920x1080 mockup boards: Home, Navigation open, Movie title page, Series page, Search, Downloads, Settings, Player controls); the earlier prototypes are kept in `docs/design/direction-prototypes.html`:
 
-- Accent: amber/saffron, `#ffab2e`. Set against violet-black it is a complement, which is what keeps it apart from gold-on-grey media apps.
-- Font: one bundled variable family, Bricolage Grotesque (SIL OFL 1.1, bundled offline, Latin plus Latin Extended for Romanian diacritics, about 60 KB).
+- Ground: neutral, slightly cool near-blacks (`#0a0b0f` to `#262a35`), so poster art supplies the colour.
+- Accent: refined saffron, `#f2a93b`, for progress, Best match, the selected-tab marker, counts and badges. Never a large button fill and never a focus colour.
+- Focus: white. A focused button, chip, tab or rail item turns solid white with ground-coloured text, inside a white ring (the look is built by #53; the tokens are here).
+- Font: one bundled variable family, Inter (SIL OFL 1.1, bundled offline, Latin plus Latin Extended for Romanian diacritics, about 87 KB). Headings 700 to 800 with slight negative tracking, body 400 to 500, tabular figures for numbers.
 - Artwork: a single blurred poster layer behind rows, following the focused title, with a scrim that guarantees text contrast. On a TV the layer is the half-resolution art scaled up with no blur filter and no crossfade: measured on a 2023 Samsung (Tizen 9), the blur and the per-key motion stalled the main thread 300-1000 ms per frame, so every TV takes the lean path and snaps. Posters themselves stay sharp. Titles without artwork get a designed tinted backdrop, never an empty hole.
 - One visual language for the browser app and the TV client. Both import the same token file. Density differs by platform through the type scale and target sizes, never through a second palette.
 - Dark only. There is no light theme.
@@ -27,49 +29,59 @@ The browser app (`web/style.css`) and the desktop shell (`desktop/src/shell.css`
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--tt-ink` | `#0e0a15` | Page background |
-| `--tt-surface` | `#17111f` | Panels, rows |
-| `--tt-raised` | `#221a2e` | Cards, inputs, menus |
-| `--tt-overlay` | `#2c2239` | Dialogs and the player menu |
-| `--tt-line` / `--tt-line-strong` | `#3b3050` / `#7a6e92` | Hairlines / control boundaries (3:1 on surfaces) |
-| `--tt-text` | `#f8f2ea` | Primary text, 13.5:1 to 17.6:1 on every surface |
-| `--tt-text-muted` | `#bdb3cc` | Secondary text, 7.5:1 to 9.8:1 |
-| `--tt-accent` | `#ffab2e` | Selection, primary action, progress; 8:1 to 10.4:1 |
-| `--tt-accent-hover` / `--tt-accent-deep` | `#ffbc55` / `#d98a0b` | Hover and pressed fills |
-| `--tt-on-accent` | `#1d1200` | Text on a saffron fill, 9.8:1 |
-| `--tt-card-surface` | `rgba(23, 17, 31, 0.58)` | Series page cards over the title's sharp backdrop; 58% lets the art show. Bare, it holds 4.5:1 for `--tt-text` and `--tt-text-muted` over a mid-grey picture but not over white, so the text carries the shade below |
-| `--tt-text-shade-core` / `--tt-text-shade` | `rgba(8, 5, 12, 0.9)` / `0 0 3px core, 0 0 10px core` | The darker shade behind text on those cards: a static halo of two small layers (the `text-shadow` value). Even if the halo reaches only half of the core's alpha around thin strokes, both text colours clear 4.5:1 on it over a card over pure white |
-| `--tt-ok` / `--tt-warn` / `--tt-danger` / `--tt-info` | `#5fdca4` / `#ffd166` / `#ff7b86` / `#8fc4ff` | Status, each at least 6.7:1 on surfaces |
+Contrast figures are computed from the values (WCAG relative luminance) by `clients/shared/src/design-tokens.test.ts`; the ranges below run from `--tt-overlay` (lowest) to `--tt-ink` (highest).
 
-Rules. Saffron means "you are here" or "do this"; it is never the only signal of a state. Status colors always travel with an icon or a word (`Downloaded`, `Needs attention`). Because warn sits close to saffron in hue, warn text uses `--tt-warn` on a surface and never on a saffron fill. Translucent colors are written `rgba()`; the TV engines reject 4- and 8-digit hex.
+| Token | Value | Role |
+| --- | --- | --- |
+| `--tt-ink` | `#0a0b0f` | Page background, the ground |
+| `--tt-surface` | `#14161c` | Panels, rows |
+| `--tt-raised` | `#1d2029` | Cards, inputs, menus |
+| `--tt-overlay` | `#262a35` | Dialogs, sheets and the player menu |
+| `--tt-line` / `--tt-line-strong` | `#2c303b` / `#6b7080` | A quiet divider / the edge an input still needs (3.3:1 to 4:1 on ink, surface and raised). Hairline borders on controls are being removed screen by screen |
+| `--tt-text` | `#f5f6f8` | Primary text, 13.3:1 to 18.2:1 |
+| `--tt-text-muted` | `#c9cdd6` | Secondary text over art and on the translucent fills, 9:1 to 12.4:1 on surfaces |
+| `--tt-text-subtle` | `#a8adba` | Quieter secondary text on the plain ground only, 6.4:1 to 8.8:1; not for text over art |
+| `--tt-text-faint` | `#5d6270` | Separators (the dot between facts) only, never words; 3.2:1 on ink |
+| `--tt-fill` / `--tt-fill-selected` | `rgba(255, 255, 255, 0.1)` / `rgba(255, 255, 255, 0.14)` | Translucent control fills at rest and when hovered or selected (pills, chips, rows) |
+| `--tt-fill-focus` / `--tt-on-fill-focus` | `#ffffff` / `#0a0b0f` | The focused control's fill and its ground-coloured text, 19.7:1 |
+| `--tt-accent` | `#f2a93b` | Progress, Best match, the selected marker, counts and badges; 7.2:1 to 9.9:1 |
+| `--tt-accent-hover` / `--tt-accent-deep` | `#f6bc62` / `#c98516` | Lighter and deeper steps of the accent (for screens not yet restyled, which still fill a primary button with it) |
+| `--tt-on-accent` | `#14100a` | Text on a saffron badge or count, 9.5:1 (11.1:1 on hover) |
+| `--tt-card-surface` | `rgba(20, 22, 28, 0.58)` | Series page cards over the title's sharp backdrop; 58% lets the art show. Bare, it holds 4.5:1 for `--tt-text` and `--tt-text-muted` over a mid-grey picture but not over white, so the text carries the shade below |
+| `--tt-text-shade-core` / `--tt-text-shade` | `rgba(6, 7, 10, 0.9)` / `0 0 3px core, 0 0 10px core` | The darker shade behind text on those cards: a static halo of two small layers (the `text-shadow` value). Even if the halo reaches only half of the core's alpha around thin strokes, both text colours clear 4.5:1 on it over a card over pure white |
+| `--tt-ok` / `--tt-warn` / `--tt-danger` / `--tt-info` | `#5fd6a0` / `#ffd166` / `#ff8a8a` / `#8fc4ff` | Status, each at least 6.3:1 on every surface |
+
+The translucent fills are checked twice: `--tt-text` and `--tt-text-muted` hold 4.5:1 on either fill over each surface, and on either fill over the title-page text scrim (`--tt-scrim-text`) over an all-white picture (8.6:1 and 5.8:1 on the rest fill, 7.6:1 and 5.2:1 on the selected fill). `--tt-text-subtle` falls to 3.7:1 in that over-art case, which is why it is for the plain ground only. The white focus ring holds 9.2:1 or more against a selected fill on every surface.
+
+Rules. Saffron marks progress and a few chosen things (Best match, the selected tab, counts, badges); it is never a large button fill, never focus, and never the only signal of a state. Status colors always travel with an icon or a word (`Downloaded`, `Needs attention`). Because warn sits close to saffron in hue, warn text uses `--tt-warn` on a surface and never on a saffron fill. Translucent colors are written `rgba()`; the TV engines reject 4- and 8-digit hex.
 
 ### Type
 
-One family. `--tt-font-sans` is `"Bricolage Grotesque", system-ui, "Segoe UI", Arial, "Helvetica Neue", sans-serif`. Body copy uses weight 400 to 500, titles 700, the display size 800. Line height 1.15 for headings and 1.45 for body.
+One family, Inter. `--tt-font-sans` is `"Inter", system-ui, "Segoe UI", Arial, "Helvetica Neue", sans-serif`. Weights: `--tt-weight-regular` 400 and `--tt-weight-medium` 500 for body, `--tt-weight-semibold` 600 for labels and buttons, `--tt-weight-bold` 700 for row and section headings, `--tt-weight-black` 800 for titles and the display size. Headings take slight negative tracking: `--tt-tracking-display` -0.025em on titles and the display size, `--tt-tracking-heading` -0.02em on page headings, `--tt-tracking-snug` -0.01em on row headings. Line height `--tt-leading-display` 1.02 for titles, `--tt-leading-tight` 1.15 for headings, `--tt-leading-body` 1.45 for body. Numbers (times, sizes, counts, speeds) use tabular figures: `font-variant-numeric: var(--tt-figures)` (`tabular-nums`, the font's `tnum` feature is kept in the subset).
 
 | Role | Web (`--tt-text-*`) | TV at 1920x1080 (`--tt-tv-text-*`) |
 | --- | --- | --- |
-| meta, captions, badges | xs 13 px | meta 26 px |
+| meta, captions, badges, chips | xs 13 px | meta 26 px |
 | secondary and body | sm 15 px, md 16 px | body 30 px |
-| lead, row headings | lg 20 px | lead 36 px |
-| section heading | xl 26 px | heading 46 px |
-| page title | 2xl 36 px | title 64 px |
+| lead, row headings | lg 20 px | lead 34 px |
+| page heading (Downloads, Settings) | xl 26 px | heading 56 px |
+| title on its page | 2xl 36 px | title 88 px (movie), title-compact 80 px (series, longer names) |
 | hero | display 52 px | display 92 px |
 
-On the TV nothing a viewer must read goes below 26 px; `clients/tv/src/design-tokens.test.ts` rejects a literal font size under 26 px in `tv.css`. Numbers in source facts keep weight 500 or more.
+The web scale is unchanged by #52; the browser alignment ticket may revisit it. On the TV nothing a viewer must read goes below 26 px: `clients/shared/src/design-tokens.test.ts` keeps every `--tt-tv-text-*` token at 26 px or more and in rising order, and `clients/tv/src/design-tokens.test.ts` rejects a literal font size under 26 px in `tv.css`. Numbers in source facts keep weight 500 or more.
 
-Font loading. `fonts.css` declares the face only inside `@supports (font-variation-settings: normal)` (Chromium 62+). webOS 4 runs Chromium 53, which cannot apply a weight axis and would render the file's default instance (ExtraBold) at every weight, so it keeps its platform sans. Tizen 5 (Chromium 63), Android TV and every browser get the real face. Both TV startup pages set their `html, body` font from the token too, because an inline `font-family` there would otherwise win over `:root`. `font-display: swap` keeps text visible while the local file loads. The TV builds inline the font into `app.css` as a data URI (Vite library mode, covered by the page `data:` source in the CSP); the browser build emits two hashed `.woff2` files.
+Font loading. The bundled files are `clients/shared/design/fonts/inter-latin-wght.woff2` (32.8 KB) and `inter-latin-ext-wght.woff2` (56.1 KB), built from the official Inter 4.1 release by `tools/subset_inter.py`: weight axis 400 to 800, optical size pinned to 14 (the text design, which holds up best at 3 m), split by unicode-range so the Latin Extended file (Romanian ă ș ț, both comma and cedilla forms) loads only when such a letter appears. Provenance, hashes and the licence are in `clients/shared/design/fonts/README.md` and `OFL.txt`. `fonts.css` declares the face only inside `@supports (font-variation-settings: normal)` (Chromium 62+). webOS 4 runs Chromium 53, which cannot apply a weight axis and would render the file's default instance (Regular) at every weight, so it keeps its platform sans. Tizen 5 (Chromium 63), Android TV and every browser get the real face. Both TV startup pages set their `html, body` font from the token too, because an inline `font-family` there would otherwise win over `:root`, and their `var()` fallbacks repeat the token colours (the TV token test checks they match). `font-display: swap` keeps text visible while the local file loads. The TV builds inline the font into `app.css` as a data URI (Vite library mode, covered by the page `data:` source in the CSP), which makes `app.css` about 187 KB; the browser build emits two hashed `.woff2` files. The shared token test reads each woff2's character map and fails if a Romanian letter or basic Latin character is not drawn by the file whose unicode-range claims it.
 
 ### Spacing, shape, targets
 
 - Spacing is a 4 px scale: `--tt-space-1` to `--tt-space-9` = 4, 8, 12, 16, 24, 32, 48, 64, 96. Layouts use margins, not `gap`, on the TV engines (ADR-0006).
 - TV safe area is 5% of the canvas: `--tt-tv-safe-x` 96 px, `--tt-tv-safe-y` 54 px. Text and focus rings stay inside it; backdrops and the scrim bleed to the edge. The canvas is fixed at 1920x1080 and scales for 4K output.
-- Radii: `--tt-radius-sm` 6, `--tt-radius-md` 10 (buttons, cards), `--tt-radius-lg` 16 (dialogs), `--tt-radius-pill`. Depth comes from tonal separation and the backdrop, not from glass or `backdrop-filter`.
+- Radii: `--tt-radius-sm` 6, `--tt-radius-md` 10, `--tt-radius-lg` 16 (cards, dialogs), `--tt-radius-xl` 20 (large cards and rows), `--tt-radius-pill` (buttons and chips are fully rounded in this direction; screens move to pills as they are restyled). Depth comes from tonal separation and the backdrop, not from glass or `backdrop-filter`.
 - Targets: `--tt-target-web` 44 px minimum, `--tt-tv-target` 72 px for TV buttons and rows. One exception: the left rail rows are 56 px high, because the rail holds up to 15 destinations and 15 rows at 72 px do not fit 1080 px; their labels stay at body size.
 
 ### Focus
 
-Focus is two independent signals so it survives an engine that drops one declaration: a solid saffron-light outline (`--tt-focus-ring`, 4 px on TV via `--tt-focus-width-tv`, 3 px in the browser via `--tt-focus-width-web`) drawn outside an offset gap (`--tt-focus-offset`), plus a white inner edge (`--tt-focus-edge`) on the element's own border. On the TV add a scale of `--tt-focus-scale-tv` and the soft halo `--tt-focus-shadow-tv`. The ring sits outside the element, so it contrasts with the surrounding surface (at least 9.8:1) and stays visible on a saffron button. The browser uses `:focus-visible`; the TV stylesheet uses `:focus` because Chromium 63 and 53 lack `:focus-visible`, and TV focus is never pointer-driven. Neighbouring posters in a focused row may dim to about 70% opacity; the focused one never does. `tools/webos_ipk.py` requires the solid outline beside any `button:focus` box-shadow.
+Focus is two independent signals so it survives an engine that drops one declaration: a solid white outline (`--tt-focus-ring`, 4 px on TV via `--tt-focus-width-tv`, 3 px in the browser via `--tt-focus-width-web`) drawn outside an offset gap (`--tt-focus-offset`), plus a white inner edge (`--tt-focus-edge`) on the element's own border. On the TV add a scale of `--tt-focus-scale-tv` and the soft white halo `--tt-focus-shadow-tv` (`0 0 0 5px` white at 25%, then a drop shadow, as on the mockups). The ring sits outside the element, so it contrasts with the surrounding surface (at least 14.3:1) and stays visible on any fill. The ring went from saffron-light to white with #52 (the accent is no longer a focus colour); the focused white fill (`--tt-fill-focus`) arrives with #53. The browser uses `:focus-visible`; the TV stylesheet uses `:focus` because Chromium 63 and 53 lack `:focus-visible`, and TV focus is never pointer-driven. Neighbouring posters in a focused row may dim to about 70% opacity; the focused one never does. `tools/webos_ipk.py` requires the solid outline beside any `button:focus` box-shadow.
 
 As built on the TV: only poster cards scale under focus (`.poster-card:focus`). On capable engines the scale eases over `--tt-dur-fast` on `transform` alone, a compositor property; on lean engines (every TV browser — Tizen, webOS, Android TV WebView — and any Chromium before 70, which `clients/tv/src/capability.ts` marks with the `lean-graphics` class on the root) it applies at once, because the transition cost a layer-tree rebuild per frame there and stretched every D-pad move's settle time (ticket #49). The backdrop layer carries no `will-change`, which doubled paint cost per move. every other control keeps its geometry, so lists never shift while the remote moves, and `performance.css` pins `transform: none` for them. The 70% dim is not built, because it needs `:focus-within` (Chromium 60+). A ring is clipped by an `overflow` container, so rails, grids and scrolling lists reserve at least 16 px of padding around their focusable children; a control inside a clipped card (a season pack header) lives outside the card's `overflow` instead.
 
@@ -235,7 +247,7 @@ Everything shipped to the TV runs on Chromium 63 (Tizen 5) and Chromium 53 (webO
 
 ## Status and unverified
 
-Landed with #29: tokens, the bundled font and its wiring, this document, and the prototypes. Landed with #30: the TV client on the tokens (every screen, the Player controls surface, the focus-following backdrop, the per-screen information priorities above), the startup and fatal-error pages, and the empty, loading and error copy. Landed with #31: every screen of the browser app and the desktop shell on the tokens (home, catalog and search, detail, versions, downloads, player, settings, jobs, events, projects, setup prompts, empty and error states), the information priorities above for those screens, and the focus-following backdrop on the web. Not verified on hardware: legibility at 3 m, overscan, focus visibility on Tizen and webOS sets, the toolbar fitting the safe width with the platform font on webOS and with a two-digit track count, the backdrop blur and crossfade cost on old GPUs, and Bricolage Grotesque rendering on Chromium 63 (Tizen) and the platform-sans fallback on Chromium 53 (webOS). Screens were checked only in desktop Chromium at 1920x1080 against a mock server; the old-engine smoke runs (Chromium 53 and 63, Docker) were not run. Not verified for the web re-skin: rendering in the Wails webviews (the desktop shell was reviewed in Chromium with the Wails bindings stubbed), Safari and WebKitGTK (the version row falls back to its two-row layout where container queries are missing, and the rail dimming needs `:has()`), and real devices; phone widths were checked in headless Chromium at 320, 390 and 820 px against a mock server, not on hardware.
+Landed with #29: tokens, the bundled font and its wiring, this document, and the prototypes. Landed with #30: the TV client on the tokens (every screen, the Player controls surface, the focus-following backdrop, the per-screen information priorities above), the startup and fatal-error pages, and the empty, loading and error copy. Landed with #31: every screen of the browser app and the desktop shell on the tokens (home, catalog and search, detail, versions, downloads, player, settings, jobs, events, projects, setup prompts, empty and error states), the information priorities above for those screens, and the focus-following backdrop on the web. Not verified on hardware: legibility at 3 m, overscan, focus visibility on Tizen and webOS sets, the toolbar fitting the safe width with the platform font on webOS and with a two-digit track count, the backdrop blur and crossfade cost on old GPUs, and Inter rendering on Chromium 63 (Tizen) and the platform-sans fallback on Chromium 53 (webOS). Landed with #52: the Night Screen tokens (palette, fills, focus colour, type scale, tracking, figures) and Inter in place of Bricolage Grotesque; screens keep their Velvet Booth layout until their own tickets restyle them, so they look half-new in between (outlined boxes and saffron primary buttons on the new ground). Inter was confirmed drawing Romanian text (bold, 48 glyphs, no fallback) in the TV build under the Tizen 5 user agent and in the browser build, in headless Chromium only. Screens were checked only in desktop Chromium at 1920x1080 against a mock server; the old-engine smoke runs (Chromium 53 and 63, Docker) were not run. Not verified for the web re-skin: rendering in the Wails webviews (the desktop shell was reviewed in Chromium with the Wails bindings stubbed), Safari and WebKitGTK (the version row falls back to its two-row layout where container queries are missing, and the rail dimming needs `:has()`), and real devices; phone widths were checked in headless Chromium at 320, 390 and 820 px against a mock server, not on hardware.
 
 ## References and artifacts
 
