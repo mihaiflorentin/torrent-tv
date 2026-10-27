@@ -61,7 +61,7 @@ const (
 
 // DetectSupervision reports the process supervision from the environment:
 // a NOTIFY_SOCKET is the sd_notify convention that marks a systemd service,
-// and a cgroup path ending in a .service unit marks a real systemd service
+// and a leaf cgroup that is a .service unit marks a real systemd service
 // of any type — Type=simple units never receive NOTIFY_SOCKET, and the
 // update-helper relaunch dies with the service cgroup under systemd's
 // default KillMode. Everything else uses the update-helper relaunch.
@@ -84,16 +84,22 @@ func supervisionFromEnvironment(notifySocket, cgroup string) Supervision {
 }
 
 // cgroupIndicatesSystemdService reports whether a /proc/self/cgroup payload
-// places the process inside a systemd-managed .service unit — any path
-// element ending in .service counts (user services nest deeper, e.g.
-// user@1000.service/app.slice/...). Containers, Kubernetes pods, and the
-// root cgroup stay unsupervised.
+// places the process directly inside a systemd-managed .service unit: only
+// the leaf cgroup counts (/system.slice/torrent-tv.service, or a user unit
+// such as .../user@1000.service/app.slice/torrent-tv.service). Ancestors do
+// not — every desktop-session process sits under user@1000.service in an
+// app-*.scope that nothing restarts, so it must take the update-helper
+// relaunch. Containers, Kubernetes pods, and the root cgroup stay
+// unsupervised.
 func cgroupIndicatesSystemdService(cgroup string) bool {
 	for _, line := range strings.Split(cgroup, "\n") {
-		for _, element := range strings.Split(strings.TrimSpace(line), "/") {
-			if strings.HasSuffix(element, ".service") {
-				return true
-			}
+		fields := strings.SplitN(strings.TrimSpace(line), ":", 3)
+		if len(fields) != 3 {
+			continue
+		}
+		leaf := fields[2][strings.LastIndex(fields[2], "/")+1:]
+		if strings.HasSuffix(leaf, ".service") {
+			return true
 		}
 	}
 	return false
