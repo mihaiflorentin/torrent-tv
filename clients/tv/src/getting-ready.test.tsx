@@ -70,9 +70,7 @@ describe('Prepare modal elapsed counter', () => {
 
 describe('Player getting ready panel', () => {
   const live: Download = { id: 'dl-1', releaseId: 'r', trackerId: 'filelist', trackerName: 'FileList', displayTitle: 'Severance', parsed: { title: 'Severance', sortTitle: 'severance', kind: 'series', seasonStart: 2, episodeStart: 4 }, engineId: 'e', fileIndex: 0, filePath: 'v.mkv', mimeType: 'video/x-matroska', streamUrl: '/s/1', sizeBytes: 1000, downloadedBytes: 370, progress: 0.37, state: 'downloading', playbackMode: 'progressive', speedBytesPerSecond: 2_100_000, etaSeconds: 240, peers: 12, seeds: 9, leased: false };
-  type Listener = { onbufferingcomplete?: () => void };
   let container: HTMLDivElement;
-  let listener: Listener;
   let downloads: ReturnType<typeof vi.fn>;
   let api: API;
   const mount = () => render(h(Player, { api, download: { ...live, progress: 0, peers: 0, speedBytesPerSecond: 0, etaSeconds: 0 }, resumeMs: 0, preferences: { audioLanguage: 'en', audioTrackIndex: -1, subtitleLanguage: 'ro', subtitleMode: 'auto' }, onClose: () => { }, onStateChanged: () => { }, onComplete: () => { } }), container);
@@ -80,9 +78,8 @@ describe('Player getting ready panel', () => {
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
-    listener = {};
     let prepared: (() => void) | null = null;
-    (window as unknown as { webapis: unknown }).webapis = { avplay: { open: vi.fn(), setDisplayRect: vi.fn(), setDisplayMethod: vi.fn(), setListener: (l: Listener) => { listener = l; }, prepareAsync: (ok: () => void) => { prepared = ok; (window as unknown as { __prepare: () => void }).__prepare = () => prepared?.(); }, play: vi.fn(), pause: vi.fn(), seekTo: vi.fn(), stop: vi.fn(), close: vi.fn(), getDuration: () => 120_000, getTotalTrackInfo: () => [], setSelectTrack: vi.fn(), setSilentSubtitle: vi.fn() } };
+    (window as unknown as { webapis: unknown }).webapis = { avplay: { open: vi.fn(), setDisplayRect: vi.fn(), setDisplayMethod: vi.fn(), setListener: vi.fn(), prepareAsync: (ok: () => void) => { prepared = ok; (window as unknown as { __prepare: () => void }).__prepare = () => prepared?.(); }, play: vi.fn(), pause: vi.fn(), seekTo: vi.fn(), stop: vi.fn(), close: vi.fn(), getDuration: () => 120_000, getTotalTrackInfo: () => [], setSelectTrack: vi.fn(), setSilentSubtitle: vi.fn() } };
     downloads = vi.fn().mockResolvedValue({ items: [live], nextCursor: null, total: 1 });
     api = { base: 'http://s', streamURL: (p: string) => p, updatePlayback: vi.fn().mockResolvedValue({}), playbackPreferences: vi.fn(), updatePlaybackPreferences: vi.fn().mockResolvedValue({}), downloads, subtitles: vi.fn().mockResolvedValue({ items: [] }), diagnostic: vi.fn(), call: vi.fn() } as unknown as API;
   });
