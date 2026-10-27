@@ -60,6 +60,13 @@ describe('pickLanding', () => {
     expect(pickLanding(elements, { allowChrome: true })).toEqual({ target: refresh, rank: 'chrome' });
   });
 
+  it('settles an empty hub tab on its selected tab, not on the first tab of the strip', () => {
+    control(0, 0, 'chrome').setAttribute('aria-selected', 'false');
+    const selected = control(0, 2, 'chrome');
+    selected.setAttribute('aria-selected', 'true');
+    expect(pickLanding(all(), { allowChrome: true }).target).toBe(selected);
+  });
+
   it('ignores the sidebar and other regions', () => {
     control(0, 0, 'card', 'sidebar');
     const card = control(10, 0, 'card');

@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 import type { API, CatalogFacets, CatalogTitle } from '@torrent-tv/shared';
 
 // TV Search: recent searches under the field, results that follow what you typed from the cache only,
@@ -25,7 +26,7 @@ describe('TV search', () => {
   let titles: ReturnType<typeof vi.fn>;
   let searchTitles: ReturnType<typeof vi.fn>;
   const key = (focusKey: string) => container.querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`);
-  const route = async (name: string) => { container.querySelector<HTMLButtonElement>(`[data-menu-route="${name}"]`)!.click(); await wait(); };
+  const route = async (name: string) => { await openRoute(container, name, 0); await wait(); };
   const mount = () => render(
     <Catalog
       api={{ titles, searchTitles, ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}) } as unknown as API}
@@ -133,11 +134,13 @@ describe('TV search', () => {
     // Geometry does not exist in happy-dom, so walk the same structured chooser the D-pad uses.
     const walk = (from: HTMLElement, direction: 'up' | 'down') => chooseStructuredTarget(from, Array.from(container.querySelectorAll<HTMLElement>('[data-focus-region="content"]')), direction) as HTMLElement;
     const down: string[] = [];
-    let at = key('header-retry') as HTMLElement;
-    for (let i = 0; i < 4; i++) { at = walk(at, 'down'); down.push(at.dataset.focusKey as string); }
-    expect(down).toEqual(['search-input', 'recent-0', 'sort-newest', 'title-a']);
+    let at = key('search-input') as HTMLElement;
+    for (let i = 0; i < 3; i++) { at = walk(at, 'down'); down.push(at.dataset.focusKey as string); }
+    expect(down).toEqual(['recent-0', 'sort-newest', 'title-a']);
     const up: string[] = [];
-    for (let i = 0; i < 4; i++) { at = walk(at, 'up'); up.push(at.dataset.focusKey as string); }
-    expect(up).toEqual(['sort-newest', 'recent-0', 'search-input', 'header-retry']);
+    for (let i = 0; i < 3; i++) { at = walk(at, 'up'); up.push(at.dataset.focusKey as string); }
+    expect(up).toEqual(['sort-newest', 'recent-0', 'search-input']);
+    // The field is the top of the screen: there is no header row above it any more.
+    expect(walk(at, 'up')).toBeNull();
   });
 });

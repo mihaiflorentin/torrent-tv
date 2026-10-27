@@ -2,6 +2,7 @@
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 import { MAPS } from './dpad/maps/index.mjs';
 import { checkMaps, classify, resolveOn, resolveTarget, DIRECTIONS, type DpadMap, type ElementInfo } from './dpad/model.mjs';
 import { visibleFocusables } from './navigation';
@@ -114,7 +115,7 @@ describe('screens the D-pad audit found bugs on', () => {
     vi.restoreAllMocks();
   });
   const start = async () => { render(h(App, null), container); await wait(150); };
-  const open = async (route: string) => { container.querySelector<HTMLElement>(`[data-menu-route="${route}"]`)!.click(); await wait(80); };
+  const open = async (route: string) => { await openRoute(container, route, 0); await wait(80); };
 
   it('gives the Tracker rails their own focus keys, so Down reaches Strong swarms and Up comes back', async () => {
     await start();

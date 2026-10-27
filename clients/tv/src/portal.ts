@@ -5,12 +5,6 @@
 // functions and identity constants the tests assert against.
 import type { PortalState, UpdateStatus } from '@torrent-tv/shared';
 
-// Sidebar focus row of the Other projects entry, which opens the projects
-// route page. Appended after the fixed menu rows (the last menu row is 32),
-// so portal links appearing or disappearing never renumbers an existing
-// control.
-export const PROJECTS_MENU_ROW = 33;
-
 // Focus region of the update confirmation dialog; directional movement
 // never leaves the region of the focused element, which is the trap.
 export const UPDATE_DIALOG_REGION = 'update-dialog';
@@ -36,6 +30,11 @@ export const UPDATE_APPLY_ROW = 22;
 // 15-18 spare) and precedes the server actions; the Rebuild catalog button of
 // the Danger zone is the last control on the page, below the update install.
 export const SETTINGS_CATALOG_FETCH_ROW = 15;
+// Background jobs and Other projects (the screens that left the rail, ticket #54) follow Fetch latest in the
+// spare rows; Reload library opens the Server actions, just above Change server address.
+export const SETTINGS_JOBS_ROW = 16;
+export const SETTINGS_PROJECTS_ROW = 17;
+export const SETTINGS_RELOAD_ROW = 18;
 export const SETTINGS_REBUILD_ROW = 23;
 
 // Focus region of the rebuild confirmation dialog, a trap like the update one.

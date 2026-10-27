@@ -2,6 +2,7 @@
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 
 // App-seam tests for landing focus: entering a screen puts the D-pad cursor on
 // the screen's first card (never the header Refresh button), cards that load
@@ -76,7 +77,7 @@ describe('landing focus through the app', () => {
     vi.restoreAllMocks();
   });
 
-  const open = async (route: string) => { container.querySelector<HTMLElement>(`[data-menu-route="${route}"]`)!.click(); await wait(80); };
+  const open = async (route: string) => { await openRoute(container, route, 0); await wait(80); };
   const start = async () => { render(h(App, null), container); await wait(150); };
 
   it('opens Home on the hero button, not on Refresh', async () => {

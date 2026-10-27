@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, HouseholdItem, HouseholdState, Job } from '@torrent-tv/shared';
 import { withETag } from './test-api';
 
@@ -67,7 +68,7 @@ function mount(container: HTMLElement, api: Partial<API> = {}, props: Props = {}
 describe('TV screens show what helps the next decision', () => {
   let container: HTMLDivElement;
   const text = (selector: string) => container.querySelector(selector)?.textContent ?? '';
-  const route = async (name: string) => { container.querySelector<HTMLButtonElement>(`[data-menu-route="${name}"]`)!.click(); await wait(); };
+  const route = async (name: string) => { await openRoute(container, name, 0); await wait(); };
   const key = (focusKey: string) => container.querySelector<HTMLButtonElement>(`[data-focus-key="${focusKey}"]`);
 
   beforeEach(() => {
@@ -127,7 +128,8 @@ describe('TV screens show what helps the next decision', () => {
     mount(container, {}, { titles: [] });
     await wait();
     expect(text('.tv-empty h2')).toBe('No titles to show yet');
-    expect(text('.tv-empty p')).toMatch(/Refresh/);
+    expect(text('.tv-empty p')).toMatch(/Reload library/);
+    expect(text('.tv-empty button')).toBe('Reload library');
     await route('search');
     expect(text('.tv-empty h2')).toBe('Search the catalog');
   });

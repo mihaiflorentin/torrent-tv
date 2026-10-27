@@ -25,6 +25,8 @@ export interface Burst { from: string; key: 'up' | 'down' | 'left' | 'right'; ex
 export interface DpadMap {
   name: string;
   route?: string;
+  /** The rail item (menu-<hub>) when it is not named like the route. */
+  hub?: string;
   detect: string | string[];
   regions: string[];
   landing: string;

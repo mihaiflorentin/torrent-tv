@@ -1,7 +1,7 @@
 // The capture journeys and their naming: `node --test tools/tv_perf`.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TV_JOURNEY, WEB_JOURNEY, WEB_VIEWPORTS, checkJourney, shotFile, railMove, stepFailure, pickTitles, resolvePath } from './journey.mjs';
+import { TV_JOURNEY, WEB_JOURNEY, WEB_VIEWPORTS, checkJourney, shotFile, railMove, routePlace, stepFailure, pickTitles, resolvePath } from './journey.mjs';
 import { buildFixture } from './fixture.mjs';
 
 test('web paths name the picked fixture titles, so the journey survives a fixture reseed', () => {
@@ -45,6 +45,17 @@ test('a journey with a repeated or malformed step name, an unknown action or no 
 test('shots are numbered in journey order and named by step', () => {
   assert.equal(shotFile(0, 'home'), '01-home.png');
   assert.equal(shotFile(11, 'series-versions'), '12-series-versions.png');
+});
+
+test('a route is reached through its hub: a Library or Discover tab, a Settings entry, or the hub itself', () => {
+  assert.deepEqual(routePlace('favorites'), { hub: 'library', tab: 'favorites' });
+  assert.deepEqual(routePlace('tracker'), { hub: 'discover', tab: 'tracker' });
+  assert.deepEqual(routePlace('categories'), { hub: 'discover', tab: 'categories' });
+  assert.deepEqual(routePlace('jobs'), { hub: 'settings', entry: 'settings-jobs' });
+  assert.deepEqual(routePlace('downloads'), { hub: 'downloads' });
+  // Every route the journey visits lands on one of the six hubs.
+  const hubs = ['home', 'search', 'library', 'discover', 'downloads', 'settings'];
+  for (const step of TV_JOURNEY) for (const action of step.actions) if (action.go) assert.ok(hubs.includes(routePlace(action.go).hub), action.go);
 });
 
 test('the rail is walked toward the destination from wherever the cursor is', () => {

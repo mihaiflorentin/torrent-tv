@@ -95,10 +95,10 @@ function revealed(el, slack) {
   return '';
 }
 function signature() {
-  var route = document.querySelector('[data-menu-route][aria-current="page"]');
+  var app = document.querySelector('.tv-app[data-route]');
   return JSON.stringify({ menu: !!document.querySelector('.tv-app.menu-open'), info: seen('.info-panel'), dialogs: document.querySelectorAll('[role="dialog"]').length,
     detail: !!document.querySelector('.detail-screen'), versions: !!document.querySelector('.versions-view'), player: !!document.querySelector('.player-shell'),
-    setup: !!document.querySelector('main.setup'), route: route ? route.getAttribute('data-menu-route') : '', family: !!document.querySelector('[data-focus-key="family-back"]'),
+    setup: !!document.querySelector('main.setup'), route: app ? app.getAttribute('data-route') : '', family: !!document.querySelector('[data-focus-key="family-back"]'),
     job: !!document.querySelector('[data-focus-key="job-detail-back"]'), panel: (document.querySelector('.player-dialog') || {}).className || '',
     infoLevel: (function () { var first = document.querySelector('.info-panel .info-scroll [data-focus-key]'); return first ? first.getAttribute('data-focus-key') : ''; })(),
     controls: !!document.querySelector('.player.controls-visible') });
