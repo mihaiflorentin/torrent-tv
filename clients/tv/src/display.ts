@@ -157,18 +157,47 @@ export function downloadStatus(download: Download): { label: string; tone: Downl
   return { label: percent > 0 ? `Downloading ${percent}%` : 'Waiting', tone: 'idle', percent };
 }
 
-/** The status line of a download row: state, then speed and ETA while it moves, or the error. */
-export function downloadProgressLine(download: Download): string {
-  const status = downloadStatus(download);
-  if (status.tone === 'error') return joined([status.label, download.error]);
-  if (status.tone !== 'active') return status.label;
-  return joined([status.label, download.speedBytesPerSecond > 0 ? `${formatBytes(download.speedBytesPerSecond)}/s` : '', formatEta(download.etaSeconds)]);
+export type DownloadFilter = 'active' | 'done' | 'paused' | 'attention';
+
+/** The one filter chip a download counts under (Active, Downloaded, Paused, Needs attention); every download has one. */
+export function downloadFilterOf(download: Download): DownloadFilter {
+  const tone = downloadStatus(download).tone;
+  return tone === 'done' ? 'done' : tone === 'paused' ? 'paused' : tone === 'error' ? 'attention' : 'active';
 }
 
-/** Secondary facts of a download row. Release name, path, index, peers and the engine route are details. */
-export function downloadFacts(download: Download, group: { sizeBytes?: number; files?: number } = {}): string {
+export interface DownloadRowView { state: string; tone: DownloadTone; percent: number; meter: boolean; facts: string }
+
+/**
+ * One compact Downloads row (the Downloads board): the state (the percent while it moves, else a word), whether the
+ * slim bar shows (while it is unfinished and not failed), and one line of facts: speed, time left and Playable now
+ * while it moves; the reached percent and the picture on a paused row; the version and tracker once it is
+ * downloaded; the reason when it needs attention. Release name, path, index and peers are Details.
+ */
+export function downloadRow(download: Download, files = 1): DownloadRowView {
+  const status = downloadStatus(download);
   const parsed = download.parsed;
-  return joined([parsed?.resolution, parsed?.quality, parsed?.videoCodec, group.files && group.files > 1 ? `${group.files} files` : '', formatBytes(group.sizeBytes ?? download.sizeBytes), download.trackerName, download.playbackMode === 'progressive' && download.progress < 1 ? 'Playable while downloading' : '']);
+  const many = files > 1 ? `${files} files` : '';
+  const percent = status.percent;
+  if (status.tone === 'error') return { state: status.label, tone: status.tone, percent, meter: false, facts: download.error || 'The transfer stopped. Retry it or delete it.' };
+  if (status.tone === 'done') return { state: status.label, tone: status.tone, percent, meter: false, facts: joined([parsed?.resolution, parsed?.quality, download.trackerName, many]) };
+  if (status.tone === 'paused') return { state: 'Paused', tone: status.tone, percent, meter: true, facts: joined([`${percent}%`, parsed?.resolution, parsed?.videoCodec, many]) };
+  const moving = /^Downloading /.test(status.label);
+  const state = moving ? `${percent}%` : status.label;
+  return { state, tone: status.tone, percent, meter: true, facts: joined([!moving && percent > 0 ? `${percent}%` : '', download.speedBytesPerSecond > 0 ? `${formatBytes(download.speedBytesPerSecond)}/s` : '', formatEta(download.etaSeconds), download.playbackMode === 'progressive' && download.progress < 1 ? 'Playable now' : '', many]) };
+}
+
+const GIB = 1024 ** 3;
+const gigabytes = (value: number) => `${value < 10 ? (Math.round(value * 10) / 10).toFixed(1).replace(/\.0$/, '') : Math.round(value)} GB`;
+
+/**
+ * The Downloads heading's storage line: stored torrent content against the Allocation. The Allocation is set in
+ * binary gigabytes (Settings shows it as "Allocation (GB)"), so the stored bytes are counted the same way. With no
+ * Allocation set (0 or unknown) it only says what is stored, and percent is -1 (no bar).
+ */
+export function allocationUse(storedBytes: number, allocationGb: number | undefined): { label: string; percent: number } {
+  const stored = gigabytes(Math.max(0, storedBytes) / GIB);
+  if (!allocationGb || !(allocationGb > 0)) return { label: `${stored} stored`, percent: -1 };
+  return { label: `${stored} of ${gigabytes(allocationGb)}`, percent: Math.min(100, Math.round((storedBytes / GIB / allocationGb) * 100)) };
 }
 
 /** Player status line: the current Audio and Subtitles choice. Empty until preferences are known. */
@@ -214,4 +243,41 @@ export function jobStatusLine(job: Job, stamp: (value: string) => string = defau
   if (job.state === 'retry_wait' && job.nextAttemptAt) return joined([state, stamp(job.nextAttemptAt)]);
   if (job.state === 'queued') return state;
   return joined([state, job.updatedAt ? stamp(job.updatedAt) : '']);
+}
+
+/** What a job ran, in the order the viewer scans it: the action, then the title, then the tracker. */
+export function jobWhatRan(job: Pick<Job, 'kind' | 'label'>): string {
+  const refresh = /^Refresh (.+?) for (.+)$/.exec(job.label || '');
+  if (refresh) return joined(['Refresh', refresh[2], refresh[1]]);
+  return job.label || jobKindLabel(job.kind);
+}
+
+export type JobTone = 'active' | 'error' | 'done' | 'quiet';
+const JOB_STATE_WORDS: Record<string, { word: string; tone: JobTone; icon: string }> = {
+  running: { word: 'Running', tone: 'active', icon: 'jobs' },
+  failed: { word: 'Failed', tone: 'error', icon: 'alert' },
+  completed: { word: 'Completed', tone: 'done', icon: 'check' },
+  succeeded: { word: 'Completed', tone: 'done', icon: 'check' },
+  queued: { word: 'Queued', tone: 'quiet', icon: 'clock' },
+  retry_wait: { word: 'Retrying', tone: 'quiet', icon: 'clock' },
+};
+/** A job's state as one capitalised word, its tone (the word's colour) and its status icon. */
+export function jobState(job: Pick<Job, 'state'>): { word: string; tone: JobTone; icon: string } {
+  const known = JOB_STATE_WORDS[job.state];
+  if (known) return known;
+  const word = (job.state || 'unknown').replace(/_/g, ' ');
+  return { word: word.charAt(0).toUpperCase() + word.slice(1), tone: 'quiet', icon: 'clock' };
+}
+
+/** A time relative to now ("5 min ago", "Yesterday"); an unreadable time is left out. */
+export function relativeTime(value: string, now: number = Date.now()): string {
+  const at = Date.parse(value);
+  if (!Number.isFinite(at)) return '';
+  const minutes = Math.floor((now - at) / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'Yesterday' : `${days} days ago`;
 }

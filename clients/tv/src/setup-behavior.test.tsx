@@ -247,6 +247,7 @@ describe('Setup and link handoff behavioral regressions', () => {
         api={withETag(mockApi)}
         onChangeServer={() => { }}
         onForgetServer={() => { }}
+        group="updates"
         updateStatus={mockUpdateStatus}
         onUpdateStatus={() => { }}
         confirmOpen={false}
@@ -261,18 +262,19 @@ describe('Setup and link handoff behavioral regressions', () => {
 
     await sleep(20);
 
-    const link = container.querySelector<HTMLButtonElement>('.tv-update-notice [data-focus-key="update-release-link"]');
+    const link = container.querySelector<HTMLButtonElement>('[data-settings-pane="updates"] [data-focus-key="update-release-link"]');
     expect(link).not.toBeNull();
-    expect(link?.textContent).toBe(releaseUrl);
+    const address = () => link?.querySelector('.tv-setting-value')?.textContent;
+    expect(address()).toBe(releaseUrl);
 
     link?.click();
     await sleep(20);
 
     // Address remains visible in the link
-    expect(link?.textContent).toBe(releaseUrl);
+    expect(address()).toBe(releaseUrl);
 
-    // Refusal message appears in TVSettings message region
-    const updateMsg = container.querySelector<HTMLParagraphElement>('.tv-settings p[aria-live="polite"]');
+    // Refusal message appears in the Updates pane's status line
+    const updateMsg = container.querySelector<HTMLParagraphElement>('[data-settings-pane="updates"] [role="status"]');
     expect(updateMsg?.textContent).toBe(`Open this address on another device: ${releaseUrl}`);
   });
 

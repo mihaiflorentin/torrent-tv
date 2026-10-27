@@ -78,6 +78,7 @@ const controls: Record<string, string[]> = {
   chip: ['.tv-filters button'],
   'season tab': ['.season-tabs button'],
   'rail item': ['.tv-sidebar button'],
+  'settings group': ['.tv-settings-groups button'],
 };
 const rows: Record<string, string[]> = {
   'version row': ['.source-button'],
@@ -85,6 +86,7 @@ const rows: Record<string, string[]> = {
   'setup server row': ['.setup-results button'],
   'player menu row': ['.player-dialog button'],
   'project link': ['.tv-project'],
+  'settings row': ['.tv-setting-row'],
   poster: ['.poster-card'],
 };
 
@@ -132,9 +134,23 @@ describe('TV focus model', () => {
   it('lifts posters, landscape cards and the hero primary with a transform, and leaves rows and tabs in place', () => {
     expect(value(['.poster-card:focus'], 'transform')).toBe('scale(var(--tt-focus-scale-tv))');
     expect(value(['.tv-hero button.primary:focus'], 'transform')).toBe('scale(var(--tt-focus-scale-tv))');
-    for (const own of ['.source-button', '.info-stop', '.season-tabs button', '.tv-sidebar button', '.setup-results button', '.player-dialog button']) {
+    for (const own of ['.source-button', '.info-stop', '.season-tabs button', '.tv-sidebar button', '.setup-results button', '.player-dialog button', '.tv-setting-row', '.tv-settings-groups button']) {
       const body = tv.filter(rule => rule.selectors.some(selector => selector.startsWith(own) && selector.endsWith(':focus'))).map(rule => rule.body).join(';');
       expect(body, own).not.toMatch(/(^|[;\s])(transform|width|height|padding|margin|border-width|font-size)\s*:/);
     }
+  });
+
+  it('draws a Settings field row like any row: the face behind the focused input takes the ring and the lighter fill', () => {
+    const face = '.tv-setting-field input:focus ~ .tv-setting-face';
+    expect(value([face], 'outline')).toBe('4px solid var(--tt-focus-ring)');
+    expect(value([face], 'outline-offset')).toBe('var(--tt-focus-offset)');
+    expect(value([face], 'background')).toBe('var(--tt-fill-selected)');
+    expect(value(['.tv-setting-face'], 'background')).toBe('var(--tt-fill-quiet)');
+  });
+
+  it('shows a Settings row\'s help only while the row has focus', () => {
+    expect(value(['.tv-setting-help'], 'display')).toBe('none');
+    expect(value(['.tv-setting-row:focus .tv-setting-help'], 'display')).toBe('block');
+    expect(value(['.tv-setting-field input:focus ~ .tv-setting-help'], 'display')).toBe('block');
   });
 });

@@ -379,11 +379,55 @@ describe('busy controls keep focus and ignore their action', () => {
     expect(document.activeElement).toBe(pause);
   });
 
+  it('download Resume keeps focus while pending, runs once, and is the same focused control afterwards', async () => {
+    let finish: () => void = () => { };
+    const onManageDownload = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    render(<Catalog {...catalogProps({}, { downloads: [{ ...activeDownload, state: 'pausedDL' }], onManageDownload })} />, container);
+    await settle();
+    await openRoute(container, 'downloads', 0);
+    await settle();
+
+    const resume = control(container, 'download-dl-1-resume');
+    expectIdle(resume);
+    resume!.focus();
+    resume!.click();
+    await settle();
+    expectBusyAndFocusable(resume);
+    expect(resume!.textContent).toBe('Resuming…');
+    expect(document.activeElement).toBe(resume);
+
+    resume!.click();
+    await settle();
+    expect(onManageDownload).toHaveBeenCalledTimes(1);
+    expect(onManageDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 'dl-1' }), 'resume');
+
+    finish();
+    await settle();
+    expectIdle(resume);
+    expect(control(container, 'download-dl-1-resume')).toBe(resume);
+    expect(document.activeElement).toBe(resume);
+  });
+
+  it('download Play stays a plain control that plays the download', async () => {
+    const onPlayDownload = vi.fn();
+    render(<Catalog {...catalogProps({}, { downloads: [activeDownload], onPlayDownload })} />, container);
+    await settle();
+    await openRoute(container, 'downloads', 0);
+    await settle();
+    const play = control(container, 'download-dl-1-play');
+    expectIdle(play);
+    play!.click();
+    expect(onPlayDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 'dl-1' }));
+  });
+
   it('download delete dialog keeps focus on Delete while deleting and ignores Cancel and repeat presses', async () => {
     let finish: () => void = () => { };
     const onManageDownload = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
     await openDownloads(container, onManageDownload);
-    control(container, 'download-dl-1-delete')!.click();
+    // Delete download lives in the row's More sheet (drawn on its own layer on <body>).
+    control(container, 'download-dl-1-more')!.click();
+    await settle();
+    control(document, 'more-delete')!.click();
     await settle();
 
     const confirm = control(container, 'download-confirm');
@@ -445,10 +489,16 @@ describe('release link on the Settings screen', () => {
     await openRoute(container, 'settings', 0);
     await settle();
 
-    const save = control(container, 'settings-save');
-    expect(save).not.toBeNull();
-    save!.focus();
-    press('ArrowDown', 40);
+    const key = () => (document.activeElement as HTMLElement).dataset.focusKey;
+    // Settings opens on Playback; Left goes to the group list, Down walks it, Right opens Updates on its first row.
+    control(container, 'setting-audio-primary')!.focus();
+    press('ArrowLeft', 37);
+    expect(key()).toBe('settings-group-playback');
+    for (let i = 0; i < 5; i++) press('ArrowDown', 40);
+    expect(key()).toBe('settings-group-updates');
+    expect(container.querySelector('[data-settings-pane]')!.getAttribute('data-settings-pane')).toBe('playback');
+    press('ArrowRight', 39);
+    await settle();
 
     const link = control(container, 'update-release-link');
     expect(link).not.toBeNull();
@@ -460,19 +510,18 @@ describe('release link on the Settings screen', () => {
     await settle();
     expect(openExternal).toHaveBeenCalledWith(releaseUrl);
 
-    // Down continues to the connection tests disclosure, so the link is not a dead end.
+    // Down continues to Check for updates, so the link is not a dead end; Up walks back to it.
     press('ArrowDown', 40);
-    const diagnostics = control(container, 'settings-diagnostics');
-    expect(document.activeElement).toBe(diagnostics);
-    expect(control(container, 'test-filelist')).toBeNull();
-    press('Enter', 13);
-    await settle();
-    // Opened, the tests follow it and Up walks back to the same controls.
-    press('ArrowDown', 40);
-    expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('test-filelist');
-    press('ArrowUp', 38);
-    expect(document.activeElement).toBe(diagnostics);
+    expect(key()).toBe('update-check');
     press('ArrowUp', 38);
     expect(document.activeElement).toBe(link);
+    press('ArrowUp', 38);
+    expect(document.activeElement).toBe(link);
+    // Left returns to the selected group, and Left again opens the rail.
+    press('ArrowLeft', 37);
+    expect(key()).toBe('settings-group-updates');
+    press('ArrowLeft', 37);
+    await settle();
+    expect(container.querySelector('.tv-app.menu-open')).not.toBeNull();
   });
 });

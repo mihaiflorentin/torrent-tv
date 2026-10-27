@@ -16,5 +16,9 @@ export async function openRoute(container: ParentNode, route: TVRoute | string, 
   };
   await click(`[data-menu-hub="${hub.id}"]`);
   if (hub.tabs && !container.querySelector(`[data-hub-tab="${target}"][aria-selected="true"]`)) await click(`[data-hub-tab="${target}"]`);
-  if (target === 'jobs' || target === 'projects') await click(`[data-focus-key="settings-${target}"]`);
+  // Background jobs and Other projects: open their Settings group, then the entry in it.
+  if (target === 'jobs' || target === 'projects') {
+    await click(`[data-focus-key="settings-group-${target}"]`);
+    await click(`[data-focus-key="settings-${target}"]`);
+  }
 }

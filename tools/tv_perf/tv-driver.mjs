@@ -91,6 +91,11 @@ export function makeDriver(cdp, server, fixture, picks, { gapMs = 250 } = {}) {
       if (!(await activeData('hubTab'))) throw stepFailure(step, 'Up never reached the tab strip');
       await walkTo(step, '[data-hub-tab]', 'hubTab', place.tab, { down: 'right', up: 'left' });
     }
+    if (place.group) {
+      // Settings: Left to the group list, Up or Down to the group, OK opens it on its first row.
+      for (let i = 0; i < 4 && !String(await activeData('focusKey')).startsWith('settings-group-'); i++) await press('left');
+      await walkTo(step, '[data-settings-group]', 'focusKey', place.group, { down: 'down', up: 'up' });
+    }
     if (place.entry) {
       for (let i = 0; i < 40 && (await activeData('focusKey')) !== place.entry; i++) await press('down', 1, 120);
       if ((await activeData('focusKey')) !== place.entry) throw stepFailure(step, `Down never reached ${place.entry}`);

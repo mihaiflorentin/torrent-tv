@@ -113,7 +113,10 @@ describe('calm action errors', () => {
     await openRoute(container, 'downloads', 0);
     await wait();
 
-    key('download-dl-1-delete')?.click();
+    // Delete download lives in the row's More sheet (drawn on its own layer on <body>).
+    key('download-dl-1-more')?.click();
+    await wait();
+    document.querySelector<HTMLButtonElement>('[data-focus-key="more-delete"]')?.click();
     await wait();
     key('download-confirm')?.click();
     await wait();

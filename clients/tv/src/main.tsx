@@ -1,10 +1,10 @@
 import { Fragment, render, type JSX } from 'preact';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, rankSources, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSeason, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
+import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, rankSources, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSeason, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus, type DownloadGroup, SettingsField } from '@torrent-tv/shared';
 import { episodeAirLabel, episodePageView, formatRuntime, infoCrumbs, releaseLine, type InfoSeasonDetail, type TitleInfo } from '@torrent-tv/shared';
 import { centredScrollTop, chooseStructuredTarget, focusElement, remoteAction, revealElement, useTVNavigation, visibleFocusables } from './navigation';
 import { LANDING_REQUEST_EVENT, landingTarget, requestLanding, useLanding } from './landing';
-import { REBUILD_DIALOG_REGION, SETTINGS_JOBS_ROW, SETTINGS_PROJECTS_ROW, SETTINGS_RELOAD_ROW, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_DIAGNOSTICS_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_REBUILD_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, UPDATE_RELEASE_LINK_ROW, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
+import { confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed } from './portal';
 import { AVTrack, clampSeek, formatTime, isDownloadComplete, isEditableTarget, normalizeTrack, parseVTT, playerAction, preferredAudio, preferredSubtitle, SubtitleCue, subtitleAt } from './player';
 import { PlayerKeyController, type PlayerFocus } from './player-keys';
 import { HOME_ROW, homeExtraRowsDue, homeHero, homeRowItems, homeRowSpecs, householdSections, nearEnd } from './catalog-data';
@@ -12,17 +12,20 @@ import { discoverServers, DiscoveredServer, normalizeServerURL } from './discove
 import { Backdrop } from './backdrop';
 import { captureNav, type NavSnapshot } from './nav-snapshot';
 import { Icon, AppMark } from './icons';
-import { cardMeta, cardRating, continueCardLine, heroKind, heroTitleParts, episodeState, timeLeft, playsLine, titleKind, episodeMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
+import { cardMeta, cardRating, continueCardLine, heroKind, heroTitleParts, episodeState, timeLeft, playsLine, titleKind, episodeMeta, episodeCode, prepareHint, readyLine, readyPercent, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, watchProgress, jobState, jobWhatRan, relativeTime, allocationUse, downloadFilterOf, downloadRow, type DownloadFilter } from './display';
 import { appIdentity } from './app-name';
 import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL, registerMediaKeys } from './platform';
 import { applyGraphicsClass, detectCapabilities } from './capability';
 import { memo, useStableCallback } from './memo';
 import { createStatusStore, useStatus, type StatusStore } from './status-store';
-import { inReach, inRowReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach, useListArtReach, useRowReach } from './lazy-art';
+import { ART_SETTLE_MS, inReach, inRowReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach, useListArtReach, useRowReach } from './lazy-art';
 import { FamilyChips, FamilyTiles } from './families';
 import type { CategoryFamily } from '@torrent-tv/shared';
 import { TitleInfoPanel } from './title-info-panel';
-import { MoreMenu } from './more-menu';
+import { MoreMenu, MoreMenuLayer } from './more-menu';
+import { SETTINGS_GROUPS_REGION, TVSettings, settingsBack, settingsDirection } from './settings';
+import { groupOfKey, type SettingsGroupId } from './settings-groups';
+export { TVSettings };
 import { HUBS, hubDestination, hubOf, knownRoute, loadHubMemory, rememberTab, saveHubMemory, screenHeading, type HubMemory, type TVRoute } from './hubs';
 import '@torrent-tv/shared/design/fonts.css';
 import '@torrent-tv/shared/design/tokens.css';
@@ -612,6 +615,8 @@ export function Catalog({ api, status, statusStore, connectionStore, titles, fac
  const [familyKey, setFamilyKey] = useState(() => initialNav?.family || '');
  const [familyChip, setFamilyChip] = useState(() => initialNav?.familyCategory || '');
  const familyBack = useRef<(() => string) | null>(null);
+ // The open Settings group (#60): kept here so a return from Background jobs or Other projects opens its pane.
+ const [settingsGroup, setSettingsGroup] = useState<SettingsGroupId>(() => groupOfKey(restoreFocus || ''));
  const familyCache = useRef<Record<string, FamilyCacheEntry>>({});
  const [sort, setSort] = useState<'newest' | 'seeders' | 'title' | 'rating'>(() => initialNav ? initialNav.sort : 'newest');
  const [remoteTitles, setRemoteTitles] = useState(titles.slice(0, 12));
@@ -725,7 +730,7 @@ export function Catalog({ api, status, statusStore, connectionStore, titles, fac
    if (!isAcquire) { setDetailMessage((error as Error).message); throw error; }
   }
  };
- const chooseRoute = (next: TVRoute, focusKey = '') => { resetFocusPoint(); setNotice(''); homeGeneration.current++; homeRequested.current = {}; setExtraRows({}); setHomeDepth(0); if (!['home', 'browse', 'search', 'tracker'].includes(next)) { setRemoteTitles([]); setNextCursor(null); } lastContent.current = null; familyCache.current = {}; setFamilyKey(''); setFamilyChip(''); setRoute(next); setDetail(null); setMenuOpen(false); if (focusKey) { landing.cancel(); pendingFocus.current = focusKey } else landing.arm(); };
+ const chooseRoute = (next: TVRoute, focusKey = '') => { resetFocusPoint(); setNotice(''); homeGeneration.current++; homeRequested.current = {}; setExtraRows({}); setHomeDepth(0); if (!['home', 'browse', 'search', 'tracker'].includes(next)) { setRemoteTitles([]); setNextCursor(null); } lastContent.current = null; familyCache.current = {}; setFamilyKey(''); setFamilyChip(''); setSettingsGroup(groupOfKey(focusKey)); setRoute(next); setDetail(null); setMenuOpen(false); if (focusKey) { landing.cancel(); pendingFocus.current = focusKey } else landing.arm(); };
  // Projects route: activation hands the link to the platform browser. When
  // no browser takes it (several ATV boxes ship none) the address stays on
  // the card and the hint says so — the URL is the fallback.
@@ -786,11 +791,12 @@ export function Catalog({ api, status, statusStore, connectionStore, titles, fac
  }, [preparing?.error, preparing?.label, onCancelPrepare]);
  // Back to the card the viewer left, or, when it is gone (another route, a reload), land like a fresh screen.
  const restoreContentFocus = () => { const key = lastContent.current; const target = key ? document.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`) : null; if (target) focusElement(target); else landing.arm() };
- const onBack = () => { if (preparing) { onCancelPrepare?.(); return; } if (updateConfirm) { closeUpdateConfirm(); return; } if (rebuildConfirm) { closeRebuildConfirm(); return; } if (detail) { setDetail(null); window.setTimeout(restoreContentFocus, 0); return; } if (menuOpen) { setMenuOpen(false); window.setTimeout(restoreContentFocus, 0); return; } const closedFamily = familyBack.current?.(); if (closedFamily) { window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closedFamily}"]`); if (tile) focusElement(tile); else landing.arm() }, 0); return; } if (route === 'jobs' || route === 'projects') { chooseRoute('settings', `settings-${route}`); return; } openRail(); };
+ const onBack = () => { if (preparing) { onCancelPrepare?.(); return; } if (updateConfirm) { closeUpdateConfirm(); return; } if (rebuildConfirm) { closeRebuildConfirm(); return; } if (detail) { setDetail(null); window.setTimeout(restoreContentFocus, 0); return; } if (menuOpen) { setMenuOpen(false); window.setTimeout(restoreContentFocus, 0); return; } const closedFamily = familyBack.current?.(); if (closedFamily) { window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closedFamily}"]`); if (tile) focusElement(tile); else landing.arm() }, 0); return; } if (route === 'jobs' || route === 'projects') { chooseRoute('settings', `settings-${route}`); return; } if (route === 'settings' && settingsBack()) return; openRail(); };
  const openRail = () => { setMenuOpen(true); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-menu-hub="${hubOf(route).id}"]`) || document.querySelector<HTMLElement>('[data-focus-region="sidebar"]')), 0) };
  useTVNavigation({
-  getInitialFocus: () => landingTarget() || first.current, restoreKey: restoreFocus, onFocusKey: key => { onFocus(key); if (route === 'home' && document.activeElement instanceof HTMLElement) { const row = Number(document.activeElement.dataset.focusRow); if (row >= HOME_ROW.recent) setHomeDepth(depth => Math.max(depth, row)) } if (document.activeElement instanceof HTMLElement && document.activeElement.dataset.focusRegion === 'content' && !detail) { lastContent.current = key; setFocusPoint(Number(document.activeElement.dataset.focusRow), Number(document.activeElement.dataset.focusCol)) } }, onBack, onLongBack: exitApplication, onDirection: (direction, current) => {
+  getInitialFocus: () => landingTarget() || first.current, restoreKey: restoreFocus, onFocusKey: key => { onFocus(key); if (route === 'home' && document.activeElement instanceof HTMLElement) { const row = Number(document.activeElement.dataset.focusRow); if (row >= HOME_ROW.recent) setHomeDepth(depth => Math.max(depth, row)) } if (document.activeElement instanceof HTMLElement && (document.activeElement.dataset.focusRegion === 'content' || document.activeElement.dataset.focusRegion === SETTINGS_GROUPS_REGION) && !detail) { lastContent.current = key; setFocusPoint(Number(document.activeElement.dataset.focusRow), Number(document.activeElement.dataset.focusCol)) } }, onBack, onLongBack: exitApplication, onDirection: (direction, current) => {
    if (detail || updateConfirm || rebuildConfirm) return false;
+   if (route === 'settings' && settingsDirection(direction, current)) return true;
    // Near the end of a title rail (Tracker), or within two lines of the end of the Search and Browse grid, fire the
    // next page without consuming the keypress: focus still moves while the append lands.
    if ((current.dataset.focusKey || '').startsWith('title-')) {
@@ -800,7 +806,7 @@ export function Catalog({ api, status, statusStore, connectionStore, titles, fac
    }
    if (route === 'jobs' && direction === 'down' && (current.dataset.focusKey || '').startsWith('job-')) window.dispatchEvent(new CustomEvent('tv-jobs-near-end'));
    const region = current.dataset.focusRegion;
-   if (region === 'content' && direction === 'left' && current.dataset.focusCol === '0') { openRail(); return true; }
+   if ((region === 'content' || region === SETTINGS_GROUPS_REGION) && direction === 'left' && current.dataset.focusCol === '0') { openRail(); return true; }
    // Down from a tab enters the content at its first stop (the first card of the first line), whatever tab it left.
    if (region === 'content' && direction === 'down' && current.dataset.hubTab) { const below = visibleFocusables().filter(element => element.dataset.focusRegion === 'content' && !element.dataset.hubTab && Number.isFinite(Number(element.dataset.focusRow)) && Number(element.dataset.focusRow) > 0).sort((a, b) => Number(a.dataset.focusRow) - Number(b.dataset.focusRow) || Number(a.dataset.focusCol) - Number(b.dataset.focusCol))[0]; if (below) focusElement(below); return true; }
    // Up from the content into the tab strip lands on the selected tab, whatever column the cursor was in.
@@ -867,7 +873,7 @@ export function Catalog({ api, status, statusStore, connectionStore, titles, fac
    {notice && <p class="tv-notice" role="status">{notice}</p>}
    {route === 'search' && <div class="tv-search"><span class="tv-search-field"><Icon name="search" /><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="search-input" data-landing="control" value={draftQuery} onInput={event => setDraftQuery(event.currentTarget.value)} onBlur={event => refreshFromCache(event.currentTarget.value)} placeholder="Search titles; press OK to type" />{query && resultTotal !== null && <span class="tv-search-count" aria-live="polite">{resultTotal === 1 ? '1 result' : `${resultTotal} results`}</span>}</span><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="search-submit" class="primary" aria-disabled={searching ? 'true' : undefined} onClick={() => void submitSearch()}>{searching ? 'Searching…' : 'Search'}</button>{query && <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="search-clear" onClick={() => { setDraftQuery(''); setQuery('') }}>Clear</button>}</div>}
    {['tracker', 'browse', 'search'].includes(route) && <div class="tv-filters tv-chip-line" role="group" aria-label={route === 'search' ? 'Sort and recent searches' : 'Sort titles'}><span class="tv-chip-label">Sort</span><button data-focus-region="content" data-focus-row="2" data-focus-col="0" data-focus-key="sort-newest" class={sort === 'newest' ? 'active' : ''} onClick={() => setSort('newest')}>Newest</button><button data-focus-region="content" data-focus-row="2" data-focus-col="1" data-focus-key="sort-seeders" class={sort === 'seeders' ? 'active' : ''} onClick={() => setSort('seeders')}>Most seeded</button><button data-focus-region="content" data-focus-row="2" data-focus-col="2" data-focus-key="sort-rating" class={sort === 'rating' ? 'active' : ''} onClick={() => setSort('rating')}>Rating</button><button data-focus-region="content" data-focus-row="2" data-focus-col="3" data-focus-key="sort-title" class={sort === 'title' ? 'active' : ''} onClick={() => setSort('title')}>A–Z</button>{category && <button data-focus-region="content" data-focus-row="2" data-focus-col="4" data-focus-key="clear-category" onClick={() => setCategory('')}>Clear {category}</button>}{route === 'search' && recent.length > 0 && <><span class="tv-chip-label tv-chip-label-next">Recent</span>{recentShown.map((term, index) => <button class="tv-recent-chip" data-focus-region="content" data-focus-row="2" data-focus-col={recentCol + index} data-focus-key={`recent-${index}`} onClick={() => runRecent(term)}>{term}</button>)}<button data-focus-region="content" data-focus-row="2" data-focus-col={recentCol + recentShown.length} data-focus-key="recent-clear" onClick={forgetRecent}>Clear recent</button></>}</div>}
-   {route === 'projects' ? <section class="tv-projects"><p class="tv-muted">Project sites published with this server. Press OK on a card to open it.</p>{portal && portal.links.length > 0 ? portal.links.map((link, index) => <button class="tv-project" key={link.id} data-landing="card" data-focus-region="content" data-focus-row={3 + index} data-focus-col="0" data-focus-key={`project-${link.id}`} onClick={() => openProjectLink(link)}><strong>{link.title}</strong>{link.description && <p>{link.description}</p>}<code>{link.url}</code></button>) : <EmptyState title="No project links yet">They appear here when the server publishes them.</EmptyState>}{projectsMessage && <p class="focus-hint" aria-live="polite">{projectsMessage}</p>}</section> : route === 'settings' ? <TVSettings api={api} hasProjects={Boolean(portal && portal.links.length > 0)} onOpen={next => chooseRoute(next)} onReload={onRetry} onChangeServer={onChangeServer} onForgetServer={onForgetServer} updateStatus={updateStatus} onUpdateStatus={onUpdateStatus} confirmOpen={updateConfirm} onConfirmOpen={openUpdateConfirm} onConfirmClose={closeUpdateConfirm} rebuildConfirmOpen={rebuildConfirm} onRebuildConfirmOpen={openRebuildConfirm} onRebuildConfirmClose={closeRebuildConfirm} /> : route === 'downloads' ? <TVDownloads items={downloads} eager={Boolean(lastContent.current)} onPlay={onPlayDownload} onManage={onManageDownload} /> : route === 'library-categories' ? <TVFamilies api={api} mode="library" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : route === 'jobs' ? <TVJobs api={api} items={jobs} /> : route === 'categories' ? <TVFamilies api={api} mode="catalog" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : <>
+   {route === 'projects' ? <section class="tv-projects"><p class="tv-muted">Project sites published with this server. Press OK on a card to open it.</p>{portal && portal.links.length > 0 ? portal.links.map((link, index) => <button class="tv-project" key={link.id} data-landing="card" data-focus-region="content" data-focus-row={3 + index} data-focus-col="0" data-focus-key={`project-${link.id}`} onClick={() => openProjectLink(link)}><strong>{link.title}</strong>{link.description && <p>{link.description}</p>}<code>{link.url}</code></button>) : <EmptyState title="No project links yet">They appear here when the server publishes them.</EmptyState>}{projectsMessage && <p class="focus-hint" aria-live="polite">{projectsMessage}</p>}</section> : route === 'settings' ? <TVSettings api={api} hasProjects={Boolean(portal && portal.links.length > 0)} projectCount={portal ? portal.links.length : 0} jobs={jobs} group={settingsGroup} onGroup={setSettingsGroup} onOpen={next => chooseRoute(next)} onReload={onRetry} onChangeServer={onChangeServer} onForgetServer={onForgetServer} updateStatus={updateStatus} onUpdateStatus={onUpdateStatus} confirmOpen={updateConfirm} onConfirmOpen={openUpdateConfirm} onConfirmClose={closeUpdateConfirm} rebuildConfirmOpen={rebuildConfirm} onRebuildConfirmOpen={openRebuildConfirm} onRebuildConfirmClose={closeRebuildConfirm} /> : route === 'downloads' ? <TVDownloads api={api} items={downloads} eager={Boolean(lastContent.current)} onPlay={onPlayDownload} onManage={onManageDownload} /> : route === 'library-categories' ? <TVFamilies api={api} mode="library" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : route === 'jobs' ? <TVJobs api={api} items={jobs} /> : route === 'categories' ? <TVFamilies api={api} mode="catalog" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : <>
     {route === 'home' && hero && <HomeHero api={api} hero={hero} resume={resumeHero?.resume} favorite={favoriteIDs.has(hero.id)} primaryRef={first} onPlay={onPlay} onOpen={openTitle} onInfo={setHeroInfo} onFavorite={onFavorite} />}
     {homeLibrary.map((section, index) => <HouseholdRail api={api} title={['continue', 'favorites', 'watched'].includes(route) ? '' : section.title} items={section.items} landscape={section.key === 'continue'} row={3 + index} from={spanOf(3 + index).from} until={spanOf(3 + index).until} empty={route === 'home' ? '' : HOUSEHOLD_EMPTY[section.key]} onOpen={openLibraryItem} />)}
     <div class="tv-rows">{shownRows.map((row, rowIndex) => { const railRow = row.row ?? rowIndex + 10; const span = spanOf(railRow); if (route === 'search' || route === 'browse') return <TitleGrid api={api} items={row.items} firstRow={GRID_FIRST_ROW} focusRef={!hero && rowIndex === 0 ? first : undefined} onOpen={openTitleStable} />; return <TitleRail api={api} heading={row.title} items={row.items} row={railRow} from={span.from} until={span.until} keyPrefix={row.keyPrefix} seeders={row.key === 'tracker-seeded'} focusRef={!hero && rowIndex === 0 ? first : undefined} onOpen={openTitleStable} /> })}</div>
@@ -938,26 +944,80 @@ const TitleGrid = memo(function TitleGrid({ api, items, firstRow, keyPrefix, foc
 // Recent searches drawn on the chip line beside the sort chips: two, as on the board, so the line fits 1656 px.
 const RECENT_CHIPS = 2;
 type PendingDownloadRemoval = { download: Download; scope: 'torrent' | 'file' };
-// A route change draws the first few downloads at once and the rest in following tasks, so a long list never holds
-// the main thread (one long task, and the remote dead for that long) while the screen opens. A screen reopened with
-// a focus key to restore draws everything at once: the key may sit in a row that has not been drawn yet.
+// A route change draws the first screenful of downloads at once and the rest once the screen has opened, a few rows
+// per task, so a long list never holds the main thread (one long task, and the remote dead for that long) while the
+// screen opens. A screen reopened with a focus key to restore draws everything at once: the key may sit in a row that
+// has not been drawn yet.
 const DOWNLOADS_FIRST_DRAW = 6;
 const DOWNLOADS_DRAW_STEP = 6;
-function TVDownloads({ items, eager = false, onPlay, onManage }: { items: Download[]; eager?: boolean; onPlay: (download: Download) => void; onManage: (download: Download, action: string) => Promise<void> }) {
+// "The screen has opened": the rows below the first screenful, the row thumbnails and the Allocation wait this long
+// after the screen mounts, so the route change itself draws, asks and decodes only what the first frame needs.
+const DOWNLOADS_SETTLED_MS = 400;
+type DownloadsFilter = 'all' | DownloadFilter;
+const DOWNLOAD_FILTERS: Array<[DownloadsFilter, string]> = [['all', 'All'], ['active', 'Active'], ['done', 'Downloaded'], ['paused', 'Paused'], ['attention', 'Needs attention']];
+const DOWNLOAD_SORTS: Array<[DownloadSort, string]> = [['recent', 'Recent'], ['title', 'Title A–Z'], ['progress', 'Progress'], ['size', 'File size'], ['speed', 'Speed']];
+// The row's thumbnail is the title's w780 backdrop (the one the focus-following backdrop uses), drawn small.
+const downloadThumb = (api: API, download: Download) => download.titleId ? api.streamURL(`/api/v1/artwork/${encodeURIComponent(download.titleId)}/backdrop-small`) : '';
+// One Downloads row. Memoized: a progressive draw step, a poll tick or a busy action re-diffs only the rows whose
+// download, art or state changed (a group object is rebuilt on every list change, so its rows are compared instead).
+const sameGroup = (a: DownloadGroup, b: DownloadGroup) => a === b || (a.totalSizeBytes === b.totalSizeBytes && a.rows.length === b.rows.length && a.rows.every((row, index) => row === b.rows[index]));
+type TVDownloadRowProps = { group: DownloadGroup; index: number; thumb: string; busy: string; detailsShown: boolean; expanded: boolean; onPlay: (download: Download) => void; onAction: (download: Download, action: DownloadTransferAction) => void; onMore: (id: string) => void; onRemoveFile: (download: Download) => void };
+const TVDownloadRow = memo(function TVDownloadRow({ group, index, thumb, busy, detailsShown, expanded, onPlay, onAction, onMore, onRemoveFile }: TVDownloadRowProps) {
+ const download = group.representative;
+ const band = 2 + index * 20;
+ const multi = group.rows.length > 1;
+ const view = downloadRow(download, group.rows.length);
+ return <div role="group" aria-label={download.displayTitle || download.filePath} data-download-id={download.id} data-download-index={index} data-active-row="" class="tv-download-row">
+  <div class="tv-download-line">
+   <span class="tv-download-thumb" aria-hidden="true">{thumb && <img src={thumb} alt="" decoding="async" onError={hideImage} />}</span>
+   <div class="tv-download-main"><strong class="tv-download-title" title={download.displayTitle || download.filePath}>{download.displayTitle || download.filePath}</strong><span class="tv-download-state"><b class={`tv-download-status ${view.tone}`}>{view.state}</b>{view.meter && <i class={`tv-meter ${view.tone}`} role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.percent}><b style={{ width: `${view.percent}%` }} /></i>}<small class="tv-download-facts">{view.facts}</small></span></div>
+   <span class="tv-download-size">{formatBytes(group.totalSizeBytes)}</span>
+   <div class="tv-download-actions"><button data-landing="card" data-focus-region="content" data-focus-row={band} data-focus-col="0" data-focus-key={`download-${download.id}-play`} class="primary" onClick={() => onPlay(download)}><Icon name="play" />Play</button>{downloadTransferActions(download).map(item => <button key={item.action} aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={band} data-focus-col="1" data-focus-key={`download-${download.id}-${item.action}`} onClick={() => onAction(download, item.action)}>{busy === download.id + ':' + item.action ? item.pendingLabel : item.label}</button>)}<button class="tv-download-more" data-focus-region="content" data-focus-row={band} data-focus-col="2" data-focus-key={`download-${download.id}-more`} aria-haspopup="dialog" aria-label={multi ? 'More: Details, Show files, Delete download' : 'More: Details, Delete download'} onClick={() => onMore(download.id)}><Icon name="more" /></button></div>
+  </div>
+  {detailsShown && <dl class="tv-download-details"><dt>Release</dt><dd>{download.releaseName || download.filePath}</dd><dt>{multi ? 'Files' : 'File'}</dt><dd>{multi ? `${group.rows.length} files in this torrent` : `${download.filePath} (file ${download.fileIndex})`}</dd><dt>Tracker</dt><dd>{download.trackerName} release {download.releaseId}{download.trackerSeeders !== undefined ? ` · ${download.trackerSeeders} seeders` : ''}{download.releaseSizeBytes ? ` · ${formatBytes(download.releaseSizeBytes)} total` : ''}</dd><dt>Transfer</dt><dd>{download.seeds} connected seeds · {download.peers} peers</dd></dl>}
+  {multi && expanded && <div class="tv-download-files">{group.rows.map((row, rowIndex) => <div key={row.id} class="tv-download-file"><strong title={row.displayTitle || row.filePath}>{row.displayTitle || row.filePath}</strong><small>{formatBytes(row.sizeBytes)}</small><span><button data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="2" data-focus-key={`download-${row.id}-file-${row.fileIndex}-play`} onClick={() => onPlay(row)}>Play</button><button class="danger-button" data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="3" data-focus-key={`download-${row.id}-file-${row.fileIndex}-remove`} onClick={() => onRemoveFile(row)}>Remove</button></span></div>)}</div>}
+ </div>;
+}, (a, b) => sameGroup(a.group, b.group) && a.index === b.index && a.thumb === b.thumb && a.busy === b.busy && a.detailsShown === b.detailsShown && a.expanded === b.expanded);
+
+// The heading's storage line. It asks the server's settings for the Allocation itself, so the answer re-renders this
+// line only, not the list.
+function TVAllocationUse({ api, storedBytes }: { api: API; storedBytes: number }) {
+ const [allocation, setAllocation] = useState<number | undefined>(undefined);
+ useEffect(() => {
+  // Asked once the screen has opened, so the request and its answer stay out of the route change.
+  let live = true;
+  const timer = window.setTimeout(() => api.call<Record<string, unknown>>('/settings').then(settings => { const value = Number(settings?.allocationGb); if (live && Number.isFinite(value)) setAllocation(value) }).catch(() => { }), DOWNLOADS_SETTLED_MS);
+  return () => { live = false; window.clearTimeout(timer) };
+ }, []);
+ const use = allocationUse(storedBytes, allocation);
+ return <p class="tv-download-use">{use.label}{use.percent >= 0 && <i class="tv-meter" role="progressbar" aria-label="Storage used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={use.percent}><b style={{ width: `${use.percent}%` }} /></i>}</p>;
+}
+function TVDownloads({ api, items, eager = false, onPlay, onManage }: { api: API; items: Download[]; eager?: boolean; onPlay: (download: Download) => void; onManage: (download: Download, action: string) => Promise<void> }) {
  const [pending, setPending] = useState<PendingDownloadRemoval | null>(null);
  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
  const [removing, setRemoving] = useState(false);
  const [detailsOpen, setDetailsOpen] = useState<Set<string>>(() => new Set());
  const [busyAction, setBusyAction] = useState('');
+ // The download whose More sheet is open (its id), or ''.
+ const [more, setMore] = useState('');
  // A failed action shows its message here and leaves the list where it was; the fatal panel is for startup failures only.
  const [actionMessage, setActionMessage] = useState('');
  const [query, setQuery] = useState('');
- const [filter, setFilter] = useState<'all' | 'streaming' | 'complete' | 'paused' | 'errors'>('all');
+ const [filter, setFilter] = useState<DownloadsFilter>('all');
  const [sort, setSort] = useState<DownloadSort>('recent');
  const [order, setOrder] = useState<string[]>(() => orderDownloadIDs(items, 'recent'));
  const cancelButton = useRef<HTMLButtonElement>(null);
  const confirmButton = useRef<HTMLButtonElement>(null);
- const closeConfirmation = () => { if (removing) return; const key = pending ? (pending.scope === 'file' ? `download-${pending.download.id}-file-${pending.download.fileIndex}-remove` : `download-${pending.download.id}-delete`) : ''; setPending(null); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="${key}"]`) || document.querySelector<HTMLElement>('[data-focus-key="downloads-search"]')), 0) };
+ const art = useListArtReach();
+ const artTimer = useRef(0);
+ // Thumbnails wait until the screen has opened and focus rests, so the route change itself decodes no pictures.
+ const [artReady, setArtReady] = useState(false);
+ useEffect(() => {
+  const ready = window.setTimeout(() => setArtReady(true), DOWNLOADS_SETTLED_MS);
+  return () => { window.clearTimeout(ready); window.clearTimeout(artTimer.current) };
+ }, []);
+ const focusKey = (key: string) => window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="${key}"]`) || document.querySelector<HTMLElement>('[data-focus-key="downloads-search"]')), 0);
+ const closeConfirmation = () => { if (removing) return; const key = pending ? (pending.scope === 'file' ? `download-${pending.download.id}-file-${pending.download.fileIndex}-remove` : `download-${pending.download.id}-more`) : ''; setPending(null); focusKey(key) };
  useEffect(() => {
   if (!pending) return;
   const timer = removing ? 0 : window.setTimeout(() => focusElement(cancelButton.current), 0);
@@ -980,35 +1040,52 @@ function TVDownloads({ items, eager = false, onPlay, onManage }: { items: Downlo
  }, [pending?.download.id, removing]);
  const idsKey = items.map(item => item.id).join('\u0000');
  useEffect(() => setOrder(current => { const available = new Set(items.map(item => item.id)); const retained = current.filter(id => available.has(id)); const known = new Set(retained); const added = items.filter(item => !known.has(item.id)).map(item => item.id); return [...added, ...retained] }), [idsKey]);
- const visible = useMemo(() => { const term = query.trim().toLocaleLowerCase(); const byID = new Map(items.map(item => [item.id, item])); const ordered = (order.length ? order : items.map(item => item.id)).map(id => byID.get(id)).filter((item): item is Download => Boolean(item)); return ordered.filter(download => { const text = [download.displayTitle, download.releaseName, download.filePath, download.category, download.state].filter(Boolean).join(' ').toLocaleLowerCase(); const matchesFilter = filter === 'all' || filter === 'streaming' && download.playbackMode === 'progressive' || filter === 'complete' && download.playbackMode === 'local' || filter === 'paused' && /^(paused|stopped)/.test(download.state.toLocaleLowerCase()) || filter === 'errors' && Boolean(download.error); return (!term || text.includes(term)) && matchesFilter }) }, [items, order, query, filter]);
+ const counts = useMemo(() => { const result: Record<DownloadsFilter, number> = { all: items.length, active: 0, done: 0, paused: 0, attention: 0 }; for (const item of items) result[downloadFilterOf(item)]++; return result }, [items]);
+ const storedBytes = useMemo(() => items.reduce((sum, item) => sum + Math.max(0, item.sizeBytes || 0), 0), [items]);
+ const visible = useMemo(() => { const term = query.trim().toLocaleLowerCase(); const byID = new Map(items.map(item => [item.id, item])); const ordered = (order.length ? order : items.map(item => item.id)).map(id => byID.get(id)).filter((item): item is Download => Boolean(item)); return ordered.filter(download => { const text = [download.displayTitle, download.releaseName, download.filePath, download.category, download.state].filter(Boolean).join(' ').toLocaleLowerCase(); return (!term || text.includes(term)) && (filter === 'all' || downloadFilterOf(download) === filter) }) }, [items, order, query, filter]);
  const groups = useMemo(() => groupDownloadsByTorrent(visible), [visible]);
  const [progressive] = useState(!eager);
  const [drawn, setDrawn] = useState(DOWNLOADS_FIRST_DRAW);
  useEffect(() => {
   if (!progressive || drawn >= groups.length) return;
-  const timer = window.setTimeout(() => setDrawn(count => count + DOWNLOADS_DRAW_STEP), 0);
+  const timer = window.setTimeout(() => setDrawn(count => count + DOWNLOADS_DRAW_STEP), drawn === DOWNLOADS_FIRST_DRAW ? DOWNLOADS_SETTLED_MS : 0);
   return () => window.clearTimeout(timer);
  }, [progressive, drawn, groups.length]);
  const shownGroups = progressive && drawn < groups.length ? groups.slice(0, drawn) : groups;
  const toggleDetails = (id: string) => setDetailsOpen(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next });
  const toggleFiles = (engineId: string) => setExpandedGroups(current => { const next = new Set(current); if (next.has(engineId)) next.delete(engineId); else next.add(engineId); return next });
- const cycle = <T extends string,>(value: T, values: T[], set: (value: T) => void) => set(values[(values.indexOf(value) + 1) % values.length]);
- const cycleSort = () => { const values: DownloadSort[] = ['recent', 'title', 'progress', 'size', 'speed']; const next = values[(values.indexOf(sort) + 1) % values.length]; setSort(next); setOrder(orderDownloadIDs(items, next)) };
+ const chooseFilter = (value: DownloadsFilter) => { if (value === filter) return; setFilter(value); art.reset() };
+ const cycleSort = () => { const values = DOWNLOAD_SORTS.map(([value]) => value); const next = values[(values.indexOf(sort) + 1) % values.length]; setSort(next); setOrder(orderDownloadIDs(items, next)) };
+ const playRow = useStableCallback((download: Download) => onPlay(download));
+ const actRow = useStableCallback((download: Download, action: DownloadTransferAction) => void runAction(download, action));
+ const removeFile = useStableCallback((download: Download) => setPending({ download, scope: 'file' }));
  const runAction = async (download: Download, action: DownloadTransferAction) => { if (busyAction) return; setActionMessage(''); setBusyAction(`${download.id}:${action}`); try { await onManage(download, action) } catch (error) { setActionMessage((error as Error).message) } finally { setBusyAction('') } };
  const confirmRemoval = async () => { if (!pending || removing) return; setActionMessage(''); setRemoving(true); try { await onManage(pending.download, pending.scope === 'file' ? 'remove-file' : 'remove'); setPending(null); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="downloads-search"]')), 0) } catch (error) { setActionMessage((error as Error).message) } finally { setRemoving(false) } };
+ // Thumbnails load around the row that holds focus once focus rests, so a held key decodes no new pictures.
+ const followFocus = (event: FocusEvent) => { const row = (event.target as HTMLElement | null)?.closest?.('[data-download-index]') as HTMLElement | null; if (!row) return; const index = Number(row.dataset.downloadIndex); window.clearTimeout(artTimer.current); artTimer.current = window.setTimeout(() => art.focus(index), ART_SETTLE_MS) };
  if (pending) return <section role="dialog" aria-modal="true" aria-labelledby="download-delete-heading" aria-describedby="download-delete-description" class="tv-settings tv-removal-confirm">{pending.scope === 'file' ? <><h2 id="download-delete-heading">Remove episode from downloads?</h2><strong>{pending.download.displayTitle || pending.download.filePath}</strong><p id="download-delete-description">The episode leaves the download list. Its file stays on the server until the whole download is deleted.</p></> : <><h2 id="download-delete-heading">Delete download?</h2><strong>{pending.download.displayTitle || pending.download.releaseName || pending.download.filePath}</strong><p>{formatBytes(pending.download.sizeBytes)} · {pending.download.trackerName}</p><p id="download-delete-description">This permanently deletes the download and every file it stored, including unfinished ones. You can download the title again later.</p></>}{actionMessage && <p role="alert" class="focus-hint">{actionMessage}</p>}<button ref={cancelButton} aria-disabled={removing ? 'true' : undefined} data-focus-region="download-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="download-cancel" onClick={closeConfirmation}>Cancel</button><button ref={confirmButton} aria-disabled={removing ? 'true' : undefined} class="danger-button" data-focus-region="download-dialog" data-focus-row="2" data-focus-col="0" data-focus-key="download-confirm" onClick={() => void confirmRemoval()}>{removing ? (pending.scope === 'file' ? 'Removing…' : 'Deleting…') : pending.scope === 'file' ? 'Remove episode' : 'Delete download'}</button></section>;
- const filterLabel = { all: 'All', streaming: 'Still downloading', complete: 'Downloaded', paused: 'Paused', errors: 'Needs attention' }[filter];
- const sortLabel = { recent: 'Recent', title: 'Title A–Z', progress: 'Progress', size: 'File size', speed: 'Speed' }[sort];
- const narrowed = filter !== 'all' || query.trim() !== '';
- return <section class="tv-list tv-download-list">{actionMessage && <p role="status" class="focus-hint">{actionMessage}</p>}<div class="tv-filters tv-download-tools"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="downloads-search" value={query} onInput={event => setQuery(event.currentTarget.value)} placeholder="Search downloads; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="downloads-filter" onClick={() => cycle(filter, ['all', 'streaming', 'complete', 'paused', 'errors'], setFilter)}>Filter: {filterLabel}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="downloads-sort" onClick={cycleSort}>Sort: {sortLabel}</button></div><p class="tv-download-count" aria-live="polite">{items.length === 0 ? '' : narrowed ? `${groups.length} of ${items.length} downloads` : `${items.length} download${items.length === 1 ? '' : 's'}`}</p>{groups.length === 0 ? (items.length === 0 ? <EmptyState title="No downloads yet">Open a title, choose a version and press Play and download; it shows here while it transfers.</EmptyState> : <EmptyState title="No downloads match">{`Change the filter or clear the search to see all ${items.length} downloads.`}</EmptyState>) : shownGroups.map((group, groupIndex) => {
-  const download = group.representative;
-  const band = 2 + groupIndex * 20;
-  const expanded = expandedGroups.has(download.engineId);
-  const detailsShown = detailsOpen.has(download.id);
-  const multi = group.rows.length > 1;
-  const status = downloadStatus(download);
-  return <article key={download.id} data-download-id={download.id} class="tv-download-row"><div class="tv-download-main"><strong class="tv-download-title" title={download.displayTitle || download.filePath}>{download.displayTitle || download.filePath}</strong><span class={`tv-download-status ${status.tone}`}>{downloadProgressLine(download)}</span><i class={`tv-meter ${status.tone}`} role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={status.percent}><b style={{ width: `${status.percent}%` }} /></i><small class="tv-download-facts">{downloadFacts(download, { sizeBytes: group.totalSizeBytes, files: multi ? group.rows.length : 0 })}</small>{detailsShown && <dl class="tv-download-details"><dt>Release</dt><dd>{download.releaseName || download.filePath}</dd><dt>{multi ? 'Files' : 'File'}</dt><dd>{multi ? `${group.rows.length} files in this torrent` : `${download.filePath} (file ${download.fileIndex})`}</dd><dt>Tracker</dt><dd>{download.trackerName} release {download.releaseId}{download.trackerSeeders !== undefined ? ` · ${download.trackerSeeders} seeders` : ''}{download.releaseSizeBytes ? ` · ${formatBytes(download.releaseSizeBytes)} total` : ''}</dd><dt>Transfer</dt><dd>{download.seeds} connected seeds · {download.peers} peers</dd></dl>}</div><div class="tv-download-actions"><button data-landing="card" data-focus-region="content" data-focus-row={band} data-focus-col="0" data-focus-key={`download-${download.id}-play`} class="primary" onClick={() => onPlay(download)}>Play</button>{downloadTransferActions(download).map(item => <button key={item.action} aria-disabled={busyAction.startsWith(download.id + ':') ? 'true' : undefined} data-focus-region="content" data-focus-row={band} data-focus-col="1" data-focus-key={`download-${download.id}-${item.action}`} onClick={() => void runAction(download, item.action)}>{busyAction === download.id + ':' + item.action ? item.pendingLabel : item.label}</button>)}<button class="danger-button" data-focus-region="content" data-focus-row={band} data-focus-col="2" data-focus-key={`download-${download.id}-delete`} onClick={() => setPending({ download, scope: 'torrent' })}>Delete download</button><button data-focus-region="content" data-focus-row={band} data-focus-col="3" data-focus-key={`download-${download.id}-details`} aria-expanded={detailsShown} onClick={() => toggleDetails(download.id)}>{detailsShown ? 'Hide details' : 'Details'}</button>{multi && <button data-focus-region="content" data-focus-row={band} data-focus-col="4" data-focus-key={`download-${download.id}-files`} aria-expanded={expanded} onClick={() => toggleFiles(download.engineId)}>{expanded ? 'Hide files' : 'Show files'}</button>}</div>{multi && expanded && <div class="tv-download-files">{group.rows.map((row, rowIndex) => <div key={row.id} class="tv-download-file"><strong title={row.displayTitle || row.filePath}>{row.displayTitle || row.filePath}</strong><small>{formatBytes(row.sizeBytes)}</small><span><button data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="0" data-focus-key={`download-${row.id}-file-${row.fileIndex}-play`} onClick={() => onPlay(row)}>Play</button><button class="danger-button" data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="1" data-focus-key={`download-${row.id}-file-${row.fileIndex}-remove`} onClick={() => setPending({ download: row, scope: 'file' })}>Remove</button></span></div>)}</div>}</article>;
- })}</section>
+ const sortLabel = DOWNLOAD_SORTS.find(([value]) => value === sort)?.[1];
+ const moreGroup = more ? groups.find(group => group.representative.id === more) : undefined;
+ const moreSheet = moreGroup && (() => {
+  const download = moreGroup.representative;
+  const moreKey = `download-${download.id}-more`;
+  const close = () => setMore('');
+  const after = (run: () => void) => { close(); run(); focusKey(moreKey) };
+  const files = moreGroup.rows.length;
+  return <MoreMenuLayer title={download.displayTitle || download.filePath} returnKey={moreKey} onClose={close} items={[
+   { key: 'details', label: detailsOpen.has(download.id) ? 'Hide details' : 'Details', detail: 'Release, file, tracker and peers', onSelect: () => after(() => toggleDetails(download.id)) },
+   ...(files > 1 ? [{ key: 'files', label: expandedGroups.has(download.engineId) ? 'Hide files' : 'Show files', detail: `${files} files in this torrent, each to play or remove`, onSelect: () => after(() => toggleFiles(download.engineId)) }] : []),
+   { key: 'delete', label: 'Delete download', danger: true, detail: 'Deletes the download and every file it stored', onSelect: () => { close(); setPending({ download, scope: 'torrent' }) } },
+  ]} />;
+ })();
+ return <section class="tv-list tv-download-list" onFocusCapture={followFocus}>
+  <TVAllocationUse api={api} storedBytes={storedBytes} />
+  {actionMessage && <p role="status" class="focus-hint">{actionMessage}</p>}
+  <div class="tv-filters tv-download-tools">{DOWNLOAD_FILTERS.map(([value, label], col) => <button data-focus-region="content" data-focus-row="1" data-focus-col={col} data-focus-key={`downloads-filter-${value}`} class={filter === value ? 'active' : ''} aria-pressed={filter === value ? 'true' : 'false'} onClick={() => chooseFilter(value)}>{label}<em class="tv-chip-count">{counts[value]}</em></button>)}<button class="tv-download-sort" data-focus-region="content" data-focus-row="1" data-focus-col={DOWNLOAD_FILTERS.length} data-focus-key="downloads-sort" onClick={cycleSort}>Sort: {sortLabel}</button><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col={DOWNLOAD_FILTERS.length + 1} data-focus-key="downloads-search" value={query} onInput={event => { setQuery(event.currentTarget.value); art.reset() }} placeholder="Find a download" aria-label="Find a download; press OK to type" /></div>
+  {query.trim() !== '' && items.length > 0 && <p class="tv-download-count" aria-live="polite">{`${groups.length} of ${items.length} downloads match “${query.trim()}”`}</p>}
+  {groups.length === 0 ? (items.length === 0 ? <EmptyState title="No downloads yet">Open a title, choose a version and press Play and download; it shows here while it transfers.</EmptyState> : <EmptyState title="No downloads match">{`Choose All or clear the search to see all ${items.length} downloads.`}</EmptyState>) : shownGroups.map((group, groupIndex) => <TVDownloadRow key={group.representative.id} group={group} index={groupIndex} thumb={artReady && inReach(art.reach, groupIndex) ? downloadThumb(api, group.representative) : ''} busy={busyAction.startsWith(group.representative.id + ':') ? busyAction : ''} detailsShown={detailsOpen.has(group.representative.id)} expanded={expandedGroups.has(group.representative.engineId)} onPlay={playRow} onAction={actRow} onMore={setMore} onRemoveFile={removeFile} />)}
+  {moreSheet}
+ </section>
 }
 // Category families (both Categories pages). Tiles first; opening a family lists its titles (Tracker) or managed items (My Library)
 // with a chip per raw tracker category. Lists are cached in Catalog so Back from a title page lands on already-rendered cards.
@@ -1074,24 +1151,24 @@ function TVFamilies({ api, mode, familyKey, chip, sort, setFamilyKey, setChip, s
 }
 function TVJobs({ api, items: initial }: { api: API; items: Job[] }) {
  const [items, setItems] = useState(initial); const [query, setQuery] = useState(''); const [state, setState] = useState(''); const [kind, setKind] = useState(''); const [retryable, setRetryable] = useState(''); const [updatedHours, setUpdatedHours] = useState(''); const [next, setNext] = useState<string | null>(null); const [message, setMessage] = useState(''); const [detail, setDetail] = useState<{ job: Job; logs: JobLog[]; next: string | null } | null>(null);
- async function load(target = '', append = false) { try { const page = await api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: target }); setItems(value => append ? [...value, ...page.items] : page.items); setNext(page.nextCursor) } catch (error) { setMessage((error as Error).message) } }
+ async function load(target = '', append = false) { try { const page = await api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: target }); setItems(value => append ? [...value, ...page.items] : page.items); setNext(page.nextCursor) } catch (error) { setMessage('Background jobs could not be loaded. Try again in a minute.') } }
  // The job row a detail was opened from: closing the detail puts the cursor back on it (D-pad map job-detail).
  const opened = useRef('');
- async function open(job: Job) { opened.current = job.id; try { const [result, logs] = await Promise.all([api.job(job.id), api.jobLogs(job.id)]); setDetail({ job: result.job, logs: logs.items, next: logs.nextCursor }) } catch (error) { setMessage((error as Error).message) } }
- async function older() { if (!detail?.next) return; try { const page = await api.jobLogs(detail.job.id, detail.next); setDetail({ ...detail, logs: [...detail.logs, ...page.items], next: page.nextCursor }) } catch (error) { setMessage((error as Error).message) } }
+ async function open(job: Job) { opened.current = job.id; try { const [result, logs] = await Promise.all([api.job(job.id), api.jobLogs(job.id)]); setDetail({ job: result.job, logs: logs.items, next: logs.nextCursor }) } catch (error) { setMessage('Background jobs could not be loaded. Try again in a minute.') } }
+ async function older() { if (!detail?.next) return; try { const page = await api.jobLogs(detail.job.id, detail.next); setDetail({ ...detail, logs: [...detail.logs, ...page.items], next: page.nextCursor }) } catch (error) { setMessage('Background jobs could not be loaded. Try again in a minute.') } }
  useEffect(() => { const timer = window.setTimeout(() => { void load('') }, 400); return () => clearTimeout(timer) }, [query, state, kind, retryable, updatedHours]);
  useEffect(() => {
   // Catalog signals a jobs keypress near the list end; appends are guarded
   // so rapid keypresses cannot double-fetch the same page.
   let busy = false;
-  const onNear = () => { if (busy || !next) return; busy = true; api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: next }).then(page => { setItems(value => [...value, ...page.items]); setNext(page.nextCursor) }).catch(error => setMessage((error as Error).message)).then(() => { busy = false }) };
+  const onNear = () => { if (busy || !next) return; busy = true; api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: next }).then(page => { setItems(value => [...value, ...page.items]); setNext(page.nextCursor) }).catch(error => setMessage('Background jobs could not be loaded. Try again in a minute.')).then(() => { busy = false }) };
   window.addEventListener('tv-jobs-near-end', onNear);
   return () => window.removeEventListener('tv-jobs-near-end', onNear);
  });
  const closeDetail = () => { setDetail(null); window.setTimeout(() => { const row = document.querySelector<HTMLElement>(`[data-focus-key="job-${CSS.escape(opened.current)}"]`); if (row) focusElement(row); else requestLanding() }, 0) };
  if (detail) return <TVJobDetail detail={detail} onBack={closeDetail} onOlder={older} />;
  const cycle = (value: string, values: string[], set: (value: string) => void) => set(values[(values.indexOf(value) + 1) % values.length]);
- return <section class="tv-list"><div class="tv-filters"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="jobs-search" value={query} onInput={event => setQuery(event.currentTarget.value)} placeholder="Search; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="jobs-state" onClick={() => cycle(state, ['', 'failed', 'completed', 'running', 'queued'], setState)}>State: {state || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="jobs-kind" onClick={() => cycle(kind, ['', 'metadata', 'catalog-title-refresh', 'catalog-sync'], setKind)}>Kind: {kind ? jobKindLabel(kind) : 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="3" data-focus-key="jobs-retry" onClick={() => cycle(retryable, ['', 'true', 'false'], setRetryable)}>Retry: {retryable === 'true' ? 'can retry' : retryable === 'false' ? 'cannot retry' : 'any'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="4" data-focus-key="jobs-time" onClick={() => cycle(updatedHours, ['', '24', '168', '720'], setUpdatedHours)}>Updated: {updatedHours === '24' ? 'last day' : updatedHours === '168' ? 'last week' : updatedHours === '720' ? 'last month' : 'any time'}</button></div>{message && <p>{message}</p>}{items.length === 0 ? <EmptyState title="No jobs match">Set State to all, or choose a longer Updated range.</EmptyState> : items.map((job, index) => <article><div><strong>{job.label || jobKindLabel(job.kind)}</strong><span>{jobStatusLine(job)}</span></div><div><button data-landing="card" data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-${job.id}`} onClick={() => void open(job)}>Details</button><button disabled={job.state === 'queued' || job.state === 'running' || job.state === 'retry_wait'} data-focus-region="content" data-focus-row={2 + index} data-focus-col="1" data-focus-key={`job-${job.id}-retry`} onClick={() => void api.retryJob(job.id).then(() => api.job(job.id)).then(({ job: fresh }) => { setMessage('Job queued again.'); setItems(value => value.map(item => item.id === fresh.id ? fresh : item)) }).catch(error => setMessage(error.message))}>Retry</button></div></article>)}</section>
+ return <section class="tv-list tv-jobs"><div class="tv-filters"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="jobs-search" value={query} onInput={event => setQuery(event.currentTarget.value)} placeholder="Search; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="jobs-state" onClick={() => cycle(state, ['', 'failed', 'completed', 'running', 'queued'], setState)}>State: {state || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="jobs-kind" onClick={() => cycle(kind, ['', 'metadata', 'catalog-title-refresh', 'catalog-sync'], setKind)}>Kind: {kind ? jobKindLabel(kind) : 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="3" data-focus-key="jobs-retry" onClick={() => cycle(retryable, ['', 'true', 'false'], setRetryable)}>Retry: {retryable === 'true' ? 'can retry' : retryable === 'false' ? 'cannot retry' : 'any'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="4" data-focus-key="jobs-time" onClick={() => cycle(updatedHours, ['', '24', '168', '720'], setUpdatedHours)}>Updated: {updatedHours === '24' ? 'last day' : updatedHours === '168' ? 'last week' : updatedHours === '720' ? 'last month' : 'any time'}</button></div>{message && <p class="tv-job-message" role="status">{message}</p>}{items.length === 0 ? <EmptyState title="No jobs match">Set State to all, or choose a longer Updated range.</EmptyState> : items.map((job, index) => { const shown = jobState(job); return <article class={`tv-job ${shown.tone}`}><span class="tv-job-state"><Icon name={shown.icon} /><b>{shown.word}</b></span><div class="tv-job-main"><strong>{jobWhatRan(job)}</strong><span>{[relativeTime(job.updatedAt), job.state === 'running' ? `${Math.round((job.progress || 0) * 100)}%` : '', job.error || ''].filter(Boolean).join(' · ')}</span></div><div class="tv-job-actions"><button data-landing="card" data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-${job.id}`} onClick={() => void open(job)}>Details</button><button disabled={job.state === 'queued' || job.state === 'running' || job.state === 'retry_wait'} data-focus-region="content" data-focus-row={2 + index} data-focus-col="1" data-focus-key={`job-${job.id}-retry`} onClick={() => void api.retryJob(job.id).then(() => api.job(job.id)).then(({ job: fresh }) => { setMessage('Job queued again.'); setItems(value => value.map(item => item.id === fresh.id ? fresh : item)) }).catch(() => setMessage('The job could not be queued again. Try again in a minute.'))}>Retry</button></div></article> })}</section>
 }
 
 function TVJobDetail({ detail, onBack, onOlder }: { detail: { job: Job; logs: JobLog[]; next: string | null }; onBack: () => void; onOlder: () => void }) {
@@ -1110,138 +1187,9 @@ function TVJobDetail({ detail, onBack, onOlder }: { detail: { job: Job; logs: Jo
   return () => document.removeEventListener('keydown', key, true);
  }, []);
  // Row 0.5: below the header Refresh (row 0), above the log filters, so Up and Down both reach it.
- return <section class="tv-list job-detail"><button ref={backButton} data-focus-region="content" data-focus-row="0.5" data-focus-col="0" data-focus-key="job-detail-back" onClick={onBack}><Icon name="chevron-left" />Jobs</button><h2>{detail.job.label}</h2><p class="tv-muted">{jobStatusLine(detail.job)} · attempt {detail.job.attempt}</p><div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="log-level" onClick={() => setLevel(value => value === '' ? 'error' : value === 'error' ? 'warn' : '')}>Level: {level || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="log-attempt" onClick={() => setAttempt(value => value === '' ? String(detail.job.attempt) : '')}>Attempt: {attempt || 'all'}</button></div>{logs.length === 0 ? <p class="tv-muted">No logs match. Set Level and Attempt to all to see every entry.</p> : logs.map((log, index) => { const open = expanded === log.id; return <button type="button" aria-expanded={open} data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-log-${log.id}`} class={`job-log ${log.level} ${open ? 'expanded' : ''}`} onClick={() => setExpanded(value => value === log.id ? null : log.id)}><span class="job-log-heading"><strong>{log.phase} · {log.level}</strong><i>{open ? 'Hide details' : 'Show details'}</i></span><span>{new Date(log.createdAt).toLocaleString()} · attempt {log.attempt}</span><small>{log.message}</small>{open && <div class="job-log-expanded"><dl><dt>Job</dt><dd>{log.jobId}</dd><dt>Log entry</dt><dd>{log.id}</dd><dt>Attempt</dt><dd>{log.attempt}</dd></dl>{log.context && Object.keys(log.context).length > 0 ? <pre>{JSON.stringify(log.context, null, 2)}</pre> : <p>No structured context was recorded.</p>}</div>}</button> })}{detail.next && <button data-focus-region="content" data-focus-row={3 + logs.length} data-focus-col="0" data-focus-key="job-logs-older" onClick={() => void onOlder()}>Load older logs</button>}</section>
+ return <section class="tv-list job-detail"><button ref={backButton} data-focus-region="content" data-focus-row="0.5" data-focus-col="0" data-focus-key="job-detail-back" onClick={onBack}><Icon name="chevron-left" />Jobs</button><h2>{jobWhatRan(detail.job)}</h2><p class="tv-muted">{jobStatusLine(detail.job)} · attempt {detail.job.attempt}</p><div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="log-level" onClick={() => setLevel(value => value === '' ? 'error' : value === 'error' ? 'warn' : '')}>Level: {level || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="log-attempt" onClick={() => setAttempt(value => value === '' ? String(detail.job.attempt) : '')}>Attempt: {attempt || 'all'}</button></div>{logs.length === 0 ? <p class="tv-muted">No logs match. Set Level and Attempt to all to see every entry.</p> : logs.map((log, index) => { const open = expanded === log.id; return <button type="button" aria-expanded={open} data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-log-${log.id}`} class={`job-log ${log.level} ${open ? 'expanded' : ''}`} onClick={() => setExpanded(value => value === log.id ? null : log.id)}><span class="job-log-heading"><strong>{log.phase} · {log.level}</strong><i>{open ? 'Hide details' : 'Show details'}</i></span><span>{new Date(log.createdAt).toLocaleString()} · attempt {log.attempt}</span><small>{log.message}</small>{open && <div class="job-log-expanded"><dl><dt>Job</dt><dd>{log.jobId}</dd><dt>Log entry</dt><dd>{log.id}</dd><dt>Attempt</dt><dd>{log.attempt}</dd></dl>{log.context && Object.keys(log.context).length > 0 ? <pre>{JSON.stringify(log.context, null, 2)}</pre> : <p>No structured context was recorded.</p>}</div>}</button> })}{detail.next && <button data-focus-region="content" data-focus-row={3 + logs.length} data-focus-col="0" data-focus-key="job-logs-older" onClick={() => void onOlder()}>Load older logs</button>}</section>
 }
 
-
-const TEST_NAMES: Record<string, string> = {
- filelist: 'FileList',
- qbittorrent: 'qBittorrent',
- storage: 'storage',
- ffmpeg: 'FFmpeg',
- ffprobe: 'FFprobe',
- tmdb: 'TMDB',
- subdl: 'SubDL',
- piratebay: 'Pirate Bay',
-};
-
-// Display label for engine values ('native' | 'qbittorrent') in saved-vs-running feedback.
-const engineName = (v: unknown) => (v === 'native' ? 'Native' : 'qBittorrent');
-// The TV never edits the engine selection, so the feedback is read-only: the
-// ownership explanation always renders, and the running notice appears only
-// when this process started with a different engine than the saved one. Old
-// servers without engineRunning render the static copy only.
-const engineFeedback = (value: Record<string, unknown>) => {
- const running = typeof value.engineRunning === 'string' ? value.engineRunning : '';
- const saved = String(value.downloadEngine ?? '');
- if (running === '' || running === saved) return '';
- return ` Running now: ${engineName(running)} — the saved selection (${engineName(saved)}) applies to new downloads after restart.`;
-};
-
-export function TVSettings({ api, hasProjects = false, onOpen, onReload, onChangeServer, onForgetServer, updateStatus, onUpdateStatus, confirmOpen, onConfirmOpen, onConfirmClose, rebuildConfirmOpen, onRebuildConfirmOpen, onRebuildConfirmClose }: { api: API; hasProjects?: boolean; onOpen?: (route: TVRoute) => void; onReload?: () => void; onChangeServer: () => void; onForgetServer: () => void; updateStatus: UpdateStatus | null; onUpdateStatus: (status: UpdateStatus) => void; confirmOpen: boolean; onConfirmOpen: () => void; onConfirmClose: () => void; rebuildConfirmOpen: boolean; onRebuildConfirmOpen: () => void; onRebuildConfirmClose: () => void }) {
- const [value, setValue] = useState<Record<string, unknown> | null>(null); const [managed, setManaged] = useState<Set<string>>(new Set()); const [message, setMessage] = useState('Loading settings…');
- const [trackers, setTrackers] = useState<TrackerStatus[] | null>(null);
- const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
- const [coverage, setCoverage] = useState<{ observed: number; seeded: number } | null>(null);
- const [fetchMessage, setFetchMessage] = useState(''); const [rebuildMessage, setRebuildMessage] = useState(''); const [rebuilding, setRebuilding] = useState(false);
- const [checking, setChecking] = useState(false); const [applying, setApplying] = useState(false); const [updateMessage, setUpdateMessage] = useState('');
- const settingsMounted = useRef(true);
- useEffect(() => () => { settingsMounted.current = false; }, []);
- const openReleaseLink = async (url: string) => { const launched = await openExternalURL(url); if (!settingsMounted.current) return; if (!launched) setUpdateMessage('Open this address on another device: ' + url); };
- const refreshTrackers = () => {
-  const promise = typeof api.trackers === 'function' ? api.trackers() : api.call<TrackerStatus[]>('/trackers');
-  return promise.then(list => { if (settingsMounted.current) setTrackers(Array.isArray(list) ? list : null); }).catch(() => { if (settingsMounted.current) setTrackers(null); });
- };
- useEffect(() => {
-  Promise.all([api.call<Record<string, unknown>>('/settings'), api.call<{ items: SettingsField[] }>('/settings/schema')]).then(([settings, schema]) => {
-   setValue(settings);
-   setManaged(new Set(schema.items.filter(field => field.readOnly).map(field => field.key)));
-   setMessage('');
-  }).catch(error => setMessage(error.message));
-  void refreshTrackers();
- }, []);
- // Read-only catalog coverage; a failed or malformed answer just leaves it out.
- useEffect(() => { api.call<Record<string, unknown>>('/catalog/status').then(status => { const observed = Number(status?.observedReleases); const seeded = Number(status?.discoverableReleases); if (settingsMounted.current && Number.isFinite(observed) && Number.isFinite(seeded)) setCoverage({ observed, seeded }) }).catch(() => { }) }, []);
- useEffect(() => {
-  if (!updateStatus?.applying) return;
-  const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="update-check"]')), 0);
-  return () => window.clearTimeout(timer);
- }, [updateStatus?.applying]);
- async function save() {
-  if (!value) return;
-  const out = { ...value };
-  Object.keys(out).filter(key => key.endsWith('Configured') || key === 'settingsPath' || key === 'engineRunning').forEach(key => delete out[key]);
-  try {
-   await api.call('/settings', { method: 'PUT', body: JSON.stringify(out) });
-   setMessage('Settings saved. Restart the server to apply worker-limit changes.');
-   void refreshTrackers();
-  } catch (error) {
-   setMessage((error as Error).message);
-  }
- }
- async function test(name: string) { setMessage(`Testing ${TEST_NAMES[name] || name}…`); try { const result = await api.call<{ message: string }>(`/dependencies/${name}/test`, { method: 'POST' }); setMessage(result.message) } catch (error) { setMessage((error as Error).message) } }
- async function fetchLatest() { setFetchMessage('Queuing…'); try { const job = await api.syncCatalog('latest'); if (settingsMounted.current) setFetchMessage(`${job.label} queued. Follow it on Jobs.`) } catch (error) { if (settingsMounted.current) setFetchMessage((error as Error).message) } }
- async function rebuildCatalog() { if (rebuilding) return; setRebuilding(true); try { const job = await api.syncCatalog('rebuild'); if (settingsMounted.current) setRebuildMessage(`${job.label} queued. Follow it on Jobs.`) } catch (error) { if (settingsMounted.current) setRebuildMessage((error as Error).message) } finally { if (settingsMounted.current) setRebuilding(false); onRebuildConfirmClose() } }
- async function checkUpdate() {
-  if (checking) return;
-  setChecking(true); setUpdateMessage('Checking for updates…');
-  try { const next = await api.call<UpdateStatus>('/updates/check', { method: 'POST' }); onUpdateStatus(next); setUpdateMessage(next.available ? `Version ${next.latest} is available.` : 'The server is up to date.') } catch (error) { setUpdateMessage(`Update check failed: ${(error as Error).message}`) } finally { setChecking(false) }
- }
- async function applyUpdate() {
-  if (applying) return;
-  setApplying(true);
-  try {
-   const next = await api.call<UpdateStatus>('/updates/apply', { method: 'POST' });
-   onUpdateStatus(next);
-   setUpdateMessage(next.applying ? 'Update accepted. The server restarts; playback resumes when it is back.' : 'The server is already up to date.');
-  } catch (error) {
-   const outcome = updateApplyOutcome((error as Error & { status?: number }).status);
-   setUpdateMessage(outcome === 'conflict' ? `Update refused: ${(error as Error).message}` : `Update failed: ${(error as Error).message}`);
-  } finally { setApplying(false); onConfirmClose() }
- }
- const allDisabled = Boolean(trackers && trackers.length > 0 && trackers.every(item => !item.enabled));
-const host = (() => { try { return new URL(api.base).host } catch { return '' } })();
- const lockedNote = (key: string) => managed.has(key) && <small>Environment managed</small>;
- return <section class="tv-settings tv-settings-page"><h2>Playback</h2><p class="tv-muted">Language and watched settings for this household. API keys and file paths stay in browser Settings.</p>{value && <>
-  <div class="tv-safe-fields">
-   <label>Preferred audio language{lockedNote('preferredAudioLanguage')}<input disabled={managed.has('preferredAudioLanguage')} data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="setting-audio-primary" value={String(value.preferredAudioLanguage || 'en')} onInput={event => setValue({ ...value, preferredAudioLanguage: event.currentTarget.value })} /></label>
-   <label>Preferred subtitle language{lockedNote('preferredSubtitleLanguage')}<input disabled={managed.has('preferredSubtitleLanguage')} data-focus-region="content" data-focus-row="2" data-focus-col="0" data-focus-key="setting-subtitle-primary" value={String(value.preferredSubtitleLanguage || '')} onInput={event => setValue({ ...value, preferredSubtitleLanguage: event.currentTarget.value })} /></label>
-   <label>Fallback subtitle language{lockedNote('fallbackSubtitleLanguage')}<input disabled={managed.has('fallbackSubtitleLanguage')} data-focus-region="content" data-focus-row="3" data-focus-col="0" data-focus-key="setting-subtitle-fallback" value={String(value.fallbackSubtitleLanguage || '')} onInput={event => setValue({ ...value, fallbackSubtitleLanguage: event.currentTarget.value })} /></label>
-   <label>Mark as watched at (percent){lockedNote('watchedThresholdPercent')}<input disabled={managed.has('watchedThresholdPercent')} type="number" data-focus-region="content" data-focus-row="4" data-focus-col="0" data-focus-key="setting-watched" value={String(value.watchedThresholdPercent || 90)} onInput={event => setValue({ ...value, watchedThresholdPercent: Number(event.currentTarget.value) })} /></label>
-  </div>
-  <h3>Background work</h3>
-  <div class="tv-safe-fields">
-   <label>Concurrent background jobs{lockedNote('maxConcurrentJobs')}<input disabled={managed.has('maxConcurrentJobs')} type="number" min="1" max="20" data-focus-region="content" data-focus-row="5" data-focus-col="0" data-focus-key="setting-workers" value={String(value.maxConcurrentJobs || 10)} onInput={event => setValue({ ...value, maxConcurrentJobs: Number(event.currentTarget.value) })} /></label>
-   <label>Title refresh timeout (minutes){lockedNote('titleRefreshTimeoutMinutes')}<input disabled={managed.has('titleRefreshTimeoutMinutes')} type="number" min="5" max="120" data-focus-region="content" data-focus-row="6" data-focus-col="0" data-focus-key="setting-title-timeout" value={String(value.titleRefreshTimeoutMinutes || 30)} onInput={event => setValue({ ...value, titleRefreshTimeoutMinutes: Number(event.currentTarget.value) })} /></label>
-  </div>
-  <div class="tv-tracker-controls">
-   <h3>Trackers</h3>
-   <p class="tv-muted">Turning a tracker off hides its discovery. Existing downloads stay listed and playable.</p>
-   <button class={`tv-tracker-toggle ${value.fileListEnabled ? 'active' : ''}`} disabled={managed.has('fileListEnabled')} data-focus-region="content" data-focus-row="7" data-focus-col="0" data-focus-key="setting-filelist-enabled" aria-pressed={Boolean(value.fileListEnabled)} onClick={() => setValue({ ...value, fileListEnabled: !value.fileListEnabled })}>FileList: {value.fileListEnabled ? 'On' : 'Off'}{managed.has('fileListEnabled') && <small> · Environment managed</small>}</button>
-   <button class={`tv-tracker-toggle ${value.pirateBayEnabled ? 'active' : ''}`} disabled={managed.has('pirateBayEnabled')} data-focus-region="content" data-focus-row="8" data-focus-col="0" data-focus-key="setting-piratebay-enabled" aria-pressed={Boolean(value.pirateBayEnabled)} onClick={() => setValue({ ...value, pirateBayEnabled: !value.pirateBayEnabled })}>The Pirate Bay: {value.pirateBayEnabled ? 'On' : 'Off'}{managed.has('pirateBayEnabled') && <small> · Environment managed</small>}</button>
-   <div class="tv-tracker-readiness">{trackers === null ? <span class="tv-tracker-chip disabled">Trackers unavailable</span> : trackers.map(t => <span key={t.id} class={`tv-tracker-chip ${!t.enabled ? 'disabled' : t.configured ? 'ready' : 'setup'}`}>{t.name} · {!t.enabled ? 'disabled' : t.configured ? 'ready' : 'needs setup'}</span>)}{allDisabled && <span class="tv-tracker-zero-note">Zero trackers enabled; Downloads remain reachable.</span>}</div>
-   <div class="tv-safe-fields">
-    <label>The Pirate Bay website URL{lockedNote('pirateBayWebsiteUrl')}<input disabled={managed.has('pirateBayWebsiteUrl')} data-focus-region="content" data-focus-row="9" data-focus-col="0" data-focus-key="setting-piratebay-website" value={String(value.pirateBayWebsiteUrl || '')} onInput={event => setValue({ ...value, pirateBayWebsiteUrl: event.currentTarget.value })} /></label>
-    <label>The Pirate Bay API URL{lockedNote('pirateBayApiUrl')}<input disabled={managed.has('pirateBayApiUrl')} data-focus-region="content" data-focus-row="10" data-focus-col="0" data-focus-key="setting-piratebay-api" value={String(value.pirateBayApiUrl || '')} onInput={event => setValue({ ...value, pirateBayApiUrl: event.currentTarget.value })} /></label>
-   </div>
-  </div>
-  <p class="tv-muted">Selection controls new acquisitions. Existing downloads keep the engine that owns them.{engineFeedback(value)}</p>
-  <button class="primary" data-focus-region="content" data-focus-row={SETTINGS_SAVE_ROW} data-focus-col="0" data-focus-key="settings-save" onClick={() => void save()}>Save preferences</button>
- </>}<p class="tv-settings-message" role="status">{message}</p>
-  {updateStatus && <div class="tv-update-panel"><h3>Updates</h3><p>Version {updateStatus.currentVersion}{updateStatus.applying ? ' · installing an update' : updateStatus.available ? ' · update available' : updateStatus.selfUpdate ? ' · up to date' : ''}</p>{updateNoticeVisible(updateStatus) && <div class="tv-update-notice"><strong>{updateStatus.available ? `Version ${updateStatus.latest} is available.` : 'This server updates only by hand.'}</strong><p>Updates install on the server machine and interrupt playback on every connected player; this TV installs nothing itself.</p><button class="tv-release-link" data-focus-region="content" data-focus-row={UPDATE_RELEASE_LINK_ROW} data-focus-col="0" data-focus-key="update-release-link" onClick={() => void openReleaseLink(updateStatus.releasesUrl)}>{updateStatus.releasesUrl}</button></div>}</div>}
-  <div class="tv-diagnostics"><button class="tv-diagnostics-toggle" data-focus-region="content" data-focus-row={SETTINGS_DIAGNOSTICS_ROW} data-focus-col="0" data-focus-key="settings-diagnostics" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen(open => !open)}>{diagnosticsOpen ? 'Hide connection tests' : 'Connection tests'}</button>
-  {diagnosticsOpen && <><p class="tv-muted">Checks that the server can reach each service. The result appears under the Save button.</p><div class="tv-test-buttons">{['filelist', 'qbittorrent', 'storage', 'ffmpeg', 'ffprobe', 'tmdb', 'subdl', 'piratebay'].map((name, index) => <button data-focus-region="content" data-focus-row={SETTINGS_TEST_FIRST_ROW + Math.floor(index / 4)} data-focus-col={index % 4} data-focus-key={`test-${name}`} onClick={() => void test(name)}>Test {TEST_NAMES[name] || name}</button>)}</div></>}</div>
-  <div class="tv-catalog"><h2>Catalog</h2>{coverage && <p class="tv-muted"><strong>{coverage.observed.toLocaleString()}</strong> releases kept · <strong>{coverage.seeded.toLocaleString()}</strong> currently seeded</p>}<p class="tv-muted">Fetch latest pulls the newest releases from your trackers now instead of waiting for the hourly run. It runs in the background; follow it in Background jobs.</p><button class="primary" data-focus-region="content" data-focus-row={SETTINGS_CATALOG_FETCH_ROW} data-focus-col="0" data-focus-key="catalog-fetch-latest" onClick={() => void fetchLatest()}>Fetch latest</button><p class="tv-muted" role="status">{fetchMessage}</p></div>
-  <div class="tv-settings-links"><h2>Background work and projects</h2><button data-focus-region="content" data-focus-row={SETTINGS_JOBS_ROW} data-focus-col="0" data-focus-key="settings-jobs" onClick={() => onOpen?.('jobs')}><Icon name="jobs" />Background jobs<Icon name="chevron-right" class="tv-chevron" /></button>{hasProjects && <button data-focus-region="content" data-focus-row={SETTINGS_PROJECTS_ROW} data-focus-col="0" data-focus-key="settings-projects" onClick={() => onOpen?.('projects')}><Icon name="external" />Other projects<Icon name="chevron-right" class="tv-chevron" /></button>}</div>
-  <div class="tv-server"><h2>Server</h2>{host && <p class="tv-server-line"><strong>{host}</strong></p>}
-  <div class="tv-server-actions"><button data-focus-region="content" data-focus-row={SETTINGS_RELOAD_ROW} data-focus-col="0" data-focus-key="settings-reload" onClick={() => onReload?.()}>Reload library</button><button data-focus-region="content" data-focus-row={SETTINGS_CHANGE_SERVER_ROW} data-focus-col="0" data-focus-key="change-server" onClick={onChangeServer}>Change server address</button><button data-focus-region="content" data-focus-row={SETTINGS_FORGET_SERVER_ROW} data-focus-col="0" data-focus-key="forget-server" onClick={onForgetServer}>Forget this server</button>
-  <button data-focus-region="content" data-focus-row={UPDATE_APPLY_ROW} data-focus-col="0" data-focus-key="update-apply" disabled={updateApplyDisabled(updateStatus, applying)} onClick={onConfirmOpen}>{updateStatus?.applying || applying ? 'Installing…' : 'Install server update'}</button></div>
-  <p aria-live="polite">{updateMessage}</p></div>
-  <div class="tv-danger-zone"><h2>Danger zone</h2><p>Troubleshooting only. Rebuild catalog refreshes every enabled category's window and rebuilds the local projections. It is slow and heavy on your trackers and the server; use it only when something is broken.</p><button class="danger-button" data-focus-region="content" data-focus-row={SETTINGS_REBUILD_ROW} data-focus-col="0" data-focus-key="catalog-rebuild" onClick={onRebuildConfirmOpen}>Rebuild catalog</button><p class="tv-muted" role="status">{rebuildMessage}</p></div>
-  {confirmOpen && updateStatus && <section role="dialog" aria-modal="true" aria-labelledby="tv-update-confirm-heading" class="tv-settings tv-update-confirm"><h2 id="tv-update-confirm-heading">Install version {updateStatus.latest}?</h2><p>The server downloads the release, installs it, and restarts. Playback is interrupted on every connected device, including this TV.</p><div><button data-focus-region={UPDATE_DIALOG_REGION} data-focus-row="0" data-focus-col="0" data-focus-key="update-confirm-cancel" onClick={onConfirmClose}>Cancel</button><button class="danger-button" data-focus-region={UPDATE_DIALOG_REGION} data-focus-row="0" data-focus-col="1" data-focus-key="update-confirm-apply" disabled={applying} onClick={() => void applyUpdate()}>{applying ? 'Starting…' : 'Install and restart'}</button></div></section>}
-  {rebuildConfirmOpen && <section role="dialog" aria-modal="true" aria-labelledby="tv-rebuild-confirm-heading" class="tv-settings tv-rebuild-confirm"><h2 id="tv-rebuild-confirm-heading">Rebuild the catalog?</h2><p>This refreshes every enabled category's latest window and rebuilds the local projections over everything ever observed. It is slow and puts heavy load on your trackers and the server, so run it only when something is broken. Nothing is removed; follow the job on Jobs.</p><div><button data-focus-region={REBUILD_DIALOG_REGION} data-focus-row="0" data-focus-col="0" data-focus-key="rebuild-confirm-cancel" onClick={onRebuildConfirmClose}>Cancel</button><button class="danger-button" data-focus-region={REBUILD_DIALOG_REGION} data-focus-row="0" data-focus-col="1" data-focus-key="rebuild-confirm-apply" disabled={rebuilding} onClick={() => void rebuildCatalog()}>{rebuilding ? 'Starting…' : 'Rebuild now'}</button></div></section>}
- </section>;
-}
 
 // Promotion slot on the home route. It is one focus stop: OK hands the
 // creative's click URL to the platform browser (the server resolves

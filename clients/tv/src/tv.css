@@ -1195,87 +1195,351 @@ button>.tv-icon:first-child {
 }
 
 .tv-settings-page {
- background: transparent;
- border: 0;
- padding: 0;
- margin: 0;
- max-width: 1180px
-}
-
-.tv-settings-page>h2,
-.tv-server>h2,
-.tv-catalog>h2,
-.tv-danger-zone>h2 {
- margin-top: var(--tt-space-3)
-}
-
-.tv-settings-page>button,
-.tv-settings-page .tv-server button,
-.tv-settings-page .tv-catalog button,
-.tv-settings-page .tv-danger-zone button,
-.tv-diagnostics-toggle {
- margin-top: var(--tt-space-4)
-}
-
-.tv-settings-message {
- min-height: 40px
-}
-
-/* The screens that left the rail (Background jobs, Other projects): one row each, an icon, the name and a chevron. */
-.tv-settings-links>h2 {
- margin-top: var(--tt-space-3)
-}
-
-.tv-settings-links>button {
  display: flex;
- justify-content: flex-start;
- width: 640px;
+ align-items: flex-start;
+ margin-top: 14px
+}
+
+/* Settings in two panes (#60, the "Settings" board). The group list: 460 px of 72 px rows, the name at 30 px and
+   its status at 26 px muted on the right. The selected group has the selected fill and the bold name; the focused
+   one is the white pill like every control (a vertical tab list). */
+.tv-settings-groups {
+ flex: 0 0 460px;
+ width: 460px;
+ margin-right: 72px
+}
+
+.tv-settings-groups button {
+ display: flex;
+ justify-content: space-between;
+ width: 100%;
+ height: var(--tt-tv-target);
+ margin: 0 0 6px;
+ padding: 0 var(--tt-space-5);
+ border-radius: var(--tt-radius-xl);
+ background: transparent;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold);
+ text-align: left;
+ white-space: nowrap
+}
+
+.tv-settings-groups button.selected {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold)
+}
+
+.tv-settings-groups button:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-settings-groups small {
+ margin-left: var(--tt-space-4);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium);
+ font-variant-numeric: var(--tt-figures);
+ color: var(--tt-text-subtle);
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-settings-groups small.attention {
+ color: var(--tt-danger)
+}
+
+.tv-settings-groups button:focus small {
+ color: var(--tt-on-fill-focus)
+}
+
+/* The selected group's rows: 1124 px wide under a 26 px label; the pane scrolls on its own so the group list
+   stays put (padding keeps the focus ring inside the scrollport). */
+.tv-settings-pane {
+ flex: 0 0 1148px;
+ width: 1148px;
+ max-height: 816px;
+ margin: -12px 0 0 -12px;
+ padding: 12px;
+ overflow-y: auto
+}
+
+.tv-settings-pane::-webkit-scrollbar {
+ display: none
+}
+
+.tv-settings-pane>h2 {
+ padding-left: 28px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ letter-spacing: .02em;
+ color: var(--tt-text-subtle)
+}
+
+.tv-settings-pane>h2+* {
  margin-top: var(--tt-space-4)
 }
 
-.tv-settings-links .tv-chevron {
+/* A row: the name on the left at 30 px semibold, the value and a chevron (or the switch and On/Off) on the right.
+   Focused, it keeps its own fill, lighter, inside the white ring, and its help shows under it. */
+.tv-setting-row {
+ position: relative;
+ display: block;
+ width: 100%;
+ min-height: var(--tt-tv-target);
+ margin: 0 0 var(--tt-space-2);
+ padding: 20px 28px;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet);
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-semibold);
+ text-align: left
+}
+
+.tv-setting-row:focus {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
+}
+
+.tv-setting-line {
+ display: flex;
+ align-items: center;
+ justify-content: space-between
+}
+
+.tv-setting-name {
+ flex: 1 1 auto;
+ min-width: 0;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold)
+}
+
+.tv-setting-name small {
+ color: var(--tt-warn);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium)
+}
+
+.tv-setting-value {
+ display: flex;
+ align-items: center;
+ flex: 0 1 auto;
+ min-width: 0;
+ margin-left: var(--tt-space-5);
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-regular);
+ font-variant-numeric: var(--tt-figures);
+ color: var(--tt-text-muted);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-chevron {
+ width: 28px;
+ height: 28px;
+ flex: 0 0 28px;
+ margin-left: var(--tt-space-3)
+}
+
+.tv-setting-help {
+ display: none;
+ margin-top: 10px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-regular);
+ line-height: 1.4;
+ color: var(--tt-text-subtle)
+}
+
+.tv-setting-row:focus .tv-setting-help {
+ display: block
+}
+
+/* The primary row of a pane (Save, Fetch latest) is the bolder name; the danger row is the danger-coloured word,
+   filled with the danger colour on focus. */
+.tv-setting-row.primary .tv-setting-name {
+ font-weight: var(--tt-weight-bold)
+}
+
+.tv-setting-row.primary {
+ background: var(--tt-fill-quiet)
+}
+
+.tv-setting-row.primary:focus {
+ background: var(--tt-fill-selected)
+}
+
+.tv-setting-row.danger-button {
+ color: var(--tt-danger)
+}
+
+.tv-setting-row.danger-button:focus {
+ background: var(--tt-danger);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-setting-row.danger-button:focus .tv-setting-help {
+ color: var(--tt-on-fill-focus)
+}
+
+/* A readable row (the connected server, the version): no focus stop, the quiet fill without the ring. */
+.tv-setting-info {
+ background: transparent
+}
+
+/* The switch: a 76x42 track, saffron with the dark knob on the right when on, the plain fill when off. */
+.tv-switch {
+ position: relative;
+ display: inline-block;
+ width: 76px;
+ height: 42px;
+ flex: 0 0 76px;
+ margin-right: var(--tt-space-3);
+ border-radius: 21px;
+ background: var(--tt-fill-strong)
+}
+
+.tv-switch::after {
+ content: "";
+ position: absolute;
+ top: 5px;
+ left: 5px;
  width: 32px;
  height: 32px;
- flex: 0 0 32px;
- margin-left: auto
+ border-radius: 16px;
+ background: var(--tt-text-muted)
 }
 
-.tv-safe-fields>label {
- display: block;
- margin-top: var(--tt-space-4);
+.tv-switch.on {
+ background: var(--tt-accent)
+}
+
+.tv-switch.on::after {
+ left: 39px;
+ background: var(--tt-on-accent)
+}
+
+.tv-setting-value b {
+ min-width: 52px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ color: var(--tt-text)
+}
+
+/* A field row: the input carries focus and shows the value on the right; the face behind it draws the row's fill
+   and ring and the help shows under it, by sibling selectors, so focus costs no script or extra layout pass. */
+.tv-setting-field {
+ display: flex;
+ padding: 20px 30px;
+ flex-wrap: wrap;
+ align-items: center;
+ z-index: 0;
+ background: transparent
+}
+
+.tv-setting-face {
+ position: absolute;
+ top: 0;
+ right: 0;
+ bottom: 0;
+ left: 0;
+ z-index: -1;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet)
+}
+
+.tv-setting-field .tv-setting-name {
+ order: 0
+}
+
+.tv-setting-field input,
+.tv-setting-field input:focus {
+ order: 1;
+ flex: 0 1 420px;
+ width: 420px;
+ height: auto;
+ min-height: 0;
+ margin: -8px 0;
+ padding: 4px 8px;
+ border: 2px solid transparent;
+ border-radius: var(--tt-radius-md);
+ background: transparent;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-regular);
+ font-variant-numeric: var(--tt-figures);
+ text-align: right;
+ outline: 0;
+ box-shadow: none
+}
+
+.tv-setting-field.wide input,
+.tv-setting-field.wide input:focus {
+ flex-basis: 640px;
+ width: 640px
+}
+
+.tv-setting-field input:disabled {
+ opacity: .6
+}
+
+.tv-setting-field input:focus ~ .tv-setting-face {
+ background: var(--tt-fill-selected);
+ outline: 4px solid var(--tt-focus-ring);
+ outline-offset: var(--tt-focus-offset)
+}
+
+.tv-setting-field input:focus ~ .tv-setting-help {
+ display: block
+}
+
+/* Typing: the value becomes a field again, on the raised surface with its edge. */
+.tv-setting-field input[data-tv-editing="true"] {
+ background: var(--tt-raised);
+ border-color: var(--tt-line-strong);
+ color: var(--tt-text)
+}
+
+.tv-setting-suffix {
+ order: 2;
+ margin-left: -4px;
+ font-size: var(--tt-tv-text-body);
  color: var(--tt-text-muted)
 }
 
-.tv-safe-fields input {
- display: block;
- width: 100%;
- margin-top: var(--tt-space-2)
+.tv-setting-field .tv-chevron {
+ order: 3;
+ color: var(--tt-text-muted)
 }
 
-.tv-safe-fields small {
- margin-left: var(--tt-space-3);
- color: var(--tt-warn)
+.tv-setting-field .tv-setting-help {
+ order: 4;
+ flex: 0 0 100%
 }
 
-.tv-tracker-controls {
- margin: var(--tt-space-5) 0 0;
- padding: var(--tt-space-4) 0 0;
- border-top: 1px solid var(--tt-line)
+/* Pane text that is not a row (the tracker readiness, the engine note, the Danger zone warning) and the status
+   line under the rows (a save, a test, a queued job). */
+.tv-setting-note {
+ margin: var(--tt-space-2) 0 var(--tt-space-4);
+ padding: 0 28px;
+ font-size: var(--tt-tv-text-meta);
+ color: var(--tt-text-subtle)
 }
 
-.tv-tracker-controls h3 {
- margin-top: 0
-}
-
-.tv-tracker-toggle {
- margin: var(--tt-space-3) var(--tt-space-4) 0 0;
- min-width: 340px
+.tv-setting-status {
+ min-height: 40px;
+ margin-top: var(--tt-space-3);
+ padding: 0 28px;
+ font-size: var(--tt-tv-text-meta);
+ color: var(--tt-text-muted)
 }
 
 .tv-tracker-readiness {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-4) 0 0
+ margin: var(--tt-space-2) 0 var(--tt-space-2);
+ padding: 0 28px
 }
 
 .tv-tracker-chip {
@@ -1303,71 +1567,21 @@ button>.tv-icon:first-child {
 
 .tv-tracker-zero-note {
  align-self: center;
- margin-left: var(--tt-space-2);
- color: var(--tt-text-muted);
+ margin: 0 0 var(--tt-space-3) var(--tt-space-2);
+ color: var(--tt-text-subtle);
  font-size: var(--tt-tv-text-meta)
 }
 
-.tv-server,
-.tv-catalog,
-.tv-danger-zone,
-.tv-diagnostics,
-.tv-update-panel {
- margin-top: var(--tt-space-6);
- padding-top: var(--tt-space-4);
- border-top: 1px solid var(--tt-line)
-}
-
-.tv-update-panel h3 {
- margin-top: 0
-}
-
-.tv-server-line strong {
- color: var(--tt-text);
- font-size: var(--tt-tv-text-lead)
-}
-
-.tv-server-actions {
- display: flex;
- flex-direction: column;
- align-items: flex-start
-}
-
+/* The connection tests: compact pills four to a line under the disclosure. */
 .tv-test-buttons {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-3) 0 0
+ margin: var(--tt-space-2) 0 0;
+ padding: 0 0 0 var(--tt-space-2)
 }
 
 .tv-test-buttons button {
  margin: 0 var(--tt-space-3) var(--tt-space-3) 0
-}
-
-.tv-update-notice {
- margin: var(--tt-space-3) 0 0;
- padding: var(--tt-space-4) var(--tt-space-5);
- background: var(--tt-raised);
- border-left: 6px solid var(--tt-info);
- border-radius: var(--tt-radius-md)
-}
-
-.tv-update-notice strong {
- display: block;
- font-size: var(--tt-tv-text-body)
-}
-
-.tv-update-notice p {
- margin-top: var(--tt-space-2)
-}
-
-.tv-release-link {
- display: block;
- margin-top: var(--tt-space-3);
- text-align: left;
- color: var(--tt-info);
- white-space: normal;
- overflow-wrap: break-word;
- overflow-wrap: anywhere
 }
 
 /* Modal dialogs: solid overlay surface, a spread shadow as the veil (no blur, no backdrop filter). */
@@ -2324,108 +2538,289 @@ button>.tv-icon:first-child {
  margin-left: var(--tt-space-3)
 }
 
+/* Downloads (the Downloads board) -------------------------------------------
+   The heading carries the storage use against the Allocation on its right; then the filter chips with their
+   counts, Sort and the find field on one line; then one compact row per torrent: thumbnail, title, state with a
+   slim bar and one line of facts, the size, and Play, Pause or Resume and More. Every row keeps its actions
+   drawn, so each row is one focus band; they are quiet until the row holds focus (the navigation layer sets
+   .active-row: the old engines have no :focus-within). Release, path and peers sit behind Details in More. */
+.tv-list.tv-download-list {
+ max-width: none
+}
+
+/* Beside the shell's "Downloads" heading: the content column is the containing block (it is contained), so this
+   sits on the heading's line at the right edge without moving the heading or the list. */
+.tv-download-use {
+ position: absolute;
+ top: var(--tt-tv-safe-y);
+ right: var(--tt-tv-safe-x);
+ display: flex;
+ align-items: center;
+ height: 96px;
+ margin: 0;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
+ white-space: nowrap
+}
+
+.tv-download-use .tv-meter {
+ width: 220px;
+ height: 8px;
+ margin: 0 0 0 18px;
+ background: var(--tt-fill-selected)
+}
+
+.tv-download-use .tv-meter b {
+ background: var(--tt-text-muted)
+}
+
+.tv-download-tools {
+ flex-wrap: nowrap;
+ align-items: center;
+ margin: 0 0 var(--tt-space-6)
+}
+
+.tv-download-tools>* {
+ margin: 0 var(--tt-space-3) 0 0
+}
+
+.tv-download-tools button {
+ flex: 0 0 auto;
+ padding: 0 var(--tt-space-5);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap
+}
+
+/* The count after the chip's word, in the lighter tone of the pill's own text colour (it follows focus). */
+.tv-chip-count {
+ margin-left: 10px;
+ font-style: normal;
+ font-weight: var(--tt-weight-semibold);
+ font-variant-numeric: tabular-nums;
+ opacity: .66
+}
+
+.tv-download-tools input {
+ flex: 0 1 400px;
+ width: 400px;
+ min-width: 0;
+ margin: 0 0 0 auto;
+ font-size: var(--tt-tv-text-meta)
+}
+
 .tv-download-count {
- margin: 0 0 var(--tt-space-3);
+ margin: calc(-1 * var(--tt-space-4)) 0 var(--tt-space-4);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
 }
 
-.tv-download-tools input {
- width: 700px
+.tv-download-row {
+ margin: 0 0 10px;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet)
 }
 
-.tv-download-tools button {
- min-width: 300px;
- justify-content: flex-start
+.tv-download-row.active-row {
+ background: var(--tt-fill-selected)
 }
 
-/* Downloads: one card per torrent. The lines keep a fixed height so telemetry updates in place
-   and the focused control never moves. Release name, path and peers sit behind Details. */
-.tv-list .tv-download-row {
- flex-wrap: wrap;
- min-height: 292px;
- align-items: flex-start;
- overflow: visible
+.tv-download-line {
+ display: flex;
+ align-items: center;
+ height: 136px;
+ padding: 0 var(--tt-space-5) 0 18px
 }
 
-.tv-list .tv-download-row>.tv-download-main {
- flex: 0 0 100%;
- width: 100%;
- margin-right: 0
-}
-
-.tv-download-title,
-.tv-download-status,
-.tv-download-facts {
+.tv-download-thumb {
  display: block;
- max-width: 100%;
- min-height: 38px;
+ flex: 0 0 176px;
+ width: 176px;
+ height: 99px;
+ margin-right: 28px;
+ border-radius: var(--tt-radius-md);
+ background: var(--tt-raised);
+ overflow: hidden
+}
+
+.tv-download-thumb img {
+ display: block;
+ width: 100%;
+ height: 100%;
+ object-fit: cover
+}
+
+.tv-download-main {
+ flex: 1 1 0;
+ min-width: 0;
+ margin-right: 28px
+}
+
+.tv-download-title {
+ display: block;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-bold);
+ line-height: var(--tt-leading-tight);
  white-space: nowrap;
  overflow: hidden;
- text-overflow: ellipsis;
- font-variant-numeric: tabular-nums
+ text-overflow: ellipsis
 }
 
-.tv-list .tv-download-status {
- color: var(--tt-text);
- font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-bold)
+.tv-download-state {
+ display: flex;
+ align-items: center;
+ margin-top: 10px;
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
+ white-space: nowrap
 }
 
-.tv-list .tv-download-status.done {
+.tv-download-state>*+* {
+ margin-left: 18px
+}
+
+/* The state word: saffron while it moves (progress), the status colours otherwise, always as a word. */
+.tv-download-status {
+ flex: 0 0 auto;
+ font-weight: var(--tt-weight-semibold);
+ color: var(--tt-text-muted)
+}
+
+.tv-download-status.active {
+ color: var(--tt-accent)
+}
+
+.tv-download-status.done {
  color: var(--tt-ok)
 }
 
-.tv-list .tv-download-status.error {
+.tv-download-status.error {
  color: var(--tt-danger)
 }
 
-.tv-list .tv-download-status.paused {
- color: var(--tt-warn)
+.tv-download-facts {
+ flex: 1 1 auto;
+ min-width: 0;
+ color: var(--tt-text-subtle);
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
 .tv-meter {
  display: block;
- height: 12px;
- margin: var(--tt-space-1) 0 var(--tt-space-2);
- border-radius: var(--tt-radius-pill);
- background: var(--tt-line);
+ border-radius: 4px;
  overflow: hidden
 }
 
 .tv-meter b {
  display: block;
  height: 100%;
- border-radius: var(--tt-radius-pill);
+ border-radius: 4px;
  background: var(--tt-accent)
 }
 
-.tv-meter.done b {
- background: var(--tt-ok)
+.tv-download-state .tv-meter {
+ flex: 0 0 240px;
+ width: 240px;
+ height: 8px;
+ background: var(--tt-fill-selected)
 }
 
-.tv-meter.error b {
- background: var(--tt-danger)
-}
-
-.tv-meter.paused b {
+.tv-download-state .tv-meter.paused b,
+.tv-download-state .tv-meter.queued b,
+.tv-download-state .tv-meter.idle b {
  background: var(--tt-text-muted)
 }
 
+.tv-download-size {
+ flex: 0 0 auto;
+ min-width: 120px;
+ margin-right: 28px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-semibold);
+ font-variant-numeric: tabular-nums;
+ text-align: right;
+ white-space: nowrap
+}
+
+/* Wide enough for Play, Pause and More, right-aligned: More and the size line up down the list whether a row has a
+   transfer action or not. */
+.tv-download-actions {
+ display: flex;
+ flex: 0 0 auto;
+ align-items: center;
+ justify-content: flex-end;
+ min-width: 400px
+}
+
+.tv-download-actions>*+* {
+ margin-left: 14px
+}
+
+/* At rest the row's actions are quiet; the active row brings them up (the primary to the brighter pill). The focused
+   control still turns white with its outline, from the base rule's two signals. */
+.tv-download-actions button {
+ padding: 0 28px;
+ background: var(--tt-fill-quiet);
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ white-space: nowrap
+}
+
+.tv-download-actions button.primary {
+ padding: 0 30px 0 24px
+}
+
+.tv-download-actions button>.tv-icon:first-child {
+ width: 24px;
+ height: 24px;
+ flex: 0 0 24px;
+ margin: 0 10px 0 0
+}
+
+.tv-download-actions button.tv-download-more {
+ width: 72px;
+ padding: 0
+}
+
+.tv-download-actions button.tv-download-more>.tv-icon:first-child {
+ width: 28px;
+ height: 28px;
+ flex: 0 0 28px;
+ margin: 0
+}
+
+.active-row .tv-download-actions button {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
+}
+
+.active-row .tv-download-actions button.primary {
+ background: var(--tt-fill-strong)
+}
+
+.tv-download-actions button:focus,
+.active-row .tv-download-actions button:focus,
+.active-row .tv-download-actions button.primary:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
+/* Details and an opened torrent's files sit under the row, lined up with the title after the thumbnail. */
 .tv-download-details {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-3) 0 0;
- padding: var(--tt-space-3) var(--tt-space-4);
- border-radius: var(--tt-radius-md);
- background: var(--tt-ink);
+ margin: 0 var(--tt-space-5) 0 222px;
+ padding: 0 0 var(--tt-space-5);
+ color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
 }
 
 .tv-download-details dt {
  flex: 0 0 150px;
  margin: 0 0 var(--tt-space-1);
- color: var(--tt-text-muted)
+ color: var(--tt-text-subtle)
 }
 
 .tv-download-details dd {
@@ -2436,41 +2831,23 @@ button>.tv-icon:first-child {
  overflow-wrap: anywhere
 }
 
-.tv-list .tv-download-row>.tv-download-actions {
- display: flex;
- flex: 0 0 100%;
- flex-wrap: wrap;
- margin-top: var(--tt-space-3)
-}
-
-.tv-list .tv-download-row>.tv-download-actions>* {
- margin: 0 var(--tt-space-3) var(--tt-space-2) 0
-}
-
 .tv-download-files {
- flex: 0 0 100%;
  display: flex;
  flex-direction: column;
  max-height: 620px;
- margin-top: var(--tt-space-4);
- padding: 14px 0;
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
+ margin: 0 var(--tt-space-5) 0 222px;
+ padding: 0 0 var(--tt-space-4);
  overflow-y: auto
 }
 
 .tv-download-file {
  display: flex;
  align-items: center;
- padding: var(--tt-space-2) 20px
+ padding: var(--tt-space-2) 0
 }
 
 .tv-download-file>*+* {
  margin-left: var(--tt-space-4)
-}
-
-.tv-download-file+.tv-download-file {
- border-top: 1px solid var(--tt-line)
 }
 
 .tv-download-file strong {
@@ -2479,10 +2856,14 @@ button>.tv-icon:first-child {
  overflow: hidden;
  text-overflow: ellipsis;
  white-space: nowrap;
- font-size: var(--tt-tv-text-body)
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold)
 }
 
 .tv-download-file small {
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
  white-space: nowrap
 }
 
@@ -2495,10 +2876,84 @@ button>.tv-icon:first-child {
 }
 
 .tv-download-file button {
- min-width: 140px
+ min-width: 140px;
+ font-size: var(--tt-tv-text-meta)
 }
 
 /* Jobs */
+/* Background jobs (#60): one row per job on the quiet fill, Settings-row style: the status icon and its capitalised
+   word in the state's colour, what ran ("Refresh · Copper Archive · FileList") with when and how it ended under
+   it, then Details and Retry. The filters above are the chip row. */
+.tv-jobs .tv-job {
+ margin: 0 0 var(--tt-space-2);
+ padding: var(--tt-space-4) 28px;
+ border: 0;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet)
+}
+
+.tv-job-state {
+ display: flex;
+ align-items: center;
+ flex: 0 0 230px;
+ width: 230px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ color: var(--tt-text-muted)
+}
+
+.tv-job-state .tv-icon {
+ width: 32px;
+ height: 32px;
+ flex: 0 0 32px;
+ margin-right: var(--tt-space-3)
+}
+
+.tv-job.active .tv-job-state {
+ color: var(--tt-accent)
+}
+
+.tv-job.error .tv-job-state {
+ color: var(--tt-danger)
+}
+
+.tv-job.done .tv-job-state {
+ color: var(--tt-ok)
+}
+
+.tv-job-main {
+ display: flex;
+ flex: 1 1 0;
+ flex-direction: column;
+ min-width: 0;
+ margin-right: var(--tt-space-5)
+}
+
+.tv-job-main>*+* {
+ margin-top: var(--tt-space-1)
+}
+
+.tv-jobs .tv-job .tv-job-main strong {
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-jobs .tv-job .tv-job-main span {
+ font-variant-numeric: var(--tt-figures);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-job-message {
+ margin: 0 0 var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta)
+}
+
 .job-detail {
  max-width: 1500px
 }
@@ -2515,6 +2970,7 @@ button>.tv-icon:first-child {
  width: 100%;
  margin: var(--tt-space-3) 0 0;
  padding: var(--tt-space-4) var(--tt-space-5);
+ border-radius: var(--tt-radius-xl);
  border-left: 6px solid var(--tt-line-strong);
  text-align: left
 }
@@ -3794,6 +4250,3 @@ button>.tv-icon:first-child {
  font-weight: var(--tt-weight-bold)
 }
 
-.tv-danger-zone>h2 {
- color: var(--tt-danger)
-}
