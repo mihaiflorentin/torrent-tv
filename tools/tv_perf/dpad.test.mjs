@@ -28,7 +28,7 @@ function audit(mutation, only) {
 test('a map that says Left stays on the first link (it opens the rail) fails, naming that stop and key', { skip, timeout: 300000 }, () => {
   const run = audit(`MAPS.find(map => map.name === 'projects').groups.links.start = { left: 'stay' };`, 'projects');
   assert.equal(run.status, 1, run.stderr);
-  assert.match(run.stderr, /projects\s+links\[0\]\s+left\s+projects:links\[0\]\s+\S+\s+went elsewhere/);
+  assert.match(run.stderr, /projects\s+links\[0\] \(project-1\)\s+left\s+projects:links\[0\]\s+rail:\S+\s+went elsewhere/);
 });
 
 test('a stop the map does not know fails as unmapped', { skip, timeout: 300000 }, () => {
