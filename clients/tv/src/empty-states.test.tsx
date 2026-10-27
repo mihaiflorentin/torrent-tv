@@ -2,7 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sleep } from './test-wait';
-import type { API, CatalogFacets, CatalogTitle, Download, HouseholdState } from '@torrent-tv/shared';
+import type { API, CatalogDetail, CatalogFacets, CatalogTitle, Download, HouseholdState } from '@torrent-tv/shared';
 import { withETag } from './test-api';
 
 // Ticket #62 (spec #51 story 66): an empty or error state says what happened and what to do next, one sentence
@@ -30,8 +30,8 @@ const download = (over: Partial<Download> = {}): Download => ({ id: 'd1', releas
 const empty: HouseholdState = { favorites: [], continueWatching: [], recent: [], watched: [] };
 const page = { items: [], nextCursor: null, total: 0 };
 
-function mount(container: HTMLElement, props: { titles?: CatalogTitle[]; downloads?: Download[] } = {}) {
-  const api = withETag({ titles: async () => page, searchTitles: async () => page, families: async () => ({ items: [] }), libraryFamilies: async () => ({ items: [] }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => page } as unknown as API);
+function mount(container: HTMLElement, props: { titles?: CatalogTitle[]; downloads?: Download[] } = {}, extra: Partial<API> = {}) {
+  const api = withETag({ ...extra as object, titles: async () => page, searchTitles: async () => page, families: async () => ({ items: [] }), libraryFamilies: async () => ({ items: [] }), ensureMetadata: async () => ({ queued: 0 }), streamURL: (p: string) => p, call: async () => ({}), jobs: async () => page, ...extra } as unknown as API);
   render(<Catalog api={api} status="Online" titles={props.titles || []} facets={{ categories: [], kinds: [], resolutions: [], hdr: [], qualities: [], codecs: [] } as CatalogFacets} household={empty} downloads={props.downloads || []} jobs={[]} restoreFocus={null} portal={null} updateStatus={null} onUpdateStatus={() => { }} onFocus={() => { }} onRetry={() => { }} onChangeServer={() => { }} onForgetServer={() => { }} onPlay={() => { }} onPlayDownload={() => { }} onManageDownload={async () => { }} onManageSeasonPack={async () => { }} onRefreshDownloads={async () => { }} onFavorite={() => { }} />, container);
 }
 
@@ -102,5 +102,14 @@ describe('TV empty states: the cause, then the next action, one sentence each', 
     oneEach({ cause: 'No categories yet', action: /Fetch latest/ });
     await route('library-categories');
     oneEach({ cause: 'No library categories yet', action: /Download or watch a title/ });
+  });
+
+  it('on a title with no versions says the trackers have none and to refresh it through More', async () => {
+    const detail: CatalogDetail = { title: title(), seasons: [], sources: [] };
+    mount(container, { titles: [title()] }, { title: async () => detail } as unknown as Partial<API>);
+    await wait();
+    container.querySelector<HTMLButtonElement>('[data-focus-key="hero-a"]')!.click();
+    await wait();
+    oneEach({ cause: 'No versions yet', action: /More.*Refresh data/ });
   });
 });
