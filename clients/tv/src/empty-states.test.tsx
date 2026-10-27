@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sleep } from './test-wait';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, Download, HouseholdState } from '@torrent-tv/shared';
 import { withETag } from './test-api';
+import { openRoute } from './test-nav';
 
 // Ticket #62 (spec #51 story 66): an empty or error state says what happened and what to do next, one sentence
 // each, as a heading and a line on the screen, never a box inside a box. Checked on what the screens render.
@@ -40,7 +41,7 @@ const sentences = (text: string) => text.trim().split(/(?<=[.!?])\s+(?=\S)/).len
 
 describe('TV empty states: the cause, then the next action, one sentence each', () => {
   let container: HTMLDivElement;
-  const route = async (name: string) => { container.querySelector<HTMLButtonElement>(`[data-menu-route="${name}"]`)!.click(); await wait(); };
+  const route = (name: string) => openRoute(container, name);
   const state = () => {
     const box = container.querySelector('[role="status"].tv-empty');
     expect(box, 'an empty state on screen').not.toBeNull();
@@ -63,10 +64,10 @@ describe('TV empty states: the cause, then the next action, one sentence each', 
     container.remove();
   });
 
-  it('on an empty catalog says to wait for the sync and Refresh, or turn on a tracker', async () => {
+  it('on an empty catalog says to wait for the sync and Reload library, or turn on a tracker', async () => {
     mount(container);
     await wait();
-    oneEach({ cause: 'No titles to show yet', action: /Refresh.*tracker in Settings/ });
+    oneEach({ cause: 'No titles to show yet', action: /Reload library.*tracker in Settings/ });
   });
 
   it('on Search says how to search, and when nothing matches, how to widen it', async () => {
