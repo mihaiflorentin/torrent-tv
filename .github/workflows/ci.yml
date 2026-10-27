@@ -85,6 +85,39 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Ticket #66: every TV screen and overlay against its declared D-pad map
+  # (clients/tv/src/dpad/maps) in headless Chromium with real layout and the
+  # Tizen 5 user agent, after the TV build. Its own job so the audit (several
+  # minutes) runs beside the client jobs. Uses the runner's Google Chrome.
+  tv-dpad:
+    name: TV D-pad navigation audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Test and build the TV client
+        run: npm run build:tv
+      - name: TV harness tests (D-pad audit failure reports, journeys, fixture)
+        run: node --test tools/tv_perf
+      - name: D-pad navigation audit of the built TV bundle
+        run: node tools/tv_perf/dpad.mjs
+      - name: Upload the D-pad audit report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tv-dpad-report
+          path: tools/tv_perf/.out/dpad/
+          if-no-files-found: ignore
+          retention-days: 7
+
   webos:
     name: webOS TV client
     runs-on: ubuntu-latest

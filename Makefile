@@ -1,4 +1,4 @@
-.PHONY: help check test build build-arm64 build-arm64-headless build-amd64-headless build-all desktop-assets package-darwin wails-cross web frontend tizen-wgt validate-tizen-wgt smoke-tizen-engine webos-ipk validate-webos-ipk smoke-webos-engine perf-tv screens-tv screens-web tizen-sdb install-tizen torrenttv-apk deploy-pi bootstrap-server-dry-run
+.PHONY: help check test build build-arm64 build-arm64-headless build-amd64-headless build-all desktop-assets package-darwin wails-cross web frontend tizen-wgt validate-tizen-wgt smoke-tizen-engine webos-ipk validate-webos-ipk smoke-webos-engine perf-tv screens-tv screens-web dpad-tv tizen-sdb install-tizen torrenttv-apk deploy-pi bootstrap-server-dry-run
 
 VERSION ?= $(shell tr -d '[:space:]' < VERSION)
 PI_HOST ?=
@@ -275,6 +275,11 @@ perf-tv:
 screens-tv:
 	npm run build:tv
 	node tools/tv_perf/screens.mjs tv $(SCREENS_ARGS)
+
+## dpad-tv: build the TV bundle, then audit every screen's declared D-pad map (clients/tv/src/dpad/maps) in headless Chromium (DPAD_ARGS="--only home,rail")
+dpad-tv:
+	npm run build:tv
+	node tools/tv_perf/dpad.mjs $(DPAD_ARGS)
 
 ## screens-web: build the browser app, then capture its screens at 1440x900 and 390x844 into tools/tv_perf/.out/screens/web (dev only)
 screens-web:
