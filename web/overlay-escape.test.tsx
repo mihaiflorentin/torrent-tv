@@ -107,7 +107,8 @@ describe('overlay Escape', () => {
     await mountApp();
     await act(async () => { sidebarButton('Downloads').click() });
     await settle(); // downloads load
-    await act(async () => { document.querySelector<HTMLButtonElement>('.download-list .danger-button')!.click() });
+    await act(async () => { document.querySelector<HTMLButtonElement>('.download-list [aria-label="More actions"]')!.click() }); // Delete download lives in More
+    await act(async () => { document.querySelector<HTMLButtonElement>('.download-list [role="menuitem"].danger-button')!.click() });
     expect(document.querySelector('.removal-confirm')).not.toBeNull();
     pressEscape();
     await settle();
@@ -120,7 +121,8 @@ describe('overlay Escape', () => {
     await mountApp();
     await act(async () => { sidebarButton('Downloads').click() });
     await settle(); // downloads load
-    await act(async () => { document.querySelector<HTMLButtonElement>('.download-list .danger-button')!.click() });
+    await act(async () => { document.querySelector<HTMLButtonElement>('.download-list [aria-label="More actions"]')!.click() }); // Delete download lives in More
+    await act(async () => { document.querySelector<HTMLButtonElement>('.download-list [role="menuitem"].danger-button')!.click() });
     await act(async () => { document.querySelector<HTMLButtonElement>('.confirm-actions .danger-button')!.click() });
     expect(document.querySelector('.confirm-actions')!.textContent).toContain('Deleting…');
     pressEscape();

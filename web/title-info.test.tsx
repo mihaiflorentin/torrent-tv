@@ -34,7 +34,7 @@ async function settle() { for (let i = 0; i < 5; i++) await act(async () => { aw
 const pressEscape = () => act(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })) });
 const card = () => Array.from(document.querySelectorAll<HTMLButtonElement>('.media-card')).find(button => button.getAttribute('aria-label') === 'Open Alpha')!;
 const infoDialog = () => document.querySelector<HTMLElement>('.info-dialog')!.closest<HTMLElement>('[role="dialog"]')!;
-const detailInfoButton = () => Array.from(document.querySelectorAll<HTMLButtonElement>('.detail .actions button')).find(button => button.textContent?.trim() === 'Info')!;
+const detailInfoButton = () => Array.from(document.querySelectorAll<HTMLButtonElement>('.detail .actions button')).find(button => button.getAttribute('aria-label') === 'Info')!;
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);

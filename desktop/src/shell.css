@@ -43,23 +43,30 @@
  text-align: left;
 }
 
+/* Same as the browser rail (#63): hover one fill step, the current page on the
+   selected fill with a short saffron bar, the keyboard focus white. */
 .shell-nav > button:hover {
- background: var(--tt-raised);
+ background: var(--tt-fill);
  color: var(--tt-text);
 }
 
 .shell-nav > button.active {
- background: var(--tt-accent-soft);
+ background: var(--tt-fill-selected);
  color: var(--tt-text);
  font-weight: var(--tt-weight-bold);
+}
+
+.shell-nav > button:focus-visible {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
 }
 
 .shell-nav > button.active::before {
  content: "";
  position: absolute;
- left: -1px;
- top: 10px;
- bottom: 10px;
+ left: 4px;
+ top: 14px;
+ bottom: 14px;
  width: 3px;
  border-radius: var(--tt-radius-pill);
  background: var(--tt-accent);
