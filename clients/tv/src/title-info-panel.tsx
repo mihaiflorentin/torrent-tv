@@ -122,6 +122,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
   const [stack, setStack] = useState<Frame[]>([]);
   const stackRef = useRef<Frame[]>([]);
   const restoreKey = useRef<string | null>(null);
+  const landPending = useRef(false);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const [, setTick] = useState(0);
@@ -155,7 +156,12 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
 
   useEffect(() => {
     const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="info-close"]')), 0);
-    const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); popRef.current() };
+    const key = (event: KeyboardEvent) => {
+      const action = remoteAction(event.key, event.keyCode);
+      // The viewer is moving: a level's late data must not pull the cursor into the list any more.
+      if (action === 'up' || action === 'down' || action === 'left' || action === 'right') landPending.current = false;
+      if (action !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); popRef.current();
+    };
     // Artwork follows focus: the list window grows to the focused row.
     const focused = (event: FocusEvent) => {
       const row = (event.target as HTMLElement | null)?.closest?.('[data-art-index]') as HTMLElement | null;
@@ -170,6 +176,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
   // on the new level's first stop (the Close/Back buttons while its data is still loading).
   useEffect(() => {
     artRef.current.reset();
+    landPending.current = false;
     const timer = window.setTimeout(() => {
       const wanted = restoreKey.current;
       restoreKey.current = null;
@@ -178,18 +185,22 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
       if (scroll.current) scroll.current.scrollTop = 0;
       const first = document.querySelector<HTMLElement>('.info-scroll [data-focus-key]');
       if (stackRef.current.length && first) focusElement(first);
-      else focusElement(document.querySelector<HTMLElement>(stackRef.current.length ? '[data-focus-key="info-back"]' : '[data-focus-key="info-close"]'));
+      else { focusElement(document.querySelector<HTMLElement>(stackRef.current.length ? '[data-focus-key="info-back"]' : '[data-focus-key="info-close"]')); landPending.current = stackRef.current.length > 0; }
     }, 0);
     return () => window.clearTimeout(timer);
   }, [stack.length]);
 
-  // A level's data arrives after focus landed on Close: move into the list, but never steal focus from a row already focused.
+  // A level's data arrives after focus landed on Back while it loaded: move into the list once, and only
+  // until the viewer presses a key; later re-renders (artwork settling) never pull the cursor off Back or
+  // Close (D-pad map info-season).
   useEffect(() => {
-    if (!stack.length) return;
+    if (!stack.length || !landPending.current) return;
+    const first = document.querySelector<HTMLElement>('.info-scroll [data-focus-key]');
+    if (!first) return;
+    landPending.current = false;
     const active = document.activeElement as HTMLElement | null;
     if (active && active.closest && active.closest('.info-scroll')) return;
-    const first = document.querySelector<HTMLElement>('.info-scroll [data-focus-key]');
-    if (first) focusElement(first);
+    focusElement(first);
   });
 
   const view = infoView(info);
