@@ -1,4 +1,4 @@
-import { canonicalLanguage, episodeRowLine, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogSource, type CatalogTitle, type EpisodePageView, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
+import { canonicalLanguage, episodeRowLine, formatBytes, formatRuntime, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogSource, type CatalogTitle, type EpisodePageView, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
 import { formatTime } from './player';
 
 // Display decisions for the TV screens (DESIGN.md "Information priorities"), kept as pure text
@@ -17,9 +17,20 @@ export function titleKind(title: Pick<CatalogTitle, 'kind' | 'seasonCount'>): st
   return seasons > 0 ? `${seasons} season${seasons === 1 ? '' : 's'}` : 'Series';
 }
 
-/** Home hero and title page eyebrow: kind, then the full release date (a series: 'Since <year>') when known. */
+/** Home hero kind line: why a resumed title leads Home, else the kind (DESIGN.md "Home"). */
+export function heroKind(title: Pick<CatalogTitle, 'kind' | 'seasonCount'>, resuming: boolean): string {
+  return resuming ? 'Continue watching' : titleKind(title);
+}
+
+/** Home hero title: a "Title: Subtitle" name splits into the title and a subtitle line; anything else stays whole. */
+export function heroTitleParts(name: string): [string, string] {
+  const at = name.indexOf(': ');
+  return at > 0 && at < name.length - 2 ? [name.slice(0, at), name.slice(at + 2)] : [name, ''];
+}
+
+/** Home hero facts line: the full release date (a series: 'Since <year>') and up to three genres, each only when known. */
 export function heroFacts(title: CatalogTitle): string[] {
-  return [titleKind(title), releaseLine(title)].filter(Boolean);
+  return [releaseLine(title), (title.genres || []).slice(0, 3).join(', ')].filter(Boolean);
 }
 
 /** Episode tile second line: the shared versions-and-facts line, then watch progress. */
@@ -28,13 +39,13 @@ export function episodeMeta(episode: { sourceCount: number }, page: EpisodePageV
 }
 
 /**
- * Poster card second line: release (month and year; a series 'Since <year>'), best resolution, a rating that has votes. Tracker names, source
- * counts and seeders stay off the card, except on a row defined by seeders ("Strong swarms").
+ * Poster card fact line: one short fact that fits the ~210 px card whole: the release (month and year; a series
+ * 'Since <year>'), else the kind. Resolution, rating, tracker names and source counts stay off the card; a row
+ * defined by seeders ("Strong swarms") shows the seeders instead.
  */
 export function cardMeta(title: CatalogTitle, options: { seeders?: boolean } = {}): string {
-  const seeders = options.seeders && title.bestSeeders > 0 ? `${title.bestSeeders} seeders` : '';
-  const text = joined([seeders, releaseLine(title, { compact: true }), title.resolutions?.[0]]);
-  return text || (cardRating(title) ? '' : title.kind === 'series' ? 'Series' : 'Movie');
+  if (options.seeders && title.bestSeeders > 0) return `${title.bestSeeders} seeders`;
+  return releaseLine(title, { compact: true }) || (title.kind === 'series' ? 'Series' : 'Movie');
 }
 
 /** The card's rating, one decimal, only when it has votes; the card draws the star icon in front of it. */
@@ -56,12 +67,27 @@ export function watchProgress(item: Pick<HouseholdItem, 'positionMs' | 'duration
   return item.durationMs > 0 ? Math.max(0, Math.min(100, Math.round(item.positionMs / item.durationMs * 100))) : 0;
 }
 
-/** Continue-watching and Library card line: episode code (or year), then where the viewer is. */
+/** Library poster card fact line (My List, Watched, Library grids): where the viewer is, in one short fact. */
 export function libraryCardLine(item: HouseholdItem): string {
-  const code = episodeCode(item.seasonNumber, item.episodeNumber);
-  const status = item.watched ? 'Watched' : item.positionMs > 0 ? `${watchProgress(item)}% watched` : 'Ready to play';
-  if (item.watched || item.positionMs <= 0) return status;
-  return joined([code || item.catalog?.year, status]);
+  if (item.watched) return 'Watched';
+  if (item.positionMs > 0) {
+    const code = episodeCode(item.seasonNumber, item.episodeNumber);
+    return code ? `${code} · ${watchProgress(item)}%` : `${watchProgress(item)}% watched`;
+  }
+  return (item.catalog && releaseLine(item.catalog, { compact: true })) || 'Ready to play';
+}
+
+/** What is left of a title in progress ("1 h 30 min left"), rounded up to the minute; empty when its length is unknown. */
+export function timeLeft(item: Pick<HouseholdItem, 'positionMs' | 'durationMs'>): string {
+  if (item.durationMs <= 0) return '';
+  return `${formatRuntime(Math.max(1, Math.ceil((item.durationMs - item.positionMs) / 60_000)))} left`;
+}
+
+/** Continue watching landscape card line: the episode code, then the time left (or the state). */
+export function continueCardLine(item: HouseholdItem): string {
+  if (item.watched) return 'Watched';
+  const state = item.positionMs > 0 ? timeLeft(item) || 'In progress' : 'Ready to play';
+  return joined([episodeCode(item.seasonNumber, item.episodeNumber), state]);
 }
 
 /** One-line resume summary on the title detail header. */

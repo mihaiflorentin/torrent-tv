@@ -620,93 +620,205 @@ button>.tv-icon:first-child {
  margin: 0 var(--tt-space-4) var(--tt-space-3) 0
 }
 
-/* Home hero: text over the focus-following backdrop, on a scrim that guarantees contrast. */
-.tv-hero {
- margin: var(--tt-space-3) 0 var(--tt-space-4)
+/* Home hero (#55, the "Home" board): no panel and no page title. The copy sits straight on the focus-following
+   backdrop, whose Home scrims (below) darken the left under the copy and the bottom under the rows. The kind line,
+   the title with its subtitle line, facts and the resolution chip, a two-line overview, then the primary, Info and
+   My List in one row. The top margin puts the kind line where the board has it (170 px down). */
+.tv-app[data-route="home"] .tv-backdrop-scrim {
+ background: linear-gradient(90deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-text) 30%, transparent 64%), linear-gradient(0deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-bottom) 18%, transparent 56%), var(--tt-scrim-top)
 }
 
-.tv-hero-copy {
- width: 1040px;
- padding: var(--tt-space-5) var(--tt-space-6) var(--tt-space-6);
- background: var(--tt-scrim-text);
- border-radius: var(--tt-radius-lg)
+.tv-hero {
+ width: 1000px;
+ margin: 116px 0 60px
+}
+
+.tv-hero-kind {
+ display: flex;
+ align-items: center;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ line-height: var(--tt-leading-tight)
+}
+
+/* The saffron marker of a title in progress, beside its word. */
+.tv-hero-dot {
+ flex: 0 0 10px;
+ width: 10px;
+ height: 10px;
+ margin-right: 14px;
+ border-radius: 5px;
+ background: var(--tt-accent)
 }
 
 .tv-hero h2 {
- margin: var(--tt-space-2) 0 var(--tt-space-3);
- font-size: var(--tt-tv-text-title);
+ margin: 18px 0 0;
+ font-size: var(--tt-tv-text-display);
  font-weight: var(--tt-weight-black);
- line-height: 1.08;
- /* Two lines at any title size (2 x 1.08). */
- max-height: 2.16em;
+ line-height: var(--tt-leading-display);
+ letter-spacing: var(--tt-tracking-display)
+}
+
+/* Two lines at most; old engines without the line clamp stop at the same height. */
+.tv-hero-title {
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2;
+ max-height: 2.04em;
  overflow: hidden
 }
 
-.tv-hero-overview,
-.detail-overview {
+.tv-hero-subtitle {
+ display: block;
+ margin-top: 6px;
+ color: var(--tt-text-muted);
+ font-size: 40px;
+ font-weight: var(--tt-weight-semibold);
+ line-height: 1.2;
+ letter-spacing: var(--tt-tracking-snug);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-hero-facts {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ margin-top: 26px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ line-height: var(--tt-leading-tight)
+}
+
+.tv-hero-chip {
+ margin-left: var(--tt-space-5);
+ padding: var(--tt-space-1) var(--tt-space-3);
+ border: 2px solid var(--tt-line-strong);
+ border-radius: var(--tt-radius-sm);
+ color: var(--tt-text);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold)
+}
+
+.tv-hero-facts>.tv-hero-chip:first-child {
+ margin-left: 0
+}
+
+.tv-hero-overview {
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2;
+ width: 860px;
+ max-height: 2.9em;
+ margin-top: 26px;
+ overflow: hidden;
+ color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-body);
  line-height: var(--tt-leading-body)
 }
 
-.tv-hero-overview {
- max-height: 132px;
- overflow: hidden;
- display: -webkit-box;
- -webkit-line-clamp: 3;
- -webkit-box-orient: vertical
+.tv-hero-actions {
+ display: flex;
+ flex-wrap: nowrap;
+ align-items: center;
+ margin-top: 40px
 }
 
-.tv-hero-genres,
-.detail-genres {
- margin-top: var(--tt-space-2);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta)
+.tv-hero-actions>*+* {
+ margin-left: 20px
 }
 
-.tv-hero button {
- margin-top: var(--tt-space-5)
+.tv-hero-actions button {
+ flex: 0 0 auto;
+ height: 80px;
+ white-space: nowrap
 }
 
-/* Pills have no border to separate them, so neighbours in the hero take a margin. */
-.tv-hero button+button {
- margin-left: var(--tt-space-4)
+.tv-hero-actions button.primary {
+ padding: 0 40px 0 32px;
+ font-size: 32px
+}
+
+.tv-hero-actions button.primary>.tv-icon:first-child {
+ width: 30px;
+ height: 30px;
+ flex: 0 0 30px;
+ margin: 0 14px 0 0
+}
+
+.tv-hero-actions button.tv-hero-icon {
+ width: 80px;
+ padding: 0
+}
+
+.tv-hero-actions button.tv-hero-icon>.tv-icon:first-child {
+ margin: 0
 }
 
 /* Rows ----------------------------------------------------------------- */
+/* Rows sit 48 px apart: 28 px of the rail's own room under the cards plus this margin. */
 .row-heading {
  display: flex;
  align-items: baseline;
- margin: var(--tt-space-5) 0 0
+ margin: 20px 0 0
 }
 
 .row-heading h2 {
  font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ letter-spacing: var(--tt-tracking-snug)
 }
 
 .poster-rail {
  display: flex;
+ align-items: flex-start;
  overflow-x: auto;
  padding: 28px 24px 36px;
  margin: -4px -96px -8px -24px
 }
 
+/* About seven posters (210 px) or four landscape cards (400 px) across, 28 px apart. */
 .poster-rail>* {
- flex: 0 0 304px;
- margin-right: var(--tt-space-4)
+ flex: 0 0 210px;
+ margin-right: 28px
 }
 
+.landscape-rail>* {
+ flex: 0 0 400px
+}
+
+/* A card: the art, then the title (two lines at most) and one short fact under it, on no surface of its own.
+   Focused, the whole card lifts and its copy sits on a lighter fill, inside the white ring. */
 .poster-card {
  display: block;
- width: 304px;
- height: 548px;
+ width: 210px;
+ min-height: 0;
  padding: 0;
  overflow: hidden;
  text-align: left;
- background: var(--tt-raised);
+ background: transparent;
  border-radius: var(--tt-radius-lg);
  contain: layout paint style;
  transition: transform var(--tt-dur-fast) var(--tt-ease-out)
+}
+
+.landscape-card {
+ width: 400px
+}
+
+.card-art {
+ position: relative;
+ display: block;
+ height: 315px;
+ overflow: hidden;
+ background: var(--tt-raised);
+ border-radius: var(--tt-radius-lg)
+}
+
+.landscape-card .card-art {
+ height: 225px
 }
 
 .poster-card img,
@@ -714,7 +826,7 @@ button>.tv-icon:first-child {
 .poster-fallback {
  display: block;
  width: 100%;
- height: 440px;
+ height: 100%;
  object-fit: cover
 }
 
@@ -728,10 +840,9 @@ button>.tv-icon:first-child {
  font-weight: var(--tt-weight-black)
 }
 
-/* A focused poster or landscape card lifts and its copy sits on a lighter fill, inside the white ring. */
 .poster-card:focus {
  transform: scale(var(--tt-focus-scale-tv));
- background: var(--tt-overlay);
+ background: var(--tt-fill-selected);
  color: var(--tt-text)
 }
 
@@ -775,55 +886,76 @@ button>.tv-icon:first-child {
  transition: none
 }
 
+/* A fixed height (two title lines and the fact) keeps every card in a row the same size: a button centres its
+   content, so a shorter copy would push the art down. */
 .poster-copy {
- height: 104px;
- padding: var(--tt-space-3) 14px;
- display: flex;
- flex-direction: column
+ display: block;
+ height: 128px;
+ padding: var(--tt-space-3) var(--tt-space-2) 14px
 }
 
-.poster-copy>*+* {
- margin-top: var(--tt-space-1)
+.landscape-card .poster-copy {
+ height: 132px
 }
 
+/* The title wraps to a second line instead of being cut; old engines without the line clamp stop at the same height. */
 .poster-copy strong {
- font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-bold);
- line-height: var(--tt-leading-tight);
- white-space: nowrap;
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2;
+ max-height: 2.4em;
  overflow: hidden;
- text-overflow: ellipsis
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ line-height: 1.2
 }
 
+.landscape-card .poster-copy strong {
+ font-size: 28px;
+ font-weight: var(--tt-weight-bold)
+}
+
+/* One short fact, chosen to fit (display.ts); the ellipsis is only a guard. */
 .poster-copy span {
+ display: block;
+ margin-top: var(--tt-space-1);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta);
  font-weight: var(--tt-weight-medium);
- line-height: 1.25;
+ line-height: 1.3;
  white-space: nowrap;
  overflow: hidden;
  text-overflow: ellipsis
 }
 
+/* Seven cards to a line, as main.tsx numbers its focus rows: the right margin takes the last card's 28 px. */
 .tv-library-grid {
  display: flex;
  flex-wrap: wrap;
  padding: 28px 24px 0;
- margin: 0 -24px
+ margin: 0 -52px 0 -24px
 }
 
 .tv-library-grid .poster-card {
- margin: 0 var(--tt-space-4) var(--tt-space-5) 0
+ margin: 0 28px var(--tt-space-5) 0
 }
 
+/* Watch progress on the art: a slim saffron bar on a translucent track. */
 .tv-card-progress {
  position: absolute;
- left: 0;
- right: 0;
- top: 430px;
- height: 10px;
- background: var(--tt-scrim-text);
+ left: 20px;
+ right: 20px;
+ bottom: 18px;
+ height: 6px;
+ border-radius: 3px;
+ background: var(--tt-fill-strong);
  overflow: hidden
+}
+
+.poster-card:not(.landscape-card) .tv-card-progress {
+ left: 12px;
+ right: 12px;
+ bottom: 12px
 }
 
 .tv-card-progress b {
@@ -846,7 +978,7 @@ button>.tv-icon:first-child {
  margin-bottom: 8px
 }
 
-.poster-card>.tv-state-badges {
+.card-art>.tv-state-badges {
  position: absolute;
  top: 12px;
  left: 12px;

@@ -33,6 +33,16 @@ select:focus {
  will-change: scroll-position
 }
 
+/* A rail is its cards' stacking context. A card is a positioned button; inside a scroller that is not a stacking
+   context, every card near the viewport had to become a compositor layer of its own (overlap with the rail layer),
+   and the layer pass then ran on every key. Measured with the throttled harness after the denser rows of #55: 16 to
+   35 layers on Home, Layerize 10-15 ms per D-pad move; with this rule the cards paint into their rail's layer and a
+   held Down costs about 18 ms instead of 32. */
+.poster-rail {
+ position: relative;
+ z-index: 0
+}
+
 /* Every TV (capability.ts) snaps: measured on a 2023 Samsung, each animated frame costs a TV hundreds of ms, so a
    120-260 ms transition turns into visible stutter after every key. The end states (focus ring, scale, open
    sidebar, new backdrop) are the same; they just appear in one frame. */

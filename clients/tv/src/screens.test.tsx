@@ -84,17 +84,27 @@ describe('TV screens show what helps the next decision', () => {
     mount(container, {}, { titles: [title()] });
     await wait();
     expect(text('.tv-hero')).toContain('Alpha');
-    expect(text('.tv-hero')).toContain('Movie · 2019');
+    expect(text('.tv-hero-kind')).toBe('Movie');
+    expect(text('.tv-hero-facts')).toBe('20192160p');
     expect(text('.tv-hero')).not.toMatch(/seeders|FileList|\d+ versions?/i);
-    expect(text('.poster-card')).toContain('2019 · 2160p');
+    expect(text('.poster-card .poster-copy span')).toBe('2019');
     expect(text('.poster-card')).not.toMatch(/seeders|FileList|source/i);
+  });
+
+  it('badges a poster with its library state in a word short enough for the card, the full state in its label', async () => {
+    mount(container, {}, { titles: [title({ libraryState: { downloadState: 'downloaded', transferState: 'idle', watchState: 'watched' } }), title({ id: 'b', title: 'Beta', libraryState: { downloadState: 'downloading', transferState: 'active', watchState: 'partial', progress: 0.41 } })] });
+    await wait();
+    const badges = (focusKey: string) => Array.from(key(focusKey)!.querySelectorAll('.tv-state-badge')).map(node => [node.textContent, node.getAttribute('aria-label')]);
+    expect(badges('title-a')).toEqual([['Downloaded', 'Downloaded'], ['Watched', 'Watched']]);
+    expect(badges('title-b')).toEqual([['41% done', 'Downloading 41%'], ['Started', 'Some watched']]);
   });
 
   it('gives a title without a year no placeholder', async () => {
     mount(container, {}, { titles: [title({ year: undefined })] });
     await wait();
     expect(container.textContent).not.toMatch(/Year unknown|—/);
-    expect(text('.tv-hero .eyebrow')).toBe('Movie');
+    expect(text('.tv-hero-kind')).toBe('Movie');
+    expect(container.querySelector('.tv-hero-facts .detail-dot')).toBeNull();
   });
 
   it('shows seeders only on the row defined by them', async () => {
@@ -106,12 +116,12 @@ describe('TV screens show what helps the next decision', () => {
     expect(named('Strong swarms')).toContain('77 seeders');
   });
 
-  it('prints episode code and progress on a continue-watching card, never the release, tracker or path', async () => {
+  it('prints episode code and time left on a continue-watching card, never the release, tracker or path', async () => {
     mount(container, {}, { titles: [title()], household: { ...empty, continueWatching: [libraryItem()] } });
     await wait();
     const card = text('.library-poster-card');
     expect(card).toContain('Alpha');
-    expect(card).toContain('S01E02 · 41% watched');
+    expect(card).toContain('S01E02 · 1 min left');
     expect(card).not.toMatch(/FileList|WEB-DL|\.mkv|GRP/);
     expect(container.querySelector('.tv-card-progress')?.getAttribute('aria-label')).toBe('41% watched');
   });

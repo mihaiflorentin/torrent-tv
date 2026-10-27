@@ -71,14 +71,14 @@ describe('TV icons and app mark', () => {
     expect(mark.textContent).toBe('');
   });
 
-  it('draws the rating star on a poster card and keeps the number as text', async () => {
+  it('keeps the rating off the poster card: its one fact line is text, with no star and no glyph', async () => {
     mount();
     await wait();
     const card = container.querySelector<HTMLElement>('[data-focus-key="title-r"]')!;
     const meta = card.querySelector('.poster-copy span')!;
-    expect(meta.textContent).toContain('7.4');
+    expect(meta.textContent).not.toContain('7.4');
     expect(meta.textContent).not.toMatch(GLYPH_ICONS);
-    expect(meta.querySelector('svg')).not.toBeNull();
+    expect(meta.querySelector('svg')).toBeNull();
   });
 
   it('leaves no glyph icon anywhere in the TV screens, including the back buttons and the row chevrons', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogTitle, Download, HouseholdItem, Job, ParsedRelease, PlaybackPreferences } from '@torrent-tv/shared';
-import { cardMeta, cardRating, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
+import { cardMeta, cardRating, continueCardLine, heroKind, timeLeft, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
 
 // DESIGN.md "Information priorities": what each TV screen shows, decided as pure text so the
 // markup only places it. Unknown facts are omitted, never printed as a placeholder.
@@ -26,22 +26,33 @@ describe('titleKind', () => {
 });
 
 describe('heroFacts', () => {
-  it('lists kind and year', () => expect(heroFacts(title({ year: 2019 }))).toEqual(['Movie', '2019']));
-  it('omits an unknown year instead of printing a placeholder', () => expect(heroFacts(title())).toEqual(['Movie']));
+  it('lists the release and up to three genres; the kind has its own line', () => expect(heroFacts(title({ year: 2019, genres: ['Animation', 'Action', 'Drama', 'War'] }))).toEqual(['2019', 'Animation, Action, Drama']));
+  it('omits an unknown year instead of printing a placeholder', () => expect(heroFacts(title())).toEqual([]));
 });
 
+describe('heroKind', () => {
+  it('says why a resumed title leads Home', () => expect(heroKind(title(), true)).toBe('Continue watching'));
+  it('names the kind otherwise', () => { expect(heroKind(title(), false)).toBe('Movie'); expect(heroKind(title({ kind: 'series', seasonCount: 2 }), false)).toBe('2 seasons'); });
+});
+
+// A poster card is about 210 px wide: at the 26 px floor about 14 characters fit, so its fact line is one short fact.
+const CARD_FIT = 14;
 describe('cardMeta', () => {
-  it('shows year, best resolution and a rating that has votes', () => {
-    expect(cardMeta(title({ year: 2019, resolutions: ['1080p', '720p'], rating: 7.44, ratingVotes: 120 }))).toBe('2019 · 1080p');
-    expect(cardRating(title({ year: 2019, resolutions: ['1080p', '720p'], rating: 7.44, ratingVotes: 120 }))).toBe('7.4');
+  it('is one short fact: the release, never the resolution or the rating', () => {
+    expect(cardMeta(title({ year: 2019, resolutions: ['1080p', '720p'], rating: 7.44, ratingVotes: 120 }))).toBe('2019');
+    expect(cardMeta(title({ year: 2019, releaseDate: '2019-03-14', resolutions: ['1080p'] }))).toBe('Mar 2019');
+    expect(cardMeta(title({ kind: 'series', year: 2019, resolutions: ['1080p'] }))).toBe('Since 2019');
   });
-  it('drops a rating without votes', () => { expect(cardMeta(title({ year: 2019, rating: 9, ratingVotes: 0 }))).toBe('2019'); expect(cardRating(title({ year: 2019, rating: 9, ratingVotes: 0 }))).toBe(''); });
   it('never prints seeders, tracker names or source counts', () => {
     const text = cardMeta(title({ year: 2019, bestSeeders: 999, sourceCount: 7 }));
     expect(text).not.toMatch(/seeders|FileList|source/i);
   });
-  it('shows seeders, first so a narrow card never cuts them, only for a row defined by them', () => expect(cardMeta(title({ year: 2019, resolutions: ['1080p'], bestSeeders: 42 }), { seeders: true })).toBe('42 seeders · 2019 · 1080p'));
-  it('names the kind when nothing else is known', () => expect(cardMeta(title({ kind: 'series' }))).toBe('Series'));
+  it('shows seeders alone on a row defined by them', () => expect(cardMeta(title({ year: 2019, resolutions: ['1080p'], bestSeeders: 42 }), { seeders: true })).toBe('42 seeders'));
+  it('names the kind when nothing else is known', () => { expect(cardMeta(title({ kind: 'series' }))).toBe('Series'); expect(cardMeta(title())).toBe('Movie'); });
+  it('fits the card without being cut', () => {
+    for (const sample of [title({ year: 2019, releaseDate: '2019-09-30' }), title({ kind: 'series', year: 2019 }), title({ kind: 'series' })]) expect(cardMeta(sample).length).toBeLessThanOrEqual(CARD_FIT);
+    expect(cardMeta(title({ bestSeeders: 99_999 }), { seeders: true }).length).toBeLessThanOrEqual(CARD_FIT);
+  });
 });
 
 const parsed = (over: Partial<ParsedRelease> = {}): ParsedRelease => ({ title: 'Alpha', sortTitle: 'alpha', kind: 'movie', ...over });
@@ -63,21 +74,45 @@ describe('source row facts', () => {
 const item = (over: Partial<HouseholdItem> = {}): HouseholdItem => ({ profileId: 'h', sourceId: 's', releaseId: 'r', fileIndex: 0, filePath: 'Alpha.S01E02.1080p.mkv', positionMs: 0, durationMs: 0, watched: false, updatedAt: '', release: { id: 'r', trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '1', browseClass: 'video', name: 'Alpha.S01E02.1080p', category: 'TV', sizeBytes: 1, seeders: 5, leechers: 0, freeleech: false }, favorite: false, ...over });
 
 describe('library cards', () => {
-  it('shows the episode code and percent watched', () => {
-    expect(libraryCardLine(item({ seasonNumber: 1, episodeNumber: 2, positionMs: 410, durationMs: 1000 }))).toBe('S01E02 · 41% watched');
+  it('shows the episode code and percent watched in one short fact', () => {
+    expect(libraryCardLine(item({ seasonNumber: 1, episodeNumber: 2, positionMs: 410, durationMs: 1000 }))).toBe('S01E02 · 41%');
   });
-  it('shows the year for a movie in progress', () => {
-    expect(libraryCardLine(item({ positionMs: 500, durationMs: 1000, catalog: title({ year: 2019 }) }))).toBe('2019 · 50% watched');
+  it('shows the percent for a movie in progress', () => {
+    expect(libraryCardLine(item({ positionMs: 500, durationMs: 1000, catalog: title({ year: 2019 }) }))).toBe('50% watched');
   });
   it('says Watched for a finished title', () => expect(libraryCardLine(item({ watched: true, positionMs: 1000, durationMs: 1000 }))).toBe('Watched'));
-  it('says Ready to play when nothing was watched yet', () => expect(libraryCardLine(item())).toBe('Ready to play'));
-  it('never leaks the tracker, release name or file path', () => {
-    const text = libraryCardLine(item({ positionMs: 500, durationMs: 1000 }));
-    expect(text).not.toMatch(/FileList|Alpha\.S01|mkv/);
+  it('shows the release of a title not started yet, else Ready to play', () => {
+    expect(libraryCardLine(item({ catalog: title({ kind: 'series', year: 2019 }) }))).toBe('Since 2019');
+    expect(libraryCardLine(item())).toBe('Ready to play');
+  });
+  it('never leaks the tracker, release name or file path, and fits the card', () => {
+    for (const sample of [item({ positionMs: 500, durationMs: 1000 }), item({ seasonNumber: 12, episodeNumber: 24, positionMs: 999, durationMs: 1000 }), item()]) {
+      const text = libraryCardLine(sample);
+      expect(text).not.toMatch(/FileList|Alpha\.S01|mkv/);
+      expect(text.length).toBeLessThanOrEqual(CARD_FIT);
+    }
   });
   it('clamps progress into 0 to 100', () => {
     expect(watchProgress(item({ positionMs: 5000, durationMs: 1000 }))).toBe(100);
     expect(watchProgress(item({ positionMs: 5, durationMs: 0 }))).toBe(0);
+  });
+});
+
+describe('Continue watching cards and the hero Resume', () => {
+  it('says how much is left, in hours and minutes', () => {
+    expect(timeLeft(item({ positionMs: 20 * 60_000, durationMs: 110 * 60_000 }))).toBe('1 h 30 min left');
+    expect(timeLeft(item({ positionMs: 410_000, durationMs: 1_000_000 }))).toBe('10 min left');
+    expect(timeLeft(item({ positionMs: 59_000, durationMs: 60_000 }))).toBe('1 min left');
+  });
+  it('says nothing when the length is unknown', () => expect(timeLeft(item({ positionMs: 5000 }))).toBe(''));
+  it('leads a landscape card with the episode code, then the time left', () => {
+    expect(continueCardLine(item({ seasonNumber: 1, episodeNumber: 4, positionMs: 8 * 60_000, durationMs: 30 * 60_000 }))).toBe('S01E04 · 22 min left');
+    expect(continueCardLine(item({ positionMs: 40 * 60_000, durationMs: 110 * 60_000 }))).toBe('1 h 10 min left');
+  });
+  it('falls back to the percent when the length is unknown, and to the state', () => {
+    expect(continueCardLine(item({ seasonNumber: 1, episodeNumber: 4, positionMs: 8 * 60_000 }))).toBe('S01E04 · In progress');
+    expect(continueCardLine(item({ watched: true, positionMs: 1000, durationMs: 1000 }))).toBe('Watched');
+    expect(continueCardLine(item({ seasonNumber: 2, episodeNumber: 1 }))).toBe('S02E01 · Ready to play');
   });
 });
 

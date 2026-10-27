@@ -1,5 +1,6 @@
 // The rail and Home. See ../model.mjs for the map format.
 import { lines, onRoute, row } from './common.mjs';
+import { infoPanel } from './title.mjs';
 
 export const rail = {
   name: 'rail',
@@ -24,7 +25,7 @@ export const rail = {
 export const home = {
   name: 'home',
   route: 'home',
-  notes: 'Hero, Continue watching, Recently added, the extra rails (each loads when the rail above it takes focus), My List. Up/Down keep the column; Left from column 0 of any row opens the rail.',
+  notes: 'Hero (the primary, then Info and My List as icon buttons in columns 1 and 2), Continue watching (landscape cards), Recently added, the extra rails (each loads when the rail above it takes focus), My List. Lands on the hero primary. Up/Down keep the column (Down from Info or My List enters Continue watching at that column; Up from a card past column 2 comes back to My List); Left from column 0 of any row opens the rail; Right at the end of a row stays. OK on Info opens the Info panel (map home-info); OK on My List toggles it in place.',
   detect: onRoute('home'),
   regions: ['content'],
   reach: [],
@@ -40,7 +41,15 @@ export const home = {
   bursts: [
     // Pages of 12 load as the cursor nears the end; a held Right must keep going through them.
     { from: 'recent[first]', key: 'right', presses: 40 },
+    { from: 'hero[first]', key: 'right', expect: 'hero[last]' },
     { from: 'hero[first]', key: 'down', expect: 'favorites[first]', presses: 12 },
     { from: 'favorites[first]', key: 'up', expect: 'hero[first]', presses: 12 },
   ],
 };
+
+export const homeInfo = infoPanel({
+  name: 'home-info',
+  notes: 'Info panel over Home, opened from the hero Info button: summary, cast, fine print. Back or Close returns to Info.',
+  opener: 'home:hero[1]',
+  reach: [{ focus: '[data-focus-key^="hero-info-"]' }, { press: 'enter' }],
+});
