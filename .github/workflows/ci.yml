@@ -106,7 +106,7 @@ jobs:
       - name: Test and build the TV client
         run: npm run build:tv
       - name: TV harness tests (D-pad audit failure reports, journeys, fixture)
-        run: node --test tools/tv_perf
+        run: node --test tools/tv_perf/*.test.mjs
       - name: D-pad navigation audit of the built TV bundle
         run: node tools/tv_perf/dpad.mjs
       - name: Upload the D-pad audit report
