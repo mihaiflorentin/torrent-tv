@@ -854,6 +854,8 @@ export function Catalog({ api, status, statusStore, connectionStore, titles, fac
  const homeLibrary = librarySections.filter(section => route !== 'home' || section.key === 'continue');
  const homeFavorites = route === 'home' ? librarySections.filter(section => section.key === 'favorites') : [];
  const shownRows = rows.filter(row => row.items.length > 0);
+ // Household rails take rows 3 + index and title rails 10 up; they cannot meet: the most household rails (three, rows 3-5) are on
+ // the Library dashboard, which draws no title rails, and Home, the only screen with both, draws one (Continue watching, row 3).
  const railRows = [...homeLibrary.map((section, index) => section.items.length > 0 ? 3 + index : -1).filter(row => row >= 0), ...shownRows.map((row, rowIndex) => row.row ?? rowIndex + 10), ...homeFavorites.filter(section => section.items.length > 0).map(() => HOME_ROW.favorites)];
  const railSpans = railWindows(railRows);
  const spanOf = (row: number) => railSpans[railRows.indexOf(row)] || { from: -Infinity, until: Infinity };
