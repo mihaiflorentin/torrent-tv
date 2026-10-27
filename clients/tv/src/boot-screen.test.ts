@@ -75,4 +75,13 @@ describe('startup.js boot messages', () => {
     expect(message().textContent).toBe('Application startup failed\n\napp.js did not load\n\nRestart the app; if it fails again, tell the household admin.');
     expect(message().style.color).toContain('--tt-danger');
   });
+
+  it('turns only the colour to danger and keeps the message\'s other inline styles', () => {
+    paint('../index.html');
+    message().style.textAlign = 'center';
+    (0, eval)(read('../startup.js'));
+    boot().fail(new Error('app.js did not load'));
+    expect(message().style.color).toContain('--tt-danger');
+    expect(message().style.textAlign).toBe('center');
+  });
 });
