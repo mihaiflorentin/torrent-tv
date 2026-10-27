@@ -35,7 +35,7 @@ The server runs on a Raspberry Pi on the private LAN alongside qBittorrent. The 
 ## Brand Commitments
 
 - Product name: Torrent TV; television label: Torrent TV.
-- Identity "Velvet Booth": a dark aubergine-black screening room with one saffron accent (`#ffab2e`), one bundled variable typeface (Bricolage Grotesque, SIL OFL), and a blurred poster backdrop that follows focus. Dark only; there is no light theme.
+- Identity "Night Screen": the picture is the show and the interface steps back. A cool near-black ground, white type in one bundled variable typeface (Inter, SIL OFL), translucent white controls that turn solid white under focus, and one refined saffron accent (`#f2a93b`) kept for progress, Best match, the selected marker, counts and badges, never for a large button. The poster backdrop follows focus, and a title's own picture is shown sharp on its page. Dark only; there is no light theme. It replaced "Velvet Booth" (aubergine-black, saffron primary buttons, Bricolage Grotesque) with spec #51.
 - One visual language for the browser app and the television client, built from the same shared design tokens (`clients/shared/design`). Density differs by platform, the palette does not.
 - Plex is the reference for information architecture and media-library structure only. The look, palette, type and layout must be recognizably original and must not imitate any streaming or media-server product.
 - Each screen shows only the data that helps the next decision. Title, year, state and one clear action come first; tracker names, release names, paths and raw counts sit behind details. Per-screen priorities are in `DESIGN.md`.
