@@ -336,7 +336,8 @@ describe('TV series page: episode list, then full-screen Versions', () => {
       await wait();
       const row = rowOf('2:4');
       expect(row.querySelector('.info-row-copy b')!.textContent).toBe('E04 · Episode 4');
-      expect(row.querySelector('.info-chevron')!.textContent).toBe('›');
+      expect(row.querySelector('svg.info-chevron')).not.toBeNull();
+      expect(row.querySelector('.info-chevron')!.textContent).toBe('');
       expect(row.querySelector('.info-still-small')).not.toBeNull();
       expect(row.querySelectorAll('button, a, input')).toHaveLength(0);
     });

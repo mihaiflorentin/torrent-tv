@@ -11,7 +11,8 @@ import { HOME_ROW, homeExtraRowsDue, homeHero, homeRowItems, homeRowSpecs, house
 import { discoverServers, DiscoveredServer, normalizeServerURL } from './discovery';
 import { Backdrop } from './backdrop';
 import { captureNav, type NavSnapshot } from './nav-snapshot';
-import { cardMeta, episodeMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
+import { Icon, AppMark } from './icons';
+import { cardMeta, cardRating, episodeMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
 import { appIdentity } from './app-name';
 import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL, registerMediaKeys } from './platform';
 import { applyGraphicsClass, detectCapabilities } from './capability';
@@ -57,22 +58,6 @@ function subtitleMenuRows(candidates: SubtitleCandidate[], firstRow: number, key
 }
 
 const defaultPlayerPreferences: PlaybackPreferences = { audioLanguage: 'en', audioTrackIndex: -1, subtitleLanguage: 'ro', subtitleMode: 'auto' };
-// Player control icons: 24 px viewBox, drawn at 40 px by the stylesheet, always paired with a visible label.
-const ICON_PATHS: Record<string, string> = {
- restart: 'M6 5h2.5v14H6zM20 5v14L10 12z',
- 'back-10': 'M11 6v12L2.5 12zM21 6v12l-8.5-6z',
- play: 'M8 5v14l11-7z',
- pause: 'M6 5h4v14H6zM14 5h4v14h-4z',
- 'forward-10': 'M13 6v12l8.5-6zM3 6v12l8.5-6z',
- audio: 'M4 9v6h4l5 4V5L8 9z',
- subtitles: 'M5 10h5v2H5zM12 10h7v2h-7zM5 14h8v2H5z',
- options: 'M4 7h6v2H4zM14 7h6v2h-6zM10 5h4v6h-4zM4 15h2v2H4zM10 15h10v2H10zM6 13h4v6H6z',
- back: 'M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z',
- hide: 'M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z',
-};
-function Icon({ name }: { name: string }) {
- return <svg class="tv-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={ICON_PATHS[name]} />{name === 'audio' && <path d="M16 9a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />}{name === 'subtitles' && <rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" />}</svg>;
-}
 
 export function Player({ api, download, resumeMs, preferences, onClose, onStateChanged, onComplete, onEpisode }: { api: API; download: Download; resumeMs: number; preferences?: PlaybackPreferences; onClose: () => void; onStateChanged: () => void; onComplete: (preferences: PlaybackPreferences) => void; onEpisode?: (next: Download, preferences: PlaybackPreferences) => void }) {
  const [message, setMessage] = useState('Opening stream…');
@@ -519,7 +504,7 @@ export function Setup({ draft, server, status, onDraft, onConnect, onForget }: {
  useEffect(() => { if (!server) void scan() }, []);
  useEffect(() => { if (!results.length) return; const timer = window.setTimeout(() => { if (document.activeElement === rescan.current) focusElement(document.querySelector<HTMLElement>('[data-focus-key="discovered-server-0"]')) }, 0); return () => window.clearTimeout(timer) }, [results.length]);
  useTVNavigation({ getInitialFocus: () => rescan.current || connect.current, inputExitTarget: () => connect.current, onBack: () => { if (manual && !server) { setManual(false); window.setTimeout(() => focusElement(rescan.current), 0) } else exitApplication() } });
- return <main class="setup"><span class="setup-mark" aria-hidden="true">{appIdentity().monogram}</span><h1>{appIdentity().name}</h1><p class="setup-lead">Choose a Torrent TV server on this private network.</p><div class="setup-mode-actions"><button ref={rescan} data-focus-region="setup" data-focus-row="0" data-focus-col="0" data-focus-key="setup-rescan" class={!manual ? 'primary' : ''} aria-disabled={searching ? 'true' : undefined} onClick={() => void scan()}>{searching ? 'Searching…' : 'Rescan'}</button><button data-focus-region="setup" data-focus-row="0" data-focus-col="1" data-focus-key="setup-manual" class={manual ? 'primary' : ''} onClick={() => setManual(value => !value)}>Manual address</button></div><p class="focus-hint" aria-live="polite">{discoveryStatus || 'Automatic discovery checks only the television’s local network.'}</p>{results.length > 0 && <section class="setup-results" aria-label="Discovered servers">{results.map((item, index) => <button data-focus-region="setup" data-focus-row={1 + index} data-focus-col="0" data-focus-key={`discovered-server-${index}`} onClick={() => onConnect(item.url)}><strong>{item.info.instanceName || item.info.name}</strong><span>{item.url}</span><small>Version {item.info.version}{item.info.configured ? ' · Ready' : ' · Setup required'}</small></button>)}</section>}{manual && <section class="setup-manual"><h2>Manual address</h2><div class="setup-controls"><input ref={address} readOnly data-focus-region="setup" data-focus-row="40" data-focus-col="0" data-focus-key="setup-address" type="url" inputMode="url" autoComplete="off" spellcheck={false} value={draft} onInput={event => onDraft(event.currentTarget.value)} placeholder="http://server.lan:8097" /><button ref={connect} data-focus-region="setup" data-focus-row="40" data-focus-col="1" data-focus-key="setup-connect" class="primary" onClick={() => onConnect(draft)}>Connect</button></div><p class="focus-hint">Select the address and press OK to edit it. Select Connect when ready.</p></section>}<p class="setup-status" aria-live="polite">{status}</p>{server && <button data-focus-region="setup" data-focus-row="41" data-focus-col="0" data-focus-key="setup-forget" onClick={onForget}>Forget saved server</button>}</main>;
+ return <main class="setup"><AppMark class="setup-mark" /><h1>{appIdentity().name}</h1><p class="setup-lead">Choose a Torrent TV server on this private network.</p><div class="setup-mode-actions"><button ref={rescan} data-focus-region="setup" data-focus-row="0" data-focus-col="0" data-focus-key="setup-rescan" class={!manual ? 'primary' : ''} aria-disabled={searching ? 'true' : undefined} onClick={() => void scan()}>{searching ? 'Searching…' : 'Rescan'}</button><button data-focus-region="setup" data-focus-row="0" data-focus-col="1" data-focus-key="setup-manual" class={manual ? 'primary' : ''} onClick={() => setManual(value => !value)}>Manual address</button></div><p class="focus-hint" aria-live="polite">{discoveryStatus || 'Automatic discovery checks only the television’s local network.'}</p>{results.length > 0 && <section class="setup-results" aria-label="Discovered servers">{results.map((item, index) => <button data-focus-region="setup" data-focus-row={1 + index} data-focus-col="0" data-focus-key={`discovered-server-${index}`} onClick={() => onConnect(item.url)}><strong>{item.info.instanceName || item.info.name}</strong><span>{item.url}</span><small>Version {item.info.version}{item.info.configured ? ' · Ready' : ' · Setup required'}</small></button>)}</section>}{manual && <section class="setup-manual"><h2>Manual address</h2><div class="setup-controls"><input ref={address} readOnly data-focus-region="setup" data-focus-row="40" data-focus-col="0" data-focus-key="setup-address" type="url" inputMode="url" autoComplete="off" spellcheck={false} value={draft} onInput={event => onDraft(event.currentTarget.value)} placeholder="http://server.lan:8097" /><button ref={connect} data-focus-region="setup" data-focus-row="40" data-focus-col="1" data-focus-key="setup-connect" class="primary" onClick={() => onConnect(draft)}>Connect</button></div><p class="focus-hint">Select the address and press OK to edit it. Select Connect when ready.</p></section>}<p class="setup-status" aria-live="polite">{status}</p>{server && <button data-focus-region="setup" data-focus-row="41" data-focus-col="0" data-focus-key="setup-forget" onClick={onForget}>Forget saved server</button>}</main>;
 }
 
 // Art for the backdrop: the title's backdrop, then its poster; empty when it has neither.
@@ -538,10 +523,10 @@ function EmptyState({ title, children }: { title: string; children: string }) { 
 
 type TVRoute = 'home' | 'search' | 'library' | 'continue' | 'favorites' | 'watched' | 'downloads' | 'library-categories' | 'tracker' | 'browse' | 'categories' | 'jobs' | 'settings' | 'projects';
 const menuGroups: Array<{ label: string; items: Array<{ id: TVRoute; label: string; icon: string }> }> = [
- { label: '', items: [{ id: 'home', label: 'Home', icon: '⌂' }, { id: 'search', label: 'Search', icon: '⌕' }] },
- { label: 'My Library', items: [{ id: 'library', label: 'Dashboard', icon: '◫' }, { id: 'continue', label: 'Continue watching', icon: '▶' }, { id: 'favorites', label: 'My List', icon: '★' }, { id: 'watched', label: 'Watched', icon: '✓' }, { id: 'downloads', label: 'Downloads', icon: '↓' }, { id: 'library-categories', label: 'Categories', icon: '≡' }] },
- { label: 'Tracker', items: [{ id: 'tracker', label: 'Dashboard', icon: '◉' }, { id: 'browse', label: 'Browse', icon: '▦' }, { id: 'categories', label: 'Categories', icon: '≡' }] },
- { label: '', items: [{ id: 'jobs', label: 'Jobs', icon: '↻' }, { id: 'settings', label: 'Settings', icon: '⚙' }] },
+ { label: '', items: [{ id: 'home', label: 'Home', icon: 'home' }, { id: 'search', label: 'Search', icon: 'search' }] },
+ { label: 'My Library', items: [{ id: 'library', label: 'Dashboard', icon: 'library' }, { id: 'continue', label: 'Continue watching', icon: 'continue' }, { id: 'favorites', label: 'My List', icon: 'my-list' }, { id: 'watched', label: 'Watched', icon: 'watched' }, { id: 'downloads', label: 'Downloads', icon: 'download' }, { id: 'library-categories', label: 'Categories', icon: 'categories' }] },
+ { label: 'Tracker', items: [{ id: 'tracker', label: 'Dashboard', icon: 'discover' }, { id: 'browse', label: 'Browse', icon: 'browse' }, { id: 'categories', label: 'Categories', icon: 'categories' }] },
+ { label: '', items: [{ id: 'jobs', label: 'Jobs', icon: 'jobs' }, { id: 'settings', label: 'Settings', icon: 'settings' }] },
 ];
 
 export type TVPreparingState = {
@@ -821,7 +806,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  if (detail) return <><TitleDetail key={`${detail.title.id}:${detailTarget.season || 0}:${detailTarget.episode || 0}`} api={api} detail={detail} target={detailTarget} message={detailMessage} resume={resumeForTitle(household.continueWatching, detail.title.id)} initialVersions={initialNav?.titleId === detail.title.id ? restoreVersions.current : ''} restoreKey={initialNav?.focusKey || ''} onVersions={reportVersions} favorite={favoriteIDs.has(detail.title.id)} onClose={onBack} onFavorite={onFavorite} onResume={item => onPlay(item.release, item.fileIndex, item.positionMs)} onPlay={onPlay} onPackAction={manageSeasonPack} />{preparingModal}</>;
  return <div class={`tv-app ${menuOpen ? 'menu-open' : ''}`}>
   <Backdrop key={route} initial={initialArt} />
-  <aside class="tv-sidebar"><div class="tv-brand"><span>{appIdentity().monogram}</span><b>{appIdentity().name}</b></div>{menuGroups.map((group, groupIndex) => <div class="tv-menu-group">{group.label && <small>{group.label}</small>}{group.items.map((item, index) => <button data-menu-route={item.id} data-focus-region="sidebar" data-focus-row={groupIndex * 10 + index} data-focus-col="0" data-focus-key={`menu-${item.id}`} class={route === item.id ? 'active' : ''} aria-current={route === item.id ? 'page' : undefined} onClick={() => chooseRoute(item.id)}><i>{item.icon}</i><span>{item.label}</span></button>)}</div>)}{portal && portal.links.length > 0 && <button data-menu-route="projects" data-focus-region="sidebar" data-focus-row={PROJECTS_MENU_ROW} data-focus-col="0" data-focus-key="menu-projects" class={route === 'projects' ? 'active' : ''} aria-current={route === 'projects' ? 'page' : undefined} onClick={() => chooseRoute('projects')}><i>↗</i><span>Other projects</span></button>}</aside>
+  <aside class="tv-sidebar"><div class="tv-brand"><AppMark /><b>{appIdentity().name}</b></div>{menuGroups.map((group, groupIndex) => <div class="tv-menu-group">{group.label && <small>{group.label}</small>}{group.items.map((item, index) => <button data-menu-route={item.id} data-focus-region="sidebar" data-focus-row={groupIndex * 10 + index} data-focus-col="0" data-focus-key={`menu-${item.id}`} class={route === item.id ? 'active' : ''} aria-current={route === item.id ? 'page' : undefined} onClick={() => chooseRoute(item.id)}><i><Icon name={item.icon} /></i><span>{item.label}</span></button>)}</div>)}{portal && portal.links.length > 0 && <button data-menu-route="projects" data-focus-region="sidebar" data-focus-row={PROJECTS_MENU_ROW} data-focus-col="0" data-focus-key="menu-projects" class={route === 'projects' ? 'active' : ''} aria-current={route === 'projects' ? 'page' : undefined} onClick={() => chooseRoute('projects')}><i><Icon name="external" /></i><span>Other projects</span></button>}</aside>
   <main class="tv-content">
    <header class="tv-top"><h1>{heading}</h1><StatusLine store={statusStore} fixed={status} /><button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="header-retry" data-landing="chrome" onClick={onRetry}>Refresh</button></header>
    {notice && <p class="tv-notice" role="status">{notice}</p>}
@@ -982,7 +967,7 @@ function TVFamilies({ api, mode, familyKey, chip, sort, setFamilyKey, setChip, s
  const titles = list?.titles || [];
  const items = list?.items || [];
  const empty = list !== null && titles.length === 0 && items.length === 0;
- const heading = <div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="family-back" onClick={() => { const closing = familyKey; setFamilyKey(''); setChip(''); window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closing}"]`); if (tile) focusElement(tile); else requestLanding() }, 0) }}>← All categories</button></div>;
+ const heading = <div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="family-back" onClick={() => { const closing = familyKey; setFamilyKey(''); setChip(''); window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closing}"]`); if (tile) focusElement(tile); else requestLanding() }, 0) }}><Icon name="chevron-left" />All categories</button></div>;
  return <section class="tv-family-page">
   {heading}
   <FamilyChips name={name} categories={family?.categories || []} active={chip} row={FAMILY_CHIP_ROW} onPick={pickChip} />
@@ -1017,7 +1002,7 @@ function TVJobs({ api, items: initial }: { api: API; items: Job[] }) {
 function TVJobDetail({ detail, onBack, onOlder }: { detail: { job: Job; logs: JobLog[]; next: string | null }; onBack: () => void; onOlder: () => void }) {
  const [level, setLevel] = useState(''); const [attempt, setAttempt] = useState(''); const [expanded, setExpanded] = useState<number | null>(null);
  const logs = detail.logs.filter(log => (!level || log.level === level) && (!attempt || String(log.attempt) === attempt));
- return <section class="tv-list job-detail"><button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="job-detail-back" onClick={onBack}>← Jobs</button><h2>{detail.job.label}</h2><p class="tv-muted">{jobStatusLine(detail.job)} · attempt {detail.job.attempt}</p><div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="log-level" onClick={() => setLevel(value => value === '' ? 'error' : value === 'error' ? 'warn' : '')}>Level: {level || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="log-attempt" onClick={() => setAttempt(value => value === '' ? String(detail.job.attempt) : '')}>Attempt: {attempt || 'all'}</button></div>{logs.length === 0 ? <p class="tv-muted">No logs match. Set Level and Attempt to all to see every entry.</p> : logs.map((log, index) => { const open = expanded === log.id; return <button type="button" aria-expanded={open} data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-log-${log.id}`} class={`job-log ${log.level} ${open ? 'expanded' : ''}`} onClick={() => setExpanded(value => value === log.id ? null : log.id)}><span class="job-log-heading"><strong>{log.phase} · {log.level}</strong><i>{open ? 'Hide details' : 'Show details'}</i></span><span>{new Date(log.createdAt).toLocaleString()} · attempt {log.attempt}</span><small>{log.message}</small>{open && <div class="job-log-expanded"><dl><dt>Job</dt><dd>{log.jobId}</dd><dt>Log entry</dt><dd>{log.id}</dd><dt>Attempt</dt><dd>{log.attempt}</dd></dl>{log.context && Object.keys(log.context).length > 0 ? <pre>{JSON.stringify(log.context, null, 2)}</pre> : <p>No structured context was recorded.</p>}</div>}</button> })}{detail.next && <button data-focus-region="content" data-focus-row={3 + logs.length} data-focus-col="0" data-focus-key="job-logs-older" onClick={() => void onOlder()}>Load older logs</button>}</section>
+ return <section class="tv-list job-detail"><button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="job-detail-back" onClick={onBack}><Icon name="chevron-left" />Jobs</button><h2>{detail.job.label}</h2><p class="tv-muted">{jobStatusLine(detail.job)} · attempt {detail.job.attempt}</p><div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="log-level" onClick={() => setLevel(value => value === '' ? 'error' : value === 'error' ? 'warn' : '')}>Level: {level || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="log-attempt" onClick={() => setAttempt(value => value === '' ? String(detail.job.attempt) : '')}>Attempt: {attempt || 'all'}</button></div>{logs.length === 0 ? <p class="tv-muted">No logs match. Set Level and Attempt to all to see every entry.</p> : logs.map((log, index) => { const open = expanded === log.id; return <button type="button" aria-expanded={open} data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-log-${log.id}`} class={`job-log ${log.level} ${open ? 'expanded' : ''}`} onClick={() => setExpanded(value => value === log.id ? null : log.id)}><span class="job-log-heading"><strong>{log.phase} · {log.level}</strong><i>{open ? 'Hide details' : 'Show details'}</i></span><span>{new Date(log.createdAt).toLocaleString()} · attempt {log.attempt}</span><small>{log.message}</small>{open && <div class="job-log-expanded"><dl><dt>Job</dt><dd>{log.jobId}</dd><dt>Log entry</dt><dd>{log.id}</dd><dt>Attempt</dt><dd>{log.attempt}</dd></dl>{log.context && Object.keys(log.context).length > 0 ? <pre>{JSON.stringify(log.context, null, 2)}</pre> : <p>No structured context was recorded.</p>}</div>}</button> })}{detail.next && <button data-focus-region="content" data-focus-row={3 + logs.length} data-focus-col="0" data-focus-key="job-logs-older" onClick={() => void onOlder()}>Load older logs</button>}</section>
 }
 
 
@@ -1185,8 +1170,13 @@ export function TVPromotions({ api }: { api: API }) {
  return <button class="tv-promo" data-focus-region="content" data-focus-row="95" data-focus-col="0" data-focus-key="promo" onClick={() => { void openExternalURL(url) }}><small>Advertisement</small>{/^https?:\/\//.test(promotion.image) && <img src={promotion.image} alt="" />}{promotion.title && <strong>{promotion.title}</strong>}{promotion.text && <p>{promotion.text}</p>}{promotion.link ? <code>{promotion.link}</code> : null}</button>;
 }
 
+// Poster card second line: the facts, then the rating as a drawn star and its number (never a star character).
+function CardMeta({ title, seeders }: { title: CatalogTitle; seeders?: boolean }) {
+ const meta = cardMeta(title, { seeders }); const rating = cardRating(title);
+ return <span>{meta}{meta && rating ? ' · ' : ''}{rating && <b class="tv-rating" aria-label={`Rated ${rating}`}><Icon name="star" />{rating}</b>}</span>;
+}
 const TitleCard = memo(function TitleCard({ api, title, row, col, focusKey, seeders, focusRef, loadArt, onOpen }: { api: API; title: CatalogTitle; row: number; col: number; focusKey?: string; seeders?: boolean; focusRef?: { current: HTMLButtonElement | null }; loadArt: boolean; onOpen: (title: CatalogTitle) => void }) {
- return <button ref={focusRef} class="poster-card" data-landing="card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey || `title-${title.id}`} data-art={followArtURL(api, title)} onClick={() => onOpen(title)}>{title.posterUrl ? <PosterArt src={api.streamURL(title.posterUrl)} load={loadArt} /> : <div class="poster-fallback">{title.title.slice(0, 1)}</div>}<TVStateBadges state={title.libraryState} /><div class="poster-copy"><strong>{title.title}</strong><span>{cardMeta(title, { seeders })}</span></div></button>;
+ return <button ref={focusRef} class="poster-card" data-landing="card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey || `title-${title.id}`} data-art={followArtURL(api, title)} onClick={() => onOpen(title)}>{title.posterUrl ? <PosterArt src={api.streamURL(title.posterUrl)} load={loadArt} /> : <div class="poster-fallback">{title.title.slice(0, 1)}</div>}<TVStateBadges state={title.libraryState} /><div class="poster-copy"><strong>{title.title}</strong><CardMeta title={title} seeders={seeders} /></div></button>;
 });
 function sourceActionLabel(source: CatalogSource) { return source.libraryState?.downloadState && source.libraryState.downloadState !== 'none' ? 'Play' : 'Play and download' }
 function SourceButton({ source, row, onPlay, focusKey, region = 'content', best }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void; focusKey?: string; region?: string; best?: boolean }) {
@@ -1348,7 +1338,7 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
  const packBase = Math.max(paneSources.length, unknownSources.length);
  return <main class="detail-screen">
   <Backdrop initial={artURL(api, detail.title)} follow={false} sharp posterOnly={!detail.title.backdropUrl && !!detail.title.posterUrl} />
-  <button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}>Back</button>
+  <button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}><Icon name="chevron-left" />Back</button>
   <div class="detail-copy">
    <span class="eyebrow">{heroFacts(detail.title).join(' · ')}</span>
    <h1>{detail.title.title}</h1>
@@ -1407,14 +1397,14 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
         <span class="info-still-small" aria-hidden="true">{still && inReach(art.reach, index) && <img src={api.streamURL(still)} alt="" onError={hideImage} />}</span>
         <span class="info-row-copy"><b>{episode.number ? `E${episode.number < 10 ? '0' : ''}${episode.number} · ` : ''}{episode.title}</b><small>{episodeMeta(episode, page, progress)}</small>{page.overview && <span class="episode-synopsis">{page.overview}</span>}{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
         <TVStateBadges state={episode.libraryState} />
-        <span class="info-chevron" aria-hidden="true">›</span>
+        <Icon name="chevron-right" class="info-chevron" />
        </button>
       </article>;
      })}
      {selected && unknownKey && <article key={unknownKey} role="listitem" class="episode-row unknown-group">
       <button class={`info-stop info-row episode-tile ${selectedKey === unknownKey ? 'selected' : ''}`} aria-current={selectedKey === unknownKey ? 'true' : undefined} data-episode-key={unknownKey} data-focus-region="episodes" data-focus-row={selected.episodes.length} data-focus-col="0" data-focus-key={unknownKey} onFocus={() => scheduleSelect(unknownKey)} onClick={() => openVersions(unknownKey)}>
        <span class="info-row-copy"><b>Unknown episodes ({selected.unknown!.length})</b><small>Files without episode information</small></span>
-       <span class="info-chevron" aria-hidden="true">›</span>
+       <Icon name="chevron-right" class="info-chevron" />
       </button>
      </article>}
     </div>

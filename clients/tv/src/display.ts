@@ -32,10 +32,14 @@ export function episodeMeta(episode: { sourceCount: number }, page: EpisodePageV
  * counts and seeders stay off the card, except on a row defined by seeders ("Strong swarms").
  */
 export function cardMeta(title: CatalogTitle, options: { seeders?: boolean } = {}): string {
-  const rating = title.ratingVotes && title.rating ? `★ ${title.rating.toFixed(1)}` : '';
   const seeders = options.seeders && title.bestSeeders > 0 ? `${title.bestSeeders} seeders` : '';
-  const text = joined([seeders, releaseLine(title, { compact: true }), title.resolutions?.[0], rating]);
-  return text || (title.kind === 'series' ? 'Series' : 'Movie');
+  const text = joined([seeders, releaseLine(title, { compact: true }), title.resolutions?.[0]]);
+  return text || (cardRating(title) ? '' : title.kind === 'series' ? 'Series' : 'Movie');
+}
+
+/** The card's rating, one decimal, only when it has votes; the card draws the star icon in front of it. */
+export function cardRating(title: CatalogTitle): string {
+  return title.ratingVotes && title.rating ? title.rating.toFixed(1) : '';
 }
 
 /** Version row headline: resolution with HDR. */

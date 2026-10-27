@@ -5,6 +5,7 @@ import {
   type API, type CatalogTitle, type InfoEpisode, type InfoLevel, type InfoSeasonDetail, type InfoSeasons, type TitleInfo,
 } from '@torrent-tv/shared';
 import { focusElement, remoteAction } from './navigation';
+import { Icon } from './icons';
 import { inReach, useListArtReach, type ArtReach } from './lazy-art';
 
 // Info panel: the extended description of a title in its own focus region, so the D-pad cannot leave it.
@@ -59,7 +60,7 @@ function SeasonsLevel({ api, title, cache, reach, push }: { api: API; title: Cat
     return <button class="info-stop info-row" data-focus-region={STOP} data-focus-row={1 + index} data-focus-col="0" data-focus-key={`info-season-${season.number}`} data-art-index={index} aria-haspopup="true" onClick={() => push({ kind: 'season', season: season.number })}>
       <span class="info-poster" aria-hidden="true">{card.initial}{season.posterUrl && inReach(reach, index) && <img src={api.streamURL(season.posterUrl)} alt="" loading="lazy" onError={event => { (event.currentTarget as HTMLElement).style.display = 'none' }} />}</span>
       <span class="info-row-copy"><b>{card.name}</b>{card.meta && <small>{card.meta}</small>}</span>
-      <span class="info-chevron" aria-hidden="true">›</span>
+      <Icon name="chevron-right" class="info-chevron" />
     </button>;
   })}</>;
 }
@@ -83,7 +84,7 @@ function SeasonLevel({ api, title, season, cache, reach, push }: { api: API; tit
       return <button class="info-stop info-row" data-focus-region={STOP} data-focus-row={row++} data-focus-col="0" data-focus-key={`info-episode-${episode.number}`} data-art-index={at} aria-haspopup="true" onClick={() => push({ kind: 'episode', season, episode: episode.number })}>
         <span class="info-still-small" aria-hidden="true">{source.stillUrl && inReach(reach, at) && <img src={api.streamURL(source.stillUrl)} alt="" loading="lazy" onError={event => { (event.currentTarget as HTMLElement).style.display = 'none' }} />}</span>
         <span class="info-row-copy"><b>{`${episode.short} · ${episode.title}`}</b>{episode.meta && <small>{episode.meta}</small>}</span>
-        <span class="info-chevron" aria-hidden="true">›</span>
+        <Icon name="chevron-right" class="info-chevron" />
       </button>;
     })}
     {view.cast.length > 0 && <h3 class="info-subheading">Cast</h3>}
@@ -204,7 +205,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
     <div class="info-sheet">
       <header class="info-head">
         <h2 id="tv-info-heading">{title.title}</h2>
-        {top && <button data-focus-region={STOP} data-focus-row="0" data-focus-col="0" data-focus-key="info-back" onClick={pop}>Back</button>}
+        {top && <button data-focus-region={STOP} data-focus-row="0" data-focus-col="0" data-focus-key="info-back" onClick={pop}><Icon name="chevron-left" />Back</button>}
         <button data-focus-region={STOP} data-focus-row="0" data-focus-col={top ? 1 : 0} data-focus-key="info-close" onClick={onClose}>Close</button>
       </header>
       {top && <p class="info-crumbs" aria-label="You are here">{crumbs.join(' › ')}</p>}
@@ -221,7 +222,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
           {view.credits.map(credit => <p class="info-credit"><b>{credit.label}</b> {credit.names}</p>)}
           {view.seasons && <button class="info-stop info-seasons" data-focus-region={STOP} data-focus-row={row++} data-focus-col="0" data-focus-key="info-seasons" aria-haspopup="true" onClick={() => push({ kind: 'seasons' })}>
             <span class="info-row-copy"><b>{view.seasons.label}</b><small>{view.seasons.value}</small></span>
-            <span class="info-chevron" aria-hidden="true">›</span>
+            <Icon name="chevron-right" class="info-chevron" />
           </button>}
           {view.cast.length > 0 && <h3 class="info-subheading">Cast</h3>}
           {view.cast.map((member, index) => <CastRow api={api} member={member} row={row++} focusKey={`info-cast-${index}`} index={index} reach={art.reach} />)}
