@@ -3,6 +3,7 @@ import { lines, onRoute, row } from './common.mjs';
 
 // Background jobs and Other projects left the rail: they belong to the Settings hub, and Back returns to their entry there.
 const FROM_SETTINGS = { hub: 'settings', regions: ['content'] };
+// Background jobs and Other projects are opened from their entry in Settings > Background jobs and > Other projects.
 
 // A job row is "job-<id>" and its Retry button "job-<id>-retry"; the filters are "jobs-*".
 const JOB = '^job-(?!detail-back$|log-|logs-)';
@@ -17,8 +18,8 @@ export const jobs = {
   landing: 'list[first]',
   stops: {},
   groups: {
-    filters: { ...row('^jobs-', { up: 'stay', down: 'list[same]' }), first: { back: 'settings:settings-jobs' } },
-    list: { ...lines(JOB, { up: 'filters[same]', down: 'stay' }), first: { back: 'settings:settings-jobs' } },
+    filters: { ...row('^jobs-', { up: 'stay', down: 'list[same]' }), first: { back: 'settings-background-jobs:settings-jobs' } },
+    list: { ...lines(JOB, { up: 'filters[same]', down: 'stay' }), first: { back: 'settings-background-jobs:settings-jobs' } },
   },
   bursts: [{ from: 'list[first]', key: 'down', presses: 14 }],
 };
@@ -43,38 +44,87 @@ export const jobDetail = {
   bursts: [{ from: 'logs[first]', key: 'down', expect: 'logs[last]' }],
 };
 
-// The Settings page is one column; "settings-diagnostics" opens the connection tests below it.
-const SETTINGS = '^(setting-|settings-(save|diagnostics|jobs|projects|reload)$|update-|catalog-|change-server$|forget-server$)';
+// Settings in two panes (#60): the group list ("settings-group-<id>", focus region "settings-groups") on the left,
+// the selected group's rows (region "content", one column, the connection tests four to a line) on the right.
+// Up/Down walk the groups and stop at both ends without changing the pane; OK or Right opens the focused group
+// and puts the cursor on its first row; Left and Back from a group open the rail. In the rows, Up/Down walk the
+// rows and stop at both ends, and Left (from the first column) and Back return to the selected group.
+const PANES = [
+  ['playback', 'settings'], ['trackers', 'settings-trackers'], ['catalog', 'settings-catalog'], ['server', 'settings-server'],
+  ['jobs', 'settings-background-jobs'], ['updates', 'settings-updates'], ['projects', 'settings-other-projects'], ['danger', 'settings-danger-zone'],
+];
+const groupKey = id => `settings-group-${id}`;
+const paneOf = name => PANES.find(([, map]) => map === name)[0];
+const openPane = id => [{ go: 'settings' }, { focus: `[data-focus-key="${groupKey(id)}"]` }, { press: 'enter' }];
+
+// The group list as literal stops: each opens its own pane, and Other projects is listed only while the server
+// publishes links (the fixture does).
+const GROUP_STOPS = Object.fromEntries(PANES.map(([id, map], index) => {
+  const target = map === 'settings' ? 'rows[first]' : `${map}:rows[first]`;
+  return [groupKey(id), {
+    optional: id === 'projects',
+    up: index === 0 ? 'stay' : groupKey(PANES[index - 1][0]),
+    down: index === PANES.length - 1 ? 'stay' : groupKey(PANES[index + 1][0]),
+    left: 'rail', right: target, ok: target, back: 'rail',
+  }];
+}));
+
+/** One pane's rows: a column of rows (Up/Down stop at both ends); Left from the first column and Back return to the group. */
+const paneRows = (name, keys, rest = {}) => {
+  const group = name === 'settings' ? groupKey('playback') : `settings:${groupKey(paneOf(name))}`;
+  return { keys, each: { up: '-row', down: '+row', left: '-1', right: '+1', back: group }, top: { up: 'stay' }, bottom: { down: 'stay' }, start: { left: group }, end: { right: 'stay' }, ...rest };
+};
+
+const pane = (name, keys, notes, extra = {}) => ({
+  name,
+  route: 'settings',
+  notes,
+  detect: [onRoute('settings'), `[data-settings-pane="${paneOf(name)}"]`],
+  regions: ['content'],
+  reach: openPane(paneOf(name)),
+  landing: 'rows[first]',
+  stops: {},
+  groups: { rows: paneRows(name, keys) },
+  ...extra,
+});
 
 export const settings = {
   name: 'settings',
   route: 'settings',
-  notes: 'Settings: one column of fields and actions top to bottom (Playback, Background work, trackers, Save, Updates, Diagnostics, Catalog, Background jobs and Other projects, Server with Reload library, Danger zone). Left opens the rail from every row.',
+  notes: 'Settings, Playback open (where Settings lands): the group list and the Playback rows (audio, subtitle and fallback languages, watched threshold, Save). Focus lands on the first row.',
+  // Any pane: a row's Back or Left lands on the group list, which this map owns (the panes are told apart first).
   detect: onRoute('settings'),
-  regions: ['content'],
+  regions: ['settings-groups', 'content'],
   reach: [{ go: 'settings' }],
-  landing: 'list[first]',
-  stops: {},
-  groups: { list: lines(SETTINGS, { up: 'stay', down: 'stay', sample: 'all' }) },
-  bursts: [{ from: 'list[first]', key: 'down', expect: 'list[last]' }, { from: 'list[last]', key: 'up', expect: 'list[first]' }],
+  landing: 'rows[first]',
+  stops: GROUP_STOPS,
+  groups: { rows: paneRows('settings', '^(setting-(audio|subtitle|watched)-?|settings-(save|retry)$)', { sample: 'all' }) },
+  bursts: [{ from: 'rows[first]', key: 'down', expect: 'rows[last]' }, { from: 'rows[last]', key: 'up', expect: 'rows[first]' }, { from: groupKey('playback'), key: 'down', expect: groupKey('danger') }],
 };
+
+const settingsTrackers = pane('settings-trackers', '^(setting-(filelist|piratebay)-|settings-(save|retry)$)', 'Settings > Trackers: the FileList and Pirate Bay switches, the Pirate Bay addresses, Save.');
+const settingsCatalog = pane('settings-catalog', '^catalog-fetch-latest$', 'Settings > Catalog: the release counts and Fetch latest.');
+const settingsServer = pane('settings-server', '^(settings-reload|change-server|forget-server|settings-diagnostics)$', 'Settings > Server: Reload library, Change server address, Forget this server, and the Connection tests disclosure (closed).');
+const settingsBackgroundJobs = pane('settings-background-jobs', '^(settings-jobs|setting-workers|setting-title-timeout|settings-(save|retry))$', 'Settings > Background jobs: the Background jobs screen entry, the two background-work limits, Save.');
+const settingsUpdates = pane('settings-updates', '^update-', 'Settings > Updates: Check for updates, the release link while a notice shows, Install server update when one can be installed.');
+const settingsOtherProjects = pane('settings-other-projects', '^settings-projects$', 'Settings > Other projects: the Other projects screen entry.');
+const settingsDangerZone = pane('settings-danger-zone', '^catalog-rebuild$', 'Settings > Danger zone: Rebuild catalog, which asks first.');
 
 export const settingsDiagnostics = {
   name: 'settings-diagnostics',
   route: 'settings',
-  notes: 'Settings with Diagnostics open: the connection tests sit four to a line between Diagnostics and the Catalog actions.',
+  notes: 'Settings > Server with Connection tests open: the tests sit four to a line below the disclosure.',
   detect: [onRoute('settings'), '[data-focus-key^="test-"]'],
   regions: ['content'],
-  reach: [{ go: 'settings' }, { focus: '[data-focus-key="settings-diagnostics"]' }, { press: 'enter' }],
+  reach: [...openPane('server'), { focus: '[data-focus-key="settings-diagnostics"]' }, { press: 'enter' }],
   landing: 'settings-diagnostics',
   settleMs: 900,
   stops: {
-    'settings-diagnostics': { up: 'list[same]', down: 'tests[first]', left: 'rail', right: 'stay' },
+    'settings-diagnostics': { up: 'rows[last]', down: 'tests[first]', left: `settings:${groupKey('server')}`, right: 'stay', back: `settings:${groupKey('server')}` },
   },
   groups: {
-    list: lines('^(setting-|settings-save$|update-)', { up: 'stay', down: 'settings-diagnostics' }),
-    tests: lines('^test-', { up: 'settings-diagnostics', down: 'below[first]' }),
-    below: lines('^(catalog-|settings-(jobs|projects|reload)$|change-server$|forget-server$)', { up: 'tests[same]', down: 'stay' }),
+    rows: paneRows('settings-server', '^(settings-reload|change-server|forget-server)$', { bottom: { down: 'settings-diagnostics' } }),
+    tests: paneRows('settings-server', '^test-', { top: { up: 'settings-diagnostics' } }),
   },
 };
 
@@ -83,8 +133,8 @@ export const rebuildDialog = {
   notes: 'Rebuild catalog confirmation: Cancel first; Back cancels and returns to the Rebuild button.',
   detect: '.tv-rebuild-confirm',
   regions: ['rebuild-dialog'],
-  reach: [{ go: 'settings' }, { focus: '[data-focus-key="catalog-rebuild"]' }, { press: 'enter' }],
-  opener: 'settings:list[last]',
+  reach: [...openPane('danger'), { focus: '[data-focus-key="catalog-rebuild"]' }, { press: 'enter' }],
+  opener: 'settings-danger-zone:catalog-rebuild',
   landing: 'rebuild-confirm-cancel',
   stops: {
     'rebuild-confirm-cancel': { up: 'stay', down: 'stay', left: 'stay', right: 'rebuild-confirm-apply', back: 'return' },
@@ -101,7 +151,7 @@ export const projects = {
   reach: [{ go: 'projects' }],
   landing: 'links[first]',
   stops: {},
-  groups: { links: { ...lines('^project-', { up: 'stay', down: 'stay' }), first: { back: 'settings:settings-projects' } } },
+  groups: { links: { ...lines('^project-', { up: 'stay', down: 'stay' }), first: { back: 'settings-other-projects:settings-projects' } } },
 };
 
 export const setup = {
@@ -110,7 +160,7 @@ export const setup = {
   detect: 'main.setup',
   noExit: 'the only ways off Setup are connecting to a server and Back, which exits the app',
   regions: ['setup'],
-  reach: [{ go: 'settings' }, { focus: '[data-focus-key="forget-server"]' }, { press: 'enter' }, { wait: 1000 }],
+  reach: [...openPane('server'), { focus: '[data-focus-key="forget-server"]' }, { press: 'enter' }, { wait: 1000 }],
   landing: 'modes[first]',
   stops: {},
   groups: {
@@ -120,4 +170,5 @@ export const setup = {
   },
 };
 
-export const SYSTEM_MAPS = [jobDetail, jobs, settingsDiagnostics, rebuildDialog, settings, projects, setup];
+// The panes come before "settings" and Diagnostics before the Server pane: the more specific screen is told apart first.
+export const SYSTEM_MAPS = [jobDetail, jobs, rebuildDialog, settingsDiagnostics, settingsTrackers, settingsCatalog, settingsServer, settingsBackgroundJobs, settingsUpdates, settingsOtherProjects, settingsDangerZone, settings, projects, setup];

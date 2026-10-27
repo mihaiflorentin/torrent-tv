@@ -78,6 +78,8 @@ describe('TV Settings catalog maintenance through the app', () => {
     await wait(120);
     await openRoute(container, 'settings', 0);
     await wait(120);
+    container.querySelector<HTMLButtonElement>('[data-focus-key="settings-group-danger"]')!.click();
+    await wait(30);
     const rebuild = container.querySelector<HTMLButtonElement>('[data-focus-key="catalog-rebuild"]')!;
     rebuild.focus();
     rebuild.click();
@@ -97,12 +99,14 @@ describe('TV Settings catalog maintenance through the app', () => {
     await wait(120);
     await openRoute(container, 'settings', 0);
     await wait(120);
+    container.querySelector<HTMLButtonElement>('[data-focus-key="settings-group-danger"]')!.click();
+    await wait(30);
     container.querySelector<HTMLButtonElement>('[data-focus-key="catalog-rebuild"]')!.click();
     await wait(30);
     container.querySelector<HTMLButtonElement>('[data-focus-key="rebuild-confirm-apply"]')!.click();
     await wait(60);
     expect(syncModes).toEqual(['rebuild']);
     expect(container.querySelector('.tv-rebuild-confirm')).toBeNull();
-    expect(container.querySelector('.tv-danger-zone')!.textContent).toContain('queued');
+    expect(container.querySelector('[data-settings-pane="danger"]')!.textContent).toContain('queued');
   });
 });

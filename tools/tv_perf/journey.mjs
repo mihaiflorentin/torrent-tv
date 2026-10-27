@@ -4,10 +4,10 @@
 // Steps name screens by route, never by rail position: { go: 'browse' } opens the rail, walks it
 // to the hub that holds the route (Discover, data-menu-hub="discover"), presses OK, then walks the
 // hub's tab strip to the Browse tab (data-hub-tab="browse"); { go: 'jobs' } goes through Settings
-// to its Background jobs entry. ROUTE_PLACES is the one table that knows where a route lives.
+// to its Background jobs group (Left to the group list, Down to the group, OK) and the entry there. ROUTE_PLACES is the one table that knows where a route lives.
 //
 // Actions, run in order by screens.mjs:
-//   { go: route }                    TV: open the rail, walk to the route's hub, OK, then its tab or Settings entry, OK
+//   { go: route }                    TV: open the rail, walk to the route's hub, OK, then its tab, or its Settings group and entry, OK
 //   { openRail: true }               TV: Left until the rail is open
 //   { press: key, times }            a real key event (up, down, left, right, enter, back)
 //   { pressUntil: key, focused, max } press until document.activeElement matches the selector
@@ -30,7 +30,7 @@ export const ROUTE_PLACES = {
   library: { hub: 'library', tab: 'library' }, continue: { hub: 'library', tab: 'continue' }, favorites: { hub: 'library', tab: 'favorites' },
   watched: { hub: 'library', tab: 'watched' }, 'library-categories': { hub: 'library', tab: 'library-categories' },
   tracker: { hub: 'discover', tab: 'tracker' }, browse: { hub: 'discover', tab: 'browse' }, categories: { hub: 'discover', tab: 'categories' },
-  jobs: { hub: 'settings', entry: 'settings-jobs' }, projects: { hub: 'settings', entry: 'settings-projects' },
+  jobs: { hub: 'settings', group: 'settings-group-jobs', entry: 'settings-jobs' }, projects: { hub: 'settings', group: 'settings-group-projects', entry: 'settings-projects' },
 };
 export function routePlace(route) { return ROUTE_PLACES[route] || { hub: route }; }
 
@@ -54,6 +54,8 @@ export const TV_JOURNEY = [
   rail('jobs', 'jobs', '[data-focus-key="jobs-search"]'),
   { name: 'job-detail', actions: [{ focus: '[data-focus-key^="job-job-"]' }, { press: 'enter' }], ready: { selector: '[data-focus-key="job-detail-back"]' } },
   rail('settings', 'settings', '[data-focus-key="settings-save"]'),
+  { name: 'settings-trackers', actions: [{ focus: '[data-focus-key="settings-group-trackers"]' }, { press: 'enter' }], ready: { selector: '[data-settings-pane="trackers"]', focused: '[data-focus-key="setting-filelist-enabled"]' } },
+  { name: 'settings-server', actions: [{ focus: '[data-focus-key="settings-group-server"]' }, { press: 'enter' }, { focus: '[data-focus-key="settings-diagnostics"]' }, { press: 'enter' }], ready: { selector: '[data-focus-key="test-filelist"]', focused: '[data-focus-key="settings-diagnostics"]' } },
   rail('projects', 'projects', '[data-focus-key^="project-"]'),
   { name: 'movie-title', actions: [{ openTitle: 'movie' }], ready: { selector: '.detail-screen [data-focus-key="detail-back"]', focused: '[data-focus-key="detail-playback"]' } },
   { name: 'movie-versions', actions: [{ pressUntil: 'down', focused: '.source-list .source-button', max: 3 }], ready: { selector: '.source-list .source-button', focused: '.source-button' } },

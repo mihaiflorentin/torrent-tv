@@ -215,3 +215,40 @@ export function jobStatusLine(job: Job, stamp: (value: string) => string = defau
   if (job.state === 'queued') return state;
   return joined([state, job.updatedAt ? stamp(job.updatedAt) : '']);
 }
+
+/** What a job ran, in the order the viewer scans it: the action, then the title, then the tracker. */
+export function jobWhatRan(job: Pick<Job, 'kind' | 'label'>): string {
+  const refresh = /^Refresh (.+?) for (.+)$/.exec(job.label || '');
+  if (refresh) return joined(['Refresh', refresh[2], refresh[1]]);
+  return job.label || jobKindLabel(job.kind);
+}
+
+export type JobTone = 'active' | 'error' | 'done' | 'quiet';
+const JOB_STATE_WORDS: Record<string, { word: string; tone: JobTone; icon: string }> = {
+  running: { word: 'Running', tone: 'active', icon: 'jobs' },
+  failed: { word: 'Failed', tone: 'error', icon: 'alert' },
+  completed: { word: 'Completed', tone: 'done', icon: 'check' },
+  succeeded: { word: 'Completed', tone: 'done', icon: 'check' },
+  queued: { word: 'Queued', tone: 'quiet', icon: 'clock' },
+  retry_wait: { word: 'Retrying', tone: 'quiet', icon: 'clock' },
+};
+/** A job's state as one capitalised word, its tone (the word's colour) and its status icon. */
+export function jobState(job: Pick<Job, 'state'>): { word: string; tone: JobTone; icon: string } {
+  const known = JOB_STATE_WORDS[job.state];
+  if (known) return known;
+  const word = (job.state || 'unknown').replace(/_/g, ' ');
+  return { word: word.charAt(0).toUpperCase() + word.slice(1), tone: 'quiet', icon: 'clock' };
+}
+
+/** A time relative to now ("5 min ago", "Yesterday"); an unreadable time is left out. */
+export function relativeTime(value: string, now: number = Date.now()): string {
+  const at = Date.parse(value);
+  if (!Number.isFinite(at)) return '';
+  const minutes = Math.floor((now - at) / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'Yesterday' : `${days} days ago`;
+}

@@ -47,11 +47,11 @@ test('shots are numbered in journey order and named by step', () => {
   assert.equal(shotFile(11, 'series-versions'), '12-series-versions.png');
 });
 
-test('a route is reached through its hub: a Library or Discover tab, a Settings entry, or the hub itself', () => {
+test('a route is reached through its hub: a Library or Discover tab, a Settings group and its entry, or the hub itself', () => {
   assert.deepEqual(routePlace('favorites'), { hub: 'library', tab: 'favorites' });
   assert.deepEqual(routePlace('tracker'), { hub: 'discover', tab: 'tracker' });
   assert.deepEqual(routePlace('categories'), { hub: 'discover', tab: 'categories' });
-  assert.deepEqual(routePlace('jobs'), { hub: 'settings', entry: 'settings-jobs' });
+  assert.deepEqual(routePlace('jobs'), { hub: 'settings', group: 'settings-group-jobs', entry: 'settings-jobs' });
   assert.deepEqual(routePlace('downloads'), { hub: 'downloads' });
   // Every route the journey visits lands on one of the six hubs.
   const hubs = ['home', 'search', 'library', 'discover', 'downloads', 'settings'];

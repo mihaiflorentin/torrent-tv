@@ -181,8 +181,10 @@ describe('TV screens show what helps the next decision', () => {
     await route('jobs');
     await wait(60);
     const row = text('.tv-list article');
-    expect(row).toContain('Fetch latest');
-    expect(row).toContain('Failed · tracker timed out');
+    expect(text('.tv-job-state')).toBe('Failed');
+    expect(text('.tv-job-main strong')).toBe('Fetch latest');
+    expect(text('.tv-job-main span')).toMatch(/ ago · tracker timed out$/);
+    expect(container.querySelector('.tv-job-state svg')).not.toBeNull();
     expect(row).not.toContain('job-8f31a2');
   });
 
@@ -190,6 +192,8 @@ describe('TV screens show what helps the next decision', () => {
     const call = vi.fn(async (path: string) => path === '/settings' ? { preferredAudioLanguage: 'en', preferredSubtitleLanguage: 'ro', fallbackSubtitleLanguage: 'en', watchedThresholdPercent: 90, fileListEnabled: true, pirateBayEnabled: false, downloadEngine: 'native' } : path === '/settings/schema' ? { items: [] } : []);
     mount(container, { call, trackers: async () => [] } as unknown as Partial<API>, { titles: [title()] });
     await route('settings');
+    await wait(60);
+    key('settings-group-server')!.click();
     await wait(60);
     expect(container.querySelector('[data-focus-key^="test-"]')).toBeNull();
     const toggle = key('settings-diagnostics')!;

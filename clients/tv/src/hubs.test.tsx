@@ -193,6 +193,9 @@ describe('the six-hub rail', () => {
     await back();
     expect(currentRoute()).toBe('settings');
     expect(focusKey()).toBe('settings-jobs');
+    expect(container.querySelector('[data-settings-pane]')!.getAttribute('data-settings-pane')).toBe('jobs');
+    container.querySelector<HTMLElement>('[data-focus-key="settings-group-projects"]')!.click();
+    await wait();
     container.querySelector<HTMLElement>('[data-focus-key="settings-projects"]')!.click();
     await wait();
     expect(currentRoute()).toBe('projects');
@@ -205,8 +208,8 @@ describe('the six-hub rail', () => {
     portalLinks = [];
     await start();
     await openRoute(container, 'settings');
-    expect(container.querySelector('[data-focus-key="settings-jobs"]')).not.toBeNull();
-    expect(container.querySelector('[data-focus-key="settings-projects"]')).toBeNull();
+    expect(container.querySelector('[data-focus-key="settings-group-jobs"]')).not.toBeNull();
+    expect(container.querySelector('[data-focus-key="settings-group-projects"]')).toBeNull();
   });
 
   it('draws no header Refresh and no connection text on any screen, and no duplicate section heading', async () => {
@@ -226,7 +229,9 @@ describe('the six-hub rail', () => {
   it('offers a manual reload in Settings', async () => {
     await start();
     await openRoute(container, 'settings');
-    expect(container.querySelector('[data-focus-key="settings-reload"]')!.textContent).toBe('Reload library');
+    container.querySelector<HTMLElement>('[data-focus-key="settings-group-server"]')!.click();
+    await wait();
+    expect(container.querySelector('[data-focus-key="settings-reload"] .tv-setting-name')!.textContent).toBe('Reload library');
   });
 
   it('shows the server connection at the foot of the rail and a banner only while it is lost', async () => {
