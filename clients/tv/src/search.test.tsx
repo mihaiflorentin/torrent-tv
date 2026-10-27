@@ -109,6 +109,31 @@ describe('TV search', () => {
     expect(cards.every(card => card.dataset.landing === 'card')).toBe(true);
   });
 
+  it('keeps a query and its sort to Search: Browse shows the whole catalog in its own order, and Search still has both on return', async () => {
+    const kingdom = { ...alpha, id: 'k', title: 'Paper Kingdom' } as CatalogTitle;
+    const beta = { ...alpha, id: 'b', title: 'Beta' } as CatalogTitle;
+    titles = vi.fn().mockImplementation(async (spec: { search?: string }) => spec.search ? { items: [kingdom], nextCursor: null, total: 1 } : { items: [alpha, beta, kingdom], nextCursor: null, total: 3 });
+    const cards = () => Array.from(container.querySelectorAll<HTMLElement>('.poster-card')).map(card => card.dataset.focusKey);
+    const lastCall = () => titles.mock.calls[titles.mock.calls.length - 1][0];
+    const active = () => Array.from(container.querySelectorAll<HTMLElement>('[data-focus-key^="sort-"].active')).map(chip => chip.dataset.focusKey);
+    mount();
+    await route('search');
+    await type('Kingdom');
+    key('sort-title')!.click();
+    await wait();
+    expect(cards()).toEqual(['title-k']);
+    await route('browse');
+    expect(lastCall()).toMatchObject({ search: undefined, sort: 'newest' });
+    expect(cards()).toEqual(['title-a', 'title-b', 'title-k']);
+    expect(active()).toEqual(['sort-newest']);
+    expect(container.textContent).not.toContain('Kingdom”');
+    await route('search');
+    expect((key('search-input') as HTMLInputElement).value).toBe('Kingdom');
+    expect(lastCall()).toMatchObject({ search: 'Kingdom', sort: 'title' });
+    expect(cards()).toEqual(['title-k']);
+    expect(active()).toEqual(['sort-title']);
+  });
+
   it('draws Browse as the same grid', async () => {
     titles.mockResolvedValue({ items: many(8), nextCursor: null, total: 8 });
     mount();
