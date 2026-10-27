@@ -24,7 +24,7 @@ export const movieTitle = {
 
 // The More sheet (more-menu.tsx): the page's secondary actions in their own focus region, then Close. Back (or Close)
 // returns to the More button.
-const moreSheet = ({ name, opener, reach, notes }) => ({
+export const moreSheet = ({ name, opener, reach, notes }) => ({
   name,
   notes,
   detect: '.tv-more',

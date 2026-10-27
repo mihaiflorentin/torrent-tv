@@ -159,6 +159,18 @@ export function revealElement(element: HTMLElement | null): void {
   }
 }
 
+// A row whose buttons are separate focus stops (a Downloads row) looks active while one of them holds focus. The old
+// engines have no :focus-within, so the navigation layer sets the class: the element marked data-active-row that
+// contains focus gets "active-row", and only one row has it at a time. Two class changes per move, no layout read.
+let activeRow: Element | null = null;
+export function markActiveRow(element: Element | null): void {
+  const row = element && element.closest ? element.closest('[data-active-row]') : null;
+  if (row === activeRow) return;
+  if (activeRow) activeRow.classList.remove('active-row');
+  if (row) row.classList.add('active-row');
+  activeRow = row;
+}
+
 export function focusElement(element: HTMLElement | null): void {
   if (!element) return;
   if (isTextInput(element) && element.dataset.tvEditing !== 'true') element.readOnly = true;
@@ -187,6 +199,7 @@ export function useTVNavigation(options: {
       const element = event.target as HTMLElement | null;
       if (!element) return;
       revealElement(element);
+      markActiveRow(element);
       const key = element.dataset.focusKey;
       if (key) { lastFocusKey = key; latest.current.onFocusKey?.(key); }
     };

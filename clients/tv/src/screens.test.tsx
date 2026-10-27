@@ -139,31 +139,35 @@ describe('TV screens show what helps the next decision', () => {
     await route('downloads');
     const row = () => container.querySelector('.tv-download-row')!.textContent ?? '';
     expect(row()).toContain('Alpha · S01E02 · Pilot');
-    expect(row()).toContain('Downloading 41% · 4.2 MB/s · 12 min left');
-    expect(row()).toContain('1080p · WEB-DL · H264 · 3.1 GB · FileList · Playable while downloading');
+    expect(row()).toContain('41%');
+    expect(row()).toContain('4.2 MB/s · 12 min left · Playable now');
+    expect(row()).toContain('3.1 GB');
     expect(row()).not.toMatch(/Alpha\.S01E02\.1080p|\.mkv|peers|connected seeds|file 3/);
-    key('download-d1-details')!.click();
+    key('download-d1-more')!.click();
+    await wait();
+    document.querySelector<HTMLButtonElement>('[data-focus-key="more-details"]')!.click();
     await wait();
     expect(row()).toContain('Alpha.S01E02.1080p.WEB-DL-GRP');
     expect(row()).toContain('Alpha.S01/Alpha.S01E02.1080p.mkv (file 3)');
     expect(row()).toContain('9 connected seeds · 14 peers');
-    expect(key('download-d1-details')!.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('draws a long download list in steps after a route change, so the screen opens without a long task', async () => {
     const many = Array.from({ length: 20 }, (_, index) => download({ id: `d${index}`, engineId: `e${index}`, displayTitle: `Title ${index}` }));
     mount(container, {}, { titles: [title()], downloads: many });
+    // The first screenful draws with the route change; the rest once the screen has opened.
     await route('downloads');
-    await wait(120);
+    expect(container.querySelectorAll('.tv-download-row')).toHaveLength(6);
+    await wait(520);
     expect(container.querySelectorAll('.tv-download-row')).toHaveLength(20);
-    expect(container.querySelector('.tv-download-count')!.textContent).toBe('20 downloads');
+    expect(key('downloads-filter-all')!.textContent).toBe('All20');
   });
 
   it('tells an empty Downloads screen how to fill it', async () => {
     mount(container, {}, { titles: [title()], downloads: [] });
     await route('downloads');
     expect(text('.tv-empty h2')).toBe('No downloads yet');
-    expect(text('.tv-download-count')).toBe('');
+    expect(key('downloads-filter-all')!.textContent).toBe('All0');
   });
 
   it('names a job by what ran and how it ended, with no job id', async () => {

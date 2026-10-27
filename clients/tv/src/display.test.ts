@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogTitle, Download, HouseholdItem, Job, ParsedRelease, PlaybackPreferences } from '@torrent-tv/shared';
-import { cardMeta, cardRating, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
+import { cardMeta, cardRating, prepareHint, readyLine, readyPercent, allocationUse, downloadFilterOf, downloadRow, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
 
 // DESIGN.md "Information priorities": what each TV screen shows, decided as pure text so the
 // markup only places it. Unknown facts are omitted, never printed as a placeholder.
@@ -99,34 +99,64 @@ describe('downloads', () => {
     expect(formatEta(7500)).toBe('2 h 5 min left');
     expect(formatEta(0)).toBe('');
   });
-  it('reports an active transfer with percent, speed and ETA', () => {
+  it('words every state, never colour alone', () => {
     expect(downloadStatus(download()).label).toBe('Downloading 41%');
-    expect(downloadProgressLine(download())).toBe('Downloading 41% · 4.2 MB/s · 12 min left');
-  });
-  it('reports paused, queued, finished and failed states in words', () => {
     expect(downloadStatus(download({ state: 'pausedDL' })).label).toBe('Paused at 41%');
     expect(downloadStatus(download({ state: 'queuedDL' })).label).toBe('Queued');
     expect(downloadStatus(download({ state: 'uploading', progress: 1 })).label).toBe('Downloaded');
     expect(downloadStatus(download({ state: 'error' })).label).toBe('Needs attention');
-    expect(downloadProgressLine(download({ error: 'disk full' }))).toBe('Needs attention · disk full');
-  });
-  it('tones follow the state, never colour alone', () => {
     expect(downloadStatus(download()).tone).toBe('active');
     expect(downloadStatus(download({ state: 'pausedDL' })).tone).toBe('paused');
     expect(downloadStatus(download({ state: 'uploading', progress: 1 })).tone).toBe('done');
     expect(downloadStatus(download({ error: 'x' })).tone).toBe('error');
   });
-  it('does not print speed or ETA for a paused download', () => expect(downloadProgressLine(download({ state: 'pausedDL', speedBytesPerSecond: 0 }))).toBe('Paused at 41%'));
-  it('lists the secondary facts and announces progressive playback', () => {
-    const text = downloadFacts(download({ playbackMode: 'progressive', parsed: parsed({ resolution: '1080p', quality: 'WEB-DL', videoCodec: 'HEVC' }) }));
-    expect(text).toBe('1080p · WEB-DL · HEVC · 4 GB · FileList · Playable while downloading');
+});
+
+// One compact Downloads row (the Downloads board): the state, a slim bar while it still moves, one line of facts.
+describe('download rows', () => {
+  it('leads a moving download with its percent, then speed and time left', () => {
+    expect(downloadRow(download())).toEqual({ state: '41%', tone: 'active', percent: 41, meter: true, facts: '4.2 MB/s · 12 min left' });
   });
-  it('sums a multi-file torrent instead of one file', () => {
-    expect(downloadFacts(download({ parsed: parsed({ resolution: '1080p' }) }), { sizeBytes: 12_000_000_000, files: 3 })).toBe('1080p · 3 files · 12 GB · FileList');
+  it('says Playable now while a progressive download is still arriving', () => {
+    expect(downloadRow(download({ playbackMode: 'progressive' })).facts).toBe('4.2 MB/s · 12 min left · Playable now');
+    expect(downloadRow(download({ playbackMode: 'progressive', progress: 1, state: 'uploading' })).facts).not.toContain('Playable now');
   });
-  it('hides release name, path and peers from the facts', () => {
-    const text = downloadFacts(download({ releaseName: 'Alpha.2019.1080p', filePath: 'a/b.mkv' }));
-    expect(text).not.toMatch(/Alpha\.2019|b\.mkv|peers|seeds/);
+  it('puts the reached percent and the picture facts on a paused row, with no speed', () => {
+    expect(downloadRow(download({ state: 'pausedDL', speedBytesPerSecond: 0, progress: 0.18, parsed: parsed({ resolution: '2160p', videoCodec: 'HEVC' }) }))).toEqual({ state: 'Paused', tone: 'paused', percent: 18, meter: true, facts: '18% · 2160p · HEVC' });
+  });
+  it('shows a finished download without a bar, with its version and tracker', () => {
+    expect(downloadRow(download({ state: 'uploading', progress: 1, parsed: parsed({ resolution: '1080p', quality: 'WEB-DL' }) }))).toEqual({ state: 'Downloaded', tone: 'done', percent: 100, meter: false, facts: '1080p · WEB-DL · FileList' });
+  });
+  it('gives a failed download the reason as its facts', () => {
+    expect(downloadRow(download({ error: 'No seeders for 2 hours' }))).toMatchObject({ state: 'Needs attention', tone: 'error', meter: false, facts: 'No seeders for 2 hours' });
+  });
+  it('counts the files of a multi-file torrent', () => {
+    expect(downloadRow(download({ state: 'uploading', progress: 1, parsed: parsed({ resolution: '1080p' }) }), 3).facts).toBe('1080p · FileList · 3 files');
+  });
+  it('keeps release name, path and peers off the row', () => {
+    const row = downloadRow(download({ releaseName: 'Alpha.2019.1080p', filePath: 'a/b.mkv' }));
+    expect(JSON.stringify(row)).not.toMatch(/Alpha\.2019|b\.mkv|peers|seeds/);
+  });
+  it('sorts each download into one filter chip', () => {
+    expect(downloadFilterOf(download())).toBe('active');
+    expect(downloadFilterOf(download({ state: 'queuedDL' }))).toBe('active');
+    expect(downloadFilterOf(download({ state: 'uploading', progress: 1 }))).toBe('done');
+    expect(downloadFilterOf(download({ state: 'stoppedDL' }))).toBe('paused');
+    expect(downloadFilterOf(download({ error: 'disk full' }))).toBe('attention');
+  });
+});
+
+// The Allocation is set in binary gigabytes (Settings: "Allocation (GB)"), so the use is counted the same way.
+describe('allocation use', () => {
+  const GIB = 1024 ** 3;
+  it('reads stored bytes against the Allocation', () => {
+    expect(allocationUse(148 * GIB, 500)).toEqual({ label: '148 GB of 500 GB', percent: 30 });
+  });
+  it('keeps one decimal below 10 GB', () => expect(allocationUse(2.94 * GIB, 500).label).toBe('2.9 GB of 500 GB'));
+  it('caps the bar at full when over the Allocation', () => expect(allocationUse(600 * GIB, 500).percent).toBe(100));
+  it('only says what is stored when no Allocation is set', () => {
+    expect(allocationUse(148 * GIB, 0)).toEqual({ label: '148 GB stored', percent: -1 });
+    expect(allocationUse(148 * GIB, undefined)).toEqual({ label: '148 GB stored', percent: -1 });
   });
 });
 

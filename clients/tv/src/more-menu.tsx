@@ -1,4 +1,4 @@
-import type { JSX } from 'preact';
+import { render, type JSX } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import { focusElement, remoteAction } from './navigation';
 
@@ -52,4 +52,23 @@ export function MoreMenu({ title, items, message, returnKey, onClose }: { title:
       <button class="tv-more-row tv-more-close" data-focus-region={MORE_REGION} data-focus-row={items.length} data-focus-col="0" data-focus-key="more-close" onClick={close}><b>Close</b></button>
     </div>
   </section>;
+}
+
+/**
+ * The More sheet drawn into its own layer on <body>, for a screen that lives inside the shell's content column
+ * (Downloads). That column scrolls and is contained (contain: layout paint), so a fixed sheet inside it would be
+ * placed and clipped by the column instead of the screen. The layer follows every render of its host and goes away
+ * with it.
+ */
+export function MoreMenuLayer(props: Parameters<typeof MoreMenu>[0]): null {
+  const host = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const layer = document.createElement('div');
+    layer.className = 'tv-more-layer';
+    document.body.appendChild(layer);
+    host.current = layer;
+    return () => { render(null, layer); document.body.removeChild(layer); host.current = null };
+  }, []);
+  useEffect(() => { if (host.current) render(<MoreMenu {...props} />, host.current) });
+  return null;
 }

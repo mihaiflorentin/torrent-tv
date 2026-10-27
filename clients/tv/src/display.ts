@@ -113,18 +113,47 @@ export function downloadStatus(download: Download): { label: string; tone: Downl
   return { label: percent > 0 ? `Downloading ${percent}%` : 'Waiting', tone: 'idle', percent };
 }
 
-/** The status line of a download row: state, then speed and ETA while it moves, or the error. */
-export function downloadProgressLine(download: Download): string {
-  const status = downloadStatus(download);
-  if (status.tone === 'error') return joined([status.label, download.error]);
-  if (status.tone !== 'active') return status.label;
-  return joined([status.label, download.speedBytesPerSecond > 0 ? `${formatBytes(download.speedBytesPerSecond)}/s` : '', formatEta(download.etaSeconds)]);
+export type DownloadFilter = 'active' | 'done' | 'paused' | 'attention';
+
+/** The one filter chip a download counts under (Active, Downloaded, Paused, Needs attention); every download has one. */
+export function downloadFilterOf(download: Download): DownloadFilter {
+  const tone = downloadStatus(download).tone;
+  return tone === 'done' ? 'done' : tone === 'paused' ? 'paused' : tone === 'error' ? 'attention' : 'active';
 }
 
-/** Secondary facts of a download row. Release name, path, index, peers and the engine route are details. */
-export function downloadFacts(download: Download, group: { sizeBytes?: number; files?: number } = {}): string {
+export interface DownloadRowView { state: string; tone: DownloadTone; percent: number; meter: boolean; facts: string }
+
+/**
+ * One compact Downloads row (the Downloads board): the state (the percent while it moves, else a word), whether the
+ * slim bar shows (while it is unfinished and not failed), and one line of facts: speed, time left and Playable now
+ * while it moves; the reached percent and the picture on a paused row; the version and tracker once it is
+ * downloaded; the reason when it needs attention. Release name, path, index and peers are Details.
+ */
+export function downloadRow(download: Download, files = 1): DownloadRowView {
+  const status = downloadStatus(download);
   const parsed = download.parsed;
-  return joined([parsed?.resolution, parsed?.quality, parsed?.videoCodec, group.files && group.files > 1 ? `${group.files} files` : '', formatBytes(group.sizeBytes ?? download.sizeBytes), download.trackerName, download.playbackMode === 'progressive' && download.progress < 1 ? 'Playable while downloading' : '']);
+  const many = files > 1 ? `${files} files` : '';
+  const percent = status.percent;
+  if (status.tone === 'error') return { state: status.label, tone: status.tone, percent, meter: false, facts: download.error || 'The transfer stopped. Retry it or delete it.' };
+  if (status.tone === 'done') return { state: status.label, tone: status.tone, percent, meter: false, facts: joined([parsed?.resolution, parsed?.quality, download.trackerName, many]) };
+  if (status.tone === 'paused') return { state: 'Paused', tone: status.tone, percent, meter: true, facts: joined([`${percent}%`, parsed?.resolution, parsed?.videoCodec, many]) };
+  const moving = /^Downloading /.test(status.label);
+  const state = moving ? `${percent}%` : status.label;
+  return { state, tone: status.tone, percent, meter: true, facts: joined([!moving && percent > 0 ? `${percent}%` : '', download.speedBytesPerSecond > 0 ? `${formatBytes(download.speedBytesPerSecond)}/s` : '', formatEta(download.etaSeconds), download.playbackMode === 'progressive' && download.progress < 1 ? 'Playable now' : '', many]) };
+}
+
+const GIB = 1024 ** 3;
+const gigabytes = (value: number) => `${value < 10 ? (Math.round(value * 10) / 10).toFixed(1).replace(/\.0$/, '') : Math.round(value)} GB`;
+
+/**
+ * The Downloads heading's storage line: stored torrent content against the Allocation. The Allocation is set in
+ * binary gigabytes (Settings shows it as "Allocation (GB)"), so the stored bytes are counted the same way. With no
+ * Allocation set (0 or unknown) it only says what is stored, and percent is -1 (no bar).
+ */
+export function allocationUse(storedBytes: number, allocationGb: number | undefined): { label: string; percent: number } {
+  const stored = gigabytes(Math.max(0, storedBytes) / GIB);
+  if (!allocationGb || !(allocationGb > 0)) return { label: `${stored} stored`, percent: -1 };
+  return { label: `${stored} of ${gigabytes(allocationGb)}`, percent: Math.min(100, Math.round((storedBytes / GIB / allocationGb) * 100)) };
 }
 
 /** Player status line: the current Audio and Subtitles choice. Empty until preferences are known. */
