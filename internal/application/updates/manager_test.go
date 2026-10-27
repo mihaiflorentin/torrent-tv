@@ -926,9 +926,14 @@ var _ API = (*Manager)(nil)
 
 func TestCgroupIndicatesSystemdService(t *testing.T) {
 	cases := map[string]bool{
-		"0::/system.slice/torrent-tv.service\n":                  true,  // cgroup v2 system service
-		"12:pids:/system.slice/torrent-tv.service\n":             true,  // cgroup v1 system service
-		"0::/user.slice/user-1000.slice/user@1000.service/app\n": true,  // user service
+		"0::/system.slice/torrent-tv.service\n":                                                  true,  // cgroup v2 system service
+		"12:pids:/system.slice/torrent-tv.service\n":                                             true,  // cgroup v1 system service
+		"0::/user.slice/user-1000.slice/user@1000.service/app.slice/torrent-tv.service\n":        true,  // user service
+		"0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-torrent-tv-1234.scope\n": false, // desktop session app: nothing restarts it
+		"0::/user.slice/user-1000.slice/session-2.scope\n":                                       false, // login session (TTY/SSH)
+		// Not a unit at all: user@1000.service is only an ancestor, so this
+		// process is not in a service of its own and nothing would restart it.
+		"0::/user.slice/user-1000.slice/user@1000.service/app\n": false,
 		"0::/docker/4f1d0f2c1e9b\n":                              false, // container
 		"0::/kubepods/burstable/podabc\n":                        false, // kubernetes
 		"0::/\n":                                                 false, // root cgroup
