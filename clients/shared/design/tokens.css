@@ -30,9 +30,12 @@
  --tt-text-faint: #5d6270;
 
  /* Control fills: translucent white at rest and when selected, so a pill reads on the ground and over art alike;
-    the focused control turns solid white with ground-coloured text. */
+    the focused control turns solid white with ground-coloured text. Quiet is a list row at rest (a row lightens to
+    selected under focus); strong is the primary action's pill at rest. */
+ --tt-fill-quiet: rgba(255, 255, 255, 0.05);
  --tt-fill: rgba(255, 255, 255, 0.1);
  --tt-fill-selected: rgba(255, 255, 255, 0.14);
+ --tt-fill-strong: rgba(255, 255, 255, 0.22);
  --tt-fill-focus: #ffffff;
  --tt-on-fill-focus: #0a0b0f;
 

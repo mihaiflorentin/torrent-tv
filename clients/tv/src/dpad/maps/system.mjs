@@ -23,7 +23,7 @@ export const jobs = {
 export const jobDetail = {
   name: 'job-detail',
   route: 'jobs',
-  notes: 'A job\'s detail: "← Jobs", the log filters, the log entries. It opens on "← Jobs"; Back (or "← Jobs") returns to the job row it was opened from.',
+  notes: 'A job\'s detail: the back-to-Jobs button, the log filters, the log entries. It opens on the back-to-Jobs button; Back (or the back-to-Jobs button) returns to the job row it was opened from.',
   detect: [onRoute('jobs'), '[data-focus-key="job-detail-back"]'],
   regions: ['content'],
   reach: [{ go: 'jobs' }, { focus: '[data-focus-key^="job-job-"]' }, { press: 'enter' }],

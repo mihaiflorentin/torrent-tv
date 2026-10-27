@@ -133,7 +133,7 @@ describe('screens the D-pad audit found bugs on', () => {
     expect(focusKey()).toBe(layout.groups.recent.members[0].element.key);
   });
 
-  it('opens a job on "← Jobs", walks its map, and Back returns to the job row', async () => {
+  it('opens a job on the back-to-Jobs button, walks its map, and Back returns to the job row', async () => {
     await start();
     await open('jobs');
     await wait(500);
@@ -143,7 +143,7 @@ describe('screens the D-pad audit found bugs on', () => {
     const map = mapNamed('job-detail');
     expect(focusKey()).toBe(resolveOn(map, screen(map), map.landing));
     expect(await holdsLiteralMoves(map)).toEqual([]);
-    // Up from the log filters reaches "← Jobs" (it used to share row 0 with Refresh and was skipped).
+    // Up from the log filters reaches the back-to-Jobs button (it used to share row 0 with Refresh and was skipped).
     focusOn('log-attempt');
     press(...KEY.up);
     await wait(20);
@@ -172,7 +172,7 @@ describe('screens the D-pad audit found bugs on', () => {
     expect(focusKey()).toBe('job-detail-back');
   });
 
-  it('returns to the job row when "← Jobs" is pressed', async () => {
+  it('returns to the job row when the back-to-Jobs button is pressed', async () => {
     await start();
     await open('jobs');
     await wait(500);

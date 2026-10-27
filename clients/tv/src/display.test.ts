@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogTitle, Download, HouseholdItem, Job, ParsedRelease, PlaybackPreferences } from '@torrent-tv/shared';
-import { cardMeta, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
+import { cardMeta, cardRating, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
 
 // DESIGN.md "Information priorities": what each TV screen shows, decided as pure text so the
 // markup only places it. Unknown facts are omitted, never printed as a placeholder.
@@ -32,9 +32,10 @@ describe('heroFacts', () => {
 
 describe('cardMeta', () => {
   it('shows year, best resolution and a rating that has votes', () => {
-    expect(cardMeta(title({ year: 2019, resolutions: ['1080p', '720p'], rating: 7.44, ratingVotes: 120 }))).toBe('2019 · 1080p · ★ 7.4');
+    expect(cardMeta(title({ year: 2019, resolutions: ['1080p', '720p'], rating: 7.44, ratingVotes: 120 }))).toBe('2019 · 1080p');
+    expect(cardRating(title({ year: 2019, resolutions: ['1080p', '720p'], rating: 7.44, ratingVotes: 120 }))).toBe('7.4');
   });
-  it('drops a rating without votes', () => expect(cardMeta(title({ year: 2019, rating: 9, ratingVotes: 0 }))).toBe('2019'));
+  it('drops a rating without votes', () => { expect(cardMeta(title({ year: 2019, rating: 9, ratingVotes: 0 }))).toBe('2019'); expect(cardRating(title({ year: 2019, rating: 9, ratingVotes: 0 }))).toBe(''); });
   it('never prints seeders, tracker names or source counts', () => {
     const text = cardMeta(title({ year: 2019, bestSeeders: 999, sourceCount: 7 }));
     expect(text).not.toMatch(/seeders|FileList|source/i);
