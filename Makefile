@@ -1,4 +1,4 @@
-.PHONY: help check test build build-arm64 build-arm64-headless build-amd64-headless build-all desktop-assets package-darwin wails-cross web frontend tizen-wgt validate-tizen-wgt smoke-tizen-engine webos-ipk validate-webos-ipk smoke-webos-engine perf-tv tizen-sdb install-tizen torrenttv-apk deploy-pi bootstrap-server-dry-run
+.PHONY: help check test build build-arm64 build-arm64-headless build-amd64-headless build-all desktop-assets package-darwin wails-cross web frontend tizen-wgt validate-tizen-wgt smoke-tizen-engine webos-ipk validate-webos-ipk smoke-webos-engine perf-tv screens-tv screens-web tizen-sdb install-tizen torrenttv-apk deploy-pi bootstrap-server-dry-run
 
 VERSION ?= $(shell tr -d '[:space:]' < VERSION)
 PI_HOST ?=
@@ -270,6 +270,16 @@ smoke-webos-engine:
 perf-tv:
 	npm run build:tv
 	node tools/tv_perf/run.mjs $(PERF_ARGS)
+
+## screens-tv: build the TV bundle, then capture every TV screen at 1920x1080 (lean graphics) into tools/tv_perf/.out/screens/tv (dev only; SCREENS_ARGS="--only home,settings")
+screens-tv:
+	npm run build:tv
+	node tools/tv_perf/screens.mjs tv $(SCREENS_ARGS)
+
+## screens-web: build the browser app, then capture its screens at 1440x900 and 390x844 into tools/tv_perf/.out/screens/web (dev only)
+screens-web:
+	npm run build:web
+	node tools/tv_perf/screens.mjs web $(SCREENS_ARGS)
 
 ## deploy-pi: build-arm64-headless, then stage binary + systemd units to PI_HOST (make deploy-pi PI_HOST=user@host)
 deploy-pi: build-arm64-headless
