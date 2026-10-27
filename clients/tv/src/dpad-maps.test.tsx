@@ -77,7 +77,7 @@ describe('declared D-pad maps', () => {
 
   it('cover every screen and overlay of the capture journey', () => {
     const names = MAPS.map(map => map.name);
-    for (const wanted of ['rail', 'home', 'search', 'search-results', 'library', 'continue', 'favorites', 'watched', 'downloads', 'download-delete', 'library-categories', 'library-family', 'tracker', 'browse', 'categories', 'catalog-family', 'jobs', 'job-detail', 'settings', 'settings-diagnostics', 'rebuild-dialog', 'projects', 'movie-title', 'movie-info', 'series-title', 'series-versions', 'series-info', 'player'])
+    for (const wanted of ['rail', 'home', 'search', 'search-results', 'library', 'continue', 'favorites', 'watched', 'downloads', 'download-delete', 'library-categories', 'library-family', 'tracker', 'browse', 'categories', 'catalog-family', 'jobs', 'job-detail', 'settings', 'settings-diagnostics', 'rebuild-dialog', 'projects', 'movie-title', 'movie-info', 'movie-more', 'series-title', 'series-more', 'series-versions', 'series-info', 'player'])
       expect(names).toContain(wanted);
   });
 });

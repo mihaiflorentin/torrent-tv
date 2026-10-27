@@ -72,6 +72,7 @@ describe('TV title page episode air dates', () => {
     container.querySelector<HTMLElement>('[data-focus-key="hero-a"]')!.click();
     await wait();
     expect(container.querySelector('.episode-tile small')!.textContent).toBe('1 version · Jan 2, 2019');
-    expect(container.querySelector('.eyebrow')!.textContent).toBe('Series · Since 2019');
+    expect(container.querySelector('.detail-kind')!.textContent).toBe('Series');
+    expect(container.querySelector('.detail-facts')!.textContent).toBe('Since 2019');
   });
 });

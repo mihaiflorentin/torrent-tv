@@ -240,14 +240,16 @@ describe('busy controls keep focus and ignore their action', () => {
     expect(document.activeElement).toBe(search);
   });
 
-  it('Refresh data keeps focus while refreshing, runs once, and is the same focused control afterwards', async () => {
+  it('Refresh data (in More) keeps focus while refreshing, runs once, and is the same focused control afterwards', async () => {
     let finish: () => void = () => { };
     const refreshTitle = vi.fn(() => new Promise<unknown>(resolve => { finish = () => resolve({}); }));
     await openSeriesDetail(container, { refreshTitle } as unknown as Partial<API>, {});
     // Opening a series without an episode list already asks for one refresh.
     refreshTitle.mockClear();
 
-    const refresh = control(container, 'detail-refresh');
+    control(container, 'detail-more')!.click();
+    await settle();
+    const refresh = control(container, 'more-refresh');
     expectIdle(refresh);
     refresh!.focus();
     refresh!.click();
@@ -262,7 +264,7 @@ describe('busy controls keep focus and ignore their action', () => {
     finish();
     await settle();
     expectIdle(refresh);
-    expect(control(container, 'detail-refresh')).toBe(refresh);
+    expect(control(container, 'more-refresh')).toBe(refresh);
     expect(document.activeElement).toBe(refresh);
   });
 
