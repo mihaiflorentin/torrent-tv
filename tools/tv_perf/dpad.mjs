@@ -403,7 +403,7 @@ function report(results, outDir, ms) {
     for (const result of results) lines.push(`## ${result.map}`, '', '```', table(result.rows.map(row => ({ screen: result.map, ...row, problem: row.problem || 'ok' }))), '```', '');
   }
   fs.writeFileSync(path.join(outDir, record ? 'observed.md' : 'report.md'), lines.join('\n'));
-  fs.writeFileSync(path.join(outDir, record ? 'observed.json' : 'report.json'), JSON.stringify(results.map(({ layout, ...rest }) => rest), null, 2));
+  fs.writeFileSync(path.join(outDir, record ? 'observed.json' : 'report.json'), JSON.stringify(results.map(result => { const rest = { ...result }; delete rest.layout; return rest; }), null, 2));
   const shown = file => path.relative(repo, file);
   if (record) { log(`observed moves written to ${shown(path.join(outDir, 'observed.md'))}`); return 0; }
   if (failures.length) {

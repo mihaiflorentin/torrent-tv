@@ -129,7 +129,6 @@ async function main() {
     const quiet = () => sleep(450);
     const active = () => cdp.eval(`(() => { const a = document.activeElement; return a && a.dataset ? { key: a.dataset.focusKey || '', region: a.dataset.focusRegion || '', row: a.dataset.focusRow || '', col: a.dataset.focusCol || '', route: a.dataset.menuHub || '', tab: a.dataset.hubTab || '' } : null })()`);
     const menuOpen = () => cdp.eval(`document.querySelector('.tv-app').classList.contains('menu-open')`);
-    const discrete = async (id, kind, name, label) => { const key = press(name); const index = await key; steps.push({ id, label: label || id, kind, key: index }); await quiet(); };
     const held = async (prefix, kind, name, count, label) => {
       const first = pressed;
       for (let i = 0; i < count; i++) {

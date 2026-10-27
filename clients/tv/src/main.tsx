@@ -45,11 +45,16 @@ type DetailTarget = { season?: number; episode?: number };
 function TVStateBadges({ state, compact }: { state?: MediaState; compact?: boolean }) {
  if (!state?.downloadState || !state.watchState) return null;
  const download = state.downloadState; const watch = state.watchState; const percent = Math.round((state.progress || 0) * 100);
- const downloadWord = download === 'downloaded' ? 'Downloaded' : download === 'partial' ? 'Some downloaded' : download === 'error' ? 'Needs attention' : download === 'queued' ? 'Queued' : `Downloading ${percent}%`;
- const watchWord = watch === 'watched' ? 'Watched' : watch === 'partial' ? 'Some watched' : 'In progress';
- const short = (word: string) => !compact ? word : word === 'Some downloaded' ? 'Partial' : word === 'Needs attention' ? 'Failed' : word.startsWith('Downloading') ? `${percent}% done` : word === 'Some watched' || word === 'In progress' ? 'Started' : word;
- return <span class="tv-state-badges">{download !== 'none' && <span class={`tv-state-badge download ${download}`} aria-label={downloadWord}>{!compact && <i aria-hidden="true" />}<b>{short(downloadWord)}</b></span>}{watch !== 'unwatched' && <span class={`tv-state-badge watch ${watch}`} aria-label={watchWord}>{!compact && <i aria-hidden="true" />}<b>{short(watchWord)}</b></span>}</span>;
+ const downloadWords = DOWNLOAD_WORDS[download] || { long: `Downloading ${percent}%`, short: `${percent}% done` };
+ const watchWords = WATCH_WORDS[watch] || WATCH_WORDS.inProgress;
+ const shown = (words: StateWords) => compact ? words.short : words.long;
+ return <span class="tv-state-badges">{download !== 'none' && <span class={`tv-state-badge download ${download}`} aria-label={downloadWords.long}>{!compact && <i aria-hidden="true" />}<b>{shown(downloadWords)}</b></span>}{watch !== 'unwatched' && <span class={`tv-state-badge watch ${watch}`} aria-label={watchWords.long}>{!compact && <i aria-hidden="true" />}<b>{shown(watchWords)}</b></span>}</span>;
 }
+type StateWords = { long: string; short: string };
+// Each library state's words: the full ones, and the short ones a compact card shows. A download in flight (any
+// other state) says its percentage.
+const DOWNLOAD_WORDS: Record<string, StateWords> = { downloaded: { long: 'Downloaded', short: 'Downloaded' }, partial: { long: 'Some downloaded', short: 'Partial' }, error: { long: 'Needs attention', short: 'Failed' }, queued: { long: 'Queued', short: 'Queued' } };
+const WATCH_WORDS: Record<string, StateWords> = { watched: { long: 'Watched', short: 'Watched' }, partial: { long: 'Some watched', short: 'Started' }, inProgress: { long: 'In progress', short: 'Started' } };
 
 type TVDownloadAnchor = { id: string; top: number; scrollTop: number };
 function captureTVDownloadAnchor(): TVDownloadAnchor | null { const container = document.querySelector<HTMLElement>('.tv-content'); if (!container) return null; const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-download-id]')); const row = rows.find(item => item.getBoundingClientRect().bottom > container.getBoundingClientRect().top); return row ? { id: row.dataset.downloadId || '', top: row.getBoundingClientRect().top, scrollTop: container.scrollTop } : null }

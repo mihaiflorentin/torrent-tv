@@ -28,15 +28,15 @@ export function MoreMenu({ title, items, message, returnKey, onClose }: { title:
     closeRef.current();
     window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="${returnKey}"]`)), 0);
   };
-  const closeOnce = useRef(close);
-  closeOnce.current = close;
+  const latestClose = useRef(close);
+  latestClose.current = close;
   useEffect(() => {
     const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`.tv-more [data-focus-region="${MORE_REGION}"]`)), 0);
     const key = (event: KeyboardEvent) => {
       if (remoteAction(event.key, event.keyCode) !== 'back') return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      closeOnce.current();
+      latestClose.current();
     };
     document.addEventListener('keydown', key, true);
     return () => { window.clearTimeout(timer); document.removeEventListener('keydown', key, true) };

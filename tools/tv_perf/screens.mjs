@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { buildFixture, serve } from './fixture.mjs';
-import { CDP, findChrome, launchChrome, waitFor } from './chrome.mjs';
+import { CDP, findChrome, launchChrome } from './chrome.mjs';
 import { TV_JOURNEY, WEB_JOURNEY, WEB_VIEWPORTS, checkJourney, shotFile, stepFailure, pickTitles } from './journey.mjs';
 import { makeDriver, prepareTVPage, openTVHome } from './tv-driver.mjs';
 
