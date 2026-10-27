@@ -5,6 +5,7 @@ import {
   type API, type CatalogTitle, type InfoEpisode, type InfoLevel, type InfoSeasonDetail, type InfoSeasons, type TitleInfo,
 } from '@torrent-tv/shared';
 import { focusElement, remoteAction } from './navigation';
+import { Icon } from './icons';
 import { inReach, useListArtReach, type ArtReach } from './lazy-art';
 
 // Info panel: the extended description of a title in its own focus region, so the D-pad cannot leave it.
@@ -59,7 +60,7 @@ function SeasonsLevel({ api, title, cache, reach, push }: { api: API; title: Cat
     return <button class="info-stop info-row" data-focus-region={STOP} data-focus-row={1 + index} data-focus-col="0" data-focus-key={`info-season-${season.number}`} data-art-index={index} aria-haspopup="true" onClick={() => push({ kind: 'season', season: season.number })}>
       <span class="info-poster" aria-hidden="true">{card.initial}{season.posterUrl && inReach(reach, index) && <img src={api.streamURL(season.posterUrl)} alt="" loading="lazy" onError={event => { (event.currentTarget as HTMLElement).style.display = 'none' }} />}</span>
       <span class="info-row-copy"><b>{card.name}</b>{card.meta && <small>{card.meta}</small>}</span>
-      <span class="info-chevron" aria-hidden="true">›</span>
+      <Icon name="chevron-right" class="info-chevron" />
     </button>;
   })}</>;
 }
@@ -83,7 +84,7 @@ function SeasonLevel({ api, title, season, cache, reach, push }: { api: API; tit
       return <button class="info-stop info-row" data-focus-region={STOP} data-focus-row={row++} data-focus-col="0" data-focus-key={`info-episode-${episode.number}`} data-art-index={at} aria-haspopup="true" onClick={() => push({ kind: 'episode', season, episode: episode.number })}>
         <span class="info-still-small" aria-hidden="true">{source.stillUrl && inReach(reach, at) && <img src={api.streamURL(source.stillUrl)} alt="" loading="lazy" onError={event => { (event.currentTarget as HTMLElement).style.display = 'none' }} />}</span>
         <span class="info-row-copy"><b>{`${episode.short} · ${episode.title}`}</b>{episode.meta && <small>{episode.meta}</small>}</span>
-        <span class="info-chevron" aria-hidden="true">›</span>
+        <Icon name="chevron-right" class="info-chevron" />
       </button>;
     })}
     {view.cast.length > 0 && <h3 class="info-subheading">Cast</h3>}
@@ -116,12 +117,14 @@ function EpisodeLevel({ api, title, season, episode, cache, reach }: { api: API;
   </>;
 }
 
-export function TitleInfoPanel({ api, title, onClose }: { api: API; title: CatalogTitle; onClose: () => void }): JSX.Element {
-  const [info, setInfo] = useState<TitleInfo | undefined>(undefined);
-  const [phase, setPhase] = useState<Phase>('loading');
+export function TitleInfoPanel({ api, title, initialInfo, onClose }: { api: API; title: CatalogTitle; initialInfo?: TitleInfo; onClose: () => void }): JSX.Element {
+  // The title page may already hold the provider's answer (it asks once for the facts line): then the panel opens on it.
+  const [info, setInfo] = useState<TitleInfo | undefined>(initialInfo);
+  const [phase, setPhase] = useState<Phase>(initialInfo ? 'ready' : 'loading');
   const [stack, setStack] = useState<Frame[]>([]);
   const stackRef = useRef<Frame[]>([]);
   const restoreKey = useRef<string | null>(null);
+  const landPending = useRef(false);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const [, setTick] = useState(0);
@@ -132,6 +135,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
   const scroll = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (initialInfo) return;
     let live = true;
     api.titleInfo(title.id).then(value => { if (live) { setInfo(value); setPhase('ready') } }, () => { if (live) setPhase('failed') });
     return () => { live = false };
@@ -155,7 +159,12 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
 
   useEffect(() => {
     const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="info-close"]')), 0);
-    const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); popRef.current() };
+    const key = (event: KeyboardEvent) => {
+      const action = remoteAction(event.key, event.keyCode);
+      // The viewer is moving: a level's late data must not pull the cursor into the list any more.
+      if (action === 'up' || action === 'down' || action === 'left' || action === 'right') landPending.current = false;
+      if (action !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); popRef.current();
+    };
     // Artwork follows focus: the list window grows to the focused row.
     const focused = (event: FocusEvent) => {
       const row = (event.target as HTMLElement | null)?.closest?.('[data-art-index]') as HTMLElement | null;
@@ -170,6 +179,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
   // on the new level's first stop (the Close/Back buttons while its data is still loading).
   useEffect(() => {
     artRef.current.reset();
+    landPending.current = false;
     const timer = window.setTimeout(() => {
       const wanted = restoreKey.current;
       restoreKey.current = null;
@@ -178,18 +188,22 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
       if (scroll.current) scroll.current.scrollTop = 0;
       const first = document.querySelector<HTMLElement>('.info-scroll [data-focus-key]');
       if (stackRef.current.length && first) focusElement(first);
-      else focusElement(document.querySelector<HTMLElement>(stackRef.current.length ? '[data-focus-key="info-back"]' : '[data-focus-key="info-close"]'));
+      else { focusElement(document.querySelector<HTMLElement>(stackRef.current.length ? '[data-focus-key="info-back"]' : '[data-focus-key="info-close"]')); landPending.current = stackRef.current.length > 0; }
     }, 0);
     return () => window.clearTimeout(timer);
   }, [stack.length]);
 
-  // A level's data arrives after focus landed on Close: move into the list, but never steal focus from a row already focused.
+  // A level's data arrives after focus landed on Back while it loaded: move into the list once, and only
+  // until the viewer presses a key; later re-renders (artwork settling) never pull the cursor off Back or
+  // Close (D-pad map info-season).
   useEffect(() => {
-    if (!stack.length) return;
+    if (!stack.length || !landPending.current) return;
+    const first = document.querySelector<HTMLElement>('.info-scroll [data-focus-key]');
+    if (!first) return;
+    landPending.current = false;
     const active = document.activeElement as HTMLElement | null;
     if (active && active.closest && active.closest('.info-scroll')) return;
-    const first = document.querySelector<HTMLElement>('.info-scroll [data-focus-key]');
-    if (first) focusElement(first);
+    focusElement(first);
   });
 
   const view = infoView(info);
@@ -204,7 +218,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
     <div class="info-sheet">
       <header class="info-head">
         <h2 id="tv-info-heading">{title.title}</h2>
-        {top && <button data-focus-region={STOP} data-focus-row="0" data-focus-col="0" data-focus-key="info-back" onClick={pop}>Back</button>}
+        {top && <button data-focus-region={STOP} data-focus-row="0" data-focus-col="0" data-focus-key="info-back" onClick={pop}><Icon name="chevron-left" />Back</button>}
         <button data-focus-region={STOP} data-focus-row="0" data-focus-col={top ? 1 : 0} data-focus-key="info-close" onClick={onClose}>Close</button>
       </header>
       {top && <p class="info-crumbs" aria-label="You are here">{crumbs.join(' › ')}</p>}
@@ -221,7 +235,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
           {view.credits.map(credit => <p class="info-credit"><b>{credit.label}</b> {credit.names}</p>)}
           {view.seasons && <button class="info-stop info-seasons" data-focus-region={STOP} data-focus-row={row++} data-focus-col="0" data-focus-key="info-seasons" aria-haspopup="true" onClick={() => push({ kind: 'seasons' })}>
             <span class="info-row-copy"><b>{view.seasons.label}</b><small>{view.seasons.value}</small></span>
-            <span class="info-chevron" aria-hidden="true">›</span>
+            <Icon name="chevron-right" class="info-chevron" />
           </button>}
           {view.cast.length > 0 && <h3 class="info-subheading">Cast</h3>}
           {view.cast.map((member, index) => <CastRow api={api} member={member} row={row++} focusKey={`info-cast-${index}`} index={index} reach={art.reach} />)}

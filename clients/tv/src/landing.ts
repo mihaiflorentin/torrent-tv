@@ -9,8 +9,9 @@ import { focusElement, remoteAction, visibleFocusables } from './navigation';
 //            job, download)
 //   control  the screen's primary control when it outranks the cards (the
 //            Home hero button, the Search field)
-//   chrome   header furniture (Refresh); it is never a landing target while
-//            anything else exists
+//   chrome   screen furniture (a hub's tab strip, the Reload library action of
+//            an empty catalog); it is never a landing target while anything
+//            else exists, and among it the selected tab comes first
 // Candidates are ranked by data-focus-row, then data-focus-col, so the first
 // card of the first rail wins whatever the DOM order. An untagged content
 // control (the first setting, a project link) is the fallback when a screen
@@ -30,7 +31,8 @@ export function pickLanding(elements: HTMLElement[], options: { cardsOnly?: bool
   if (options.cardsOnly) return { target: null, rank: null };
   const fallback = content.filter(element => kind(element) !== 'chrome').sort(byPosition)[0];
   if (fallback) return { target: fallback, rank: 'fallback' };
-  const chrome = options.allowChrome ? content.filter(element => kind(element) === 'chrome').sort(byPosition)[0] : undefined;
+  const furniture = options.allowChrome ? content.filter(element => kind(element) === 'chrome').sort(byPosition) : [];
+  const chrome = furniture.filter(element => element.getAttribute('aria-selected') === 'true')[0] || furniture[0];
   return chrome ? { target: chrome, rank: 'chrome' } : { target: null, rank: null };
 }
 

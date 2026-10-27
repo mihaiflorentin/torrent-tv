@@ -11,6 +11,7 @@ import {
   castInitials, EPISODE_EMPTY, EPISODE_LOADING, episodeView, infoCrumbs, infoView, SEASON_EMPTY, SEASON_LOADING, seasonCardView, seasonDetailView, SEASONS_EMPTY, SEASONS_LOADING,
   type CatalogTitle, type InfoEpisode, type InfoLevel, type InfoSeasonDetail, type InfoSeasons, type TitleInfo,
 } from '@torrent-tv/shared';
+import { Icon } from './icons';
 import { sharedApi } from './shared-api';
 
 type Phase = 'loading' | 'ready' | 'failed';
@@ -62,7 +63,7 @@ function SeasonsLevel({ title, cache, push }: { title: CatalogTitle; cache: Cach
     return <li><button class="info-row" data-info-key={`season-${season.number}`} aria-haspopup="true" onClick={event => push({ kind: 'season', season: season.number }, event.currentTarget as HTMLElement)}>
       <span class="info-poster" aria-hidden="true">{card.initial}{season.posterUrl && <img src={sharedApi().streamURL(season.posterUrl)} alt="" loading="lazy" onError={hide} />}</span>
       <span class="info-row-copy"><strong>{card.name}</strong>{card.meta && <small>{card.meta}</small>}</span>
-      <span class="info-chevron" aria-hidden="true">›</span>
+      <span class="info-chevron" aria-hidden="true"><Icon name="chevron-right" /></span>
     </button></li>;
   })}</ul>;
 }
@@ -79,7 +80,7 @@ function SeasonLevel({ title, season, cache, push }: { title: CatalogTitle; seas
       <button class="info-row" data-info-key={`episode-${episode.number}`} aria-haspopup="true" onClick={event => push({ kind: 'episode', season, episode: episode.number }, event.currentTarget as HTMLElement)}>
         <span class="info-still-small" aria-hidden="true">{detail.episodes[index].stillUrl && <img src={sharedApi().streamURL(detail.episodes[index].stillUrl!)} alt="" loading="lazy" onError={hide} />}</span>
         <span class="info-row-copy"><strong>{`${episode.short} · ${episode.title}`}</strong>{episode.meta && <small>{episode.meta}</small>}</span>
-        <span class="info-chevron" aria-hidden="true">›</span>
+        <span class="info-chevron" aria-hidden="true"><Icon name="chevron-right" /></span>
       </button>
     </li>)}</ul></section>}
     {view.cast.length > 0 && <People label="Cast" people={view.cast} />}
@@ -174,7 +175,7 @@ export function TitleInfoDialog({ title, onClose, backRef }: { title: CatalogTit
           ? <button class="info-crumb" onClick={() => jump(index)}>{crumb}</button>
           : <span aria-current="page">{crumb}</span>}
       </li>)}</ol></nav>}
-      {top && <button class="info-back" onClick={() => jump(stack.length - 1)}>Back</button>}
+      {top && <button class="info-back" onClick={() => jump(stack.length - 1)}><Icon name="chevron-left" />Back</button>}
       <div class="info-body">
         {!top && <>
           {phase === 'loading' && <div role="status" class="info-loading"><p>Loading details…</p><span class="info-skeleton" /><span class="info-skeleton short" /><span class="info-skeleton" /></div>}
@@ -186,7 +187,7 @@ export function TitleInfoDialog({ title, onClose, backRef }: { title: CatalogTit
           {view.credits.length > 0 && <dl class="info-credits">{view.credits.map(credit => <div><dt>{credit.label}</dt><dd>{credit.names}</dd></div>)}</dl>}
           {view.seasons && <button class="info-row info-seasons" data-info-key="seasons" aria-haspopup="true" onClick={event => push({ kind: 'seasons' }, event.currentTarget as HTMLElement)}>
             <span class="info-row-copy"><strong>{view.seasons.label}</strong><small>{view.seasons.value}</small></span>
-            <span class="info-chevron" aria-hidden="true">›</span>
+            <span class="info-chevron" aria-hidden="true"><Icon name="chevron-right" /></span>
           </button>}
           {view.cast.length > 0 && <People label="Cast" people={view.cast} />}
           {view.fine.length > 0 && <dl class="info-fine">{view.fine.map(entry => <div><dt>{entry.label}</dt><dd>{entry.value}</dd></div>)}</dl>}

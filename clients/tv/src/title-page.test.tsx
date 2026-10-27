@@ -23,6 +23,8 @@ const appRoot = document.createElement('div');
 appRoot.id = 'app';
 document.body.appendChild(appRoot);
 const { Catalog } = await import('./main');
+// Importing main.tsx boots an App into #app; its key handlers would move focus a second time on every press here.
+render(null, appRoot);
 
 const wait = (ms = 40) => sleep(ms);
 const release = (id: string, over = {}) => ({ id, trackerId: 'filelist', trackerName: 'FileList', providerId: '1', categoryId: '4', browseClass: 'video', name: `Alpha.${id}`, category: 'Movies HD', sizeBytes: 4_200_000_000, seeders: 50, leechers: 2, freeleech: false, ...over });
@@ -109,7 +111,7 @@ describe('TV title page', () => {
       const onPlay = vi.fn();
       await open(movie(), undefined, onPlay);
       const play = key('detail-playback')!;
-      expect(play.textContent).toBe('Play and download · 1080p WEB-DL · 4.2 GB');
+      expect(play.textContent).toBe('Play and download · 1080p WEB-DL');
       play.click();
       expect(onPlay).toHaveBeenCalledTimes(1);
       expect(onPlay.mock.calls[0][0]).toMatchObject({ id: 'best-1080p' });
@@ -143,8 +145,142 @@ describe('TV title page', () => {
       const onPlay = vi.fn();
       const household: HouseholdState = { ...empty, continueWatching: [resumeItem()] };
       await open(movie(), household, onPlay);
-      expect(key('detail-playback')!.textContent).toBe('Resume');
-      expect(key('detail-playback')!.getAttribute('aria-label')).toBe('Resume at saved position');
+      expect(key('detail-playback')!.textContent).toBe('Resume from 0:00');
+      expect(key('detail-playback')!.getAttribute('aria-label')).toBe('Resume from 0:00');
+    });
+  });
+
+  describe('the action row, More and Back', () => {
+    const press = (name: string, keyCode: number) => document.dispatchEvent(new KeyboardEvent('keydown', { key: name, keyCode, bubbles: true, cancelable: true }));
+    const back = () => { for (const type of ['keydown', 'keyup']) document.dispatchEvent(new KeyboardEvent(type, { key: 'Escape', keyCode: 27, bubbles: true, cancelable: true })); };
+    const focused = () => (document.activeElement as HTMLElement).dataset.focusKey;
+    const movie = (state?: CatalogSource['libraryState']): CatalogDetail => ({ title: title(), seasons: [], sources: [
+      source('best', { resolution: '1080p', quality: 'WEB-DL', videoCodec: 'H.264' }, { seeders: 312 }, state),
+      source('other', { resolution: '720p', quality: 'WEBRip' }, { seeders: 41, sizeBytes: 1_900_000_000 }, undefined),
+    ] });
+    // happy-dom has no layout: the D-pad sees only elements with a size.
+    beforeEach(() => { vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100); vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(40); });
+    afterEach(() => vi.restoreAllMocks());
+    const openMovie = async (over: Partial<API> = {}, household?: HouseholdState, state?: CatalogSource['libraryState']) => {
+      mount(container, { title: async () => movie(state), ...over } as unknown as Partial<API>, { titles: [title()], household });
+      await wait();
+      key('hero-a')!.click();
+      await wait();
+    };
+
+    it('holds the primary, Choose version, My List, Info and More in one row, in that order, with Refresh data off the page', async () => {
+      await openMovie();
+      const row = Array.from(container.querySelectorAll<HTMLElement>('[data-focus-row="1"][data-focus-region="content"]')).map(button => button.dataset.focusKey);
+      expect(row).toEqual(['detail-playback', 'detail-versions', 'detail-favorite', 'detail-info', 'detail-more']);
+      expect(key('detail-refresh')).toBeNull();
+      expect(container.textContent).not.toContain('Refresh data');
+      expect(key('detail-favorite')!.getAttribute('aria-label')).toBe('Add to My List');
+      expect(key('detail-info')!.getAttribute('aria-label')).toBe('Info');
+      expect(key('detail-more')!.getAttribute('aria-label')).toBe('More: Refresh data');
+    });
+
+    it('names the Best version on Play and says under the row what it will play', async () => {
+      await openMovie();
+      expect(key('detail-playback')!.textContent).toBe('Play and download · 1080p WEB-DL');
+      expect(container.querySelector('.detail-plays')!.textContent).toBe('Plays the Best match: 1080p WEB-DL · 4.2 GB');
+    });
+
+    it('says Resume with the saved position, and what it resumes', async () => {
+      await openMovie({}, { ...empty, continueWatching: [resumeItem({ release: release('best'), positionMs: 1_880_000, durationMs: 6_000_000 })] }, { downloadState: 'downloaded', watchState: 'inProgress' });
+      expect(key('detail-playback')!.textContent).toBe('Resume from 31:20');
+      expect(key('detail-playback')!.getAttribute('aria-label')).toBe('Resume from 31:20');
+      expect(container.querySelector('.detail-plays')!.textContent).toBe('Plays 1080p WEB-DL · 4.2 GB · Downloaded');
+    });
+
+    it('lays the facts on the art: kind, date, runtime, genres, rating and certification, with no boxed header', async () => {
+      const titleInfo = vi.fn(async () => ({ titleId: 'a', available: true, runtimeMinutes: 124, certification: 'PG-13' }));
+      mount(container, { title: async () => ({ ...movie(), title: title({ releaseDate: '2022-09-14', genres: ['Drama', 'Mystery', 'Crime', 'War'], rating: 7.8, ratingVotes: 900 }) }), titleInfo } as unknown as Partial<API>, { titles: [title()] });
+      await wait();
+      key('hero-a')!.click();
+      await wait(500);
+      expect(container.querySelector('.detail-kind')!.textContent).toBe('Movie');
+      expect(container.querySelector('.detail-facts')!.textContent).toBe('Sep 14, 2022·2 h 4 min·Drama, Mystery, Crime·7.8·PG-13');
+      expect(container.querySelector('.detail-facts [aria-label="Rated 7.8"]')).not.toBeNull();
+      expect(titleInfo).toHaveBeenCalledTimes(1);
+      key('detail-info')!.click();
+      await wait();
+      expect(titleInfo).toHaveBeenCalledTimes(1);
+      expect(container.querySelector('.info-panel')!.textContent).toContain('2 h 4 min');
+    });
+
+    it('walks the row with Left and Right, and Choose version moves focus to the first version', async () => {
+      await openMovie();
+      for (const expected of ['detail-versions', 'detail-favorite', 'detail-info', 'detail-more', 'detail-more']) { press('ArrowRight', 39); await wait(20); expect(focused()).toBe(expected); }
+      key('detail-versions')!.focus();
+      key('detail-versions')!.click();
+      await wait();
+      expect(focused()).toBe('source-best-0');
+      press('ArrowUp', 38);
+      await wait(20);
+      expect(focused()).toBe('detail-playback');
+    });
+
+    it('opens More on its own focus region with Refresh data, and Back returns to More', async () => {
+      await openMovie();
+      key('detail-more')!.focus();
+      key('detail-more')!.click();
+      await wait();
+      const sheet = container.querySelector<HTMLElement>('[role="dialog"].tv-more')!;
+      expect(sheet.getAttribute('aria-modal')).toBe('true');
+      expect(focused()).toBe('more-refresh');
+      expect(Array.from(sheet.querySelectorAll<HTMLElement>('[data-focus-key]')).every(stop => stop.dataset.focusRegion === 'more-menu')).toBe(true);
+      press('ArrowDown', 40);
+      await wait(20);
+      expect(focused()).toBe('more-close');
+      press('ArrowDown', 40);
+      await wait(20);
+      expect(focused()).toBe('more-close');
+      press('ArrowLeft', 37);
+      await wait(20);
+      expect(focused()).toBe('more-close');
+      back();
+      await wait();
+      expect(container.querySelector('.tv-more')).toBeNull();
+      expect(container.querySelector('.detail-screen')).not.toBeNull();
+      expect(focused()).toBe('detail-more');
+    });
+
+    it('runs Refresh data from More once, and Close returns to More', async () => {
+      const refreshTitle = vi.fn(async () => ({}));
+      await openMovie({ refreshTitle } as unknown as Partial<API>);
+      key('detail-more')!.click();
+      await wait();
+      key('more-refresh')!.click();
+      await wait();
+      expect(refreshTitle).toHaveBeenCalledTimes(1);
+      expect(refreshTitle).toHaveBeenCalledWith('a', 'Alpha', true);
+      key('more-close')!.click();
+      await wait();
+      expect(container.querySelector('.tv-more')).toBeNull();
+      expect(focused()).toBe('detail-more');
+    });
+
+    it('shows a failed refresh in the sheet, in one sentence', async () => {
+      await openMovie({ refreshTitle: async () => { throw new Error('server returned 503') } } as unknown as Partial<API>);
+      key('detail-more')!.click();
+      await wait();
+      key('more-refresh')!.click();
+      await wait();
+      expect(container.querySelector('.tv-more [role="alert"]')!.textContent).toBe('server returned 503');
+    });
+
+    it('closes the page on Back, and on the on-screen Back, onto the card it was opened from', async () => {
+      await openMovie();
+      back();
+      await wait();
+      expect(container.querySelector('.detail-screen')).toBeNull();
+      expect(focused()).toBe('hero-a');
+      key('hero-a')!.click();
+      await wait();
+      key('detail-back')!.click();
+      await wait();
+      expect(container.querySelector('.detail-screen')).toBeNull();
+      expect(focused()).toBe('hero-a');
     });
   });
 
@@ -162,8 +298,8 @@ describe('TV title page', () => {
     it('opens focused on Play, with Back reachable above it and the row order unchanged', async () => {
       await open({ title: title(), seasons: [], sources: [source('only')] });
       expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('detail-playback');
-      const rows = ['detail-back', 'detail-playback', 'detail-versions', 'detail-favorite', 'detail-refresh'].map(name => [name, key(name)!.dataset.focusRow, key(name)!.dataset.focusCol]);
-      expect(rows).toEqual([['detail-back', '0', '0'], ['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-refresh', '1', '3']]);
+      const rows = ['detail-back', 'detail-playback', 'detail-versions', 'detail-favorite', 'detail-info', 'detail-more'].map(name => [name, key(name)!.dataset.focusRow, key(name)!.dataset.focusCol]);
+      expect(rows).toEqual([['detail-back', '0', '0'], ['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-info', '1', '4'], ['detail-more', '1', '5']]);
     });
 
     it('opens focused on Resume when there is saved progress', async () => {
@@ -191,8 +327,10 @@ describe('TV title page', () => {
     it('shows a progress bar and percent only on an episode that is in progress', async () => {
       await open(series(), { ...empty, continueWatching: [resumeItem({ seasonNumber: 2, episodeNumber: 2 })] });
       const tile = (name: string) => key(`episode-${name}`)!;
-      expect(tile('2:2').querySelector('.episode-progress b')!.getAttribute('style')).toContain('width: 41%');
-      expect(tile('2:2').textContent).toContain('41% watched');
+      // The bar sits on the episode's still (the "Series page" board); the percent is the row's state word.
+      expect(tile('2:2').querySelector('.info-still-small .episode-progress b')!.getAttribute('style')).toContain('width: 41%');
+      expect(tile('2:2').querySelector('.episode-state')!.textContent).toBe('41% watched');
+      expect(tile('2:2').querySelector('.info-row-copy small')!.textContent).not.toContain('watched');
       expect(tile('2:1').querySelector('.episode-progress')).toBeNull();
       expect(tile('2:3').querySelector('.episode-progress')).toBeNull();
     });
@@ -207,7 +345,7 @@ describe('TV title page', () => {
       mount(container, { title: fetchTitle } as unknown as Partial<API>, { titles: [title()], initialNav: nav({ titleId: 'a', titleName: 'Alpha' }), household: { ...empty, continueWatching: [resumeItem({ positionMs: 900 })] } });
       await wait(80);
       expect(fetchTitle).toHaveBeenCalledWith('a');
-      expect(key('detail-playback')!.textContent).toBe('Resume');
+      expect(key('detail-playback')!.textContent).toBe('Resume from 0:00');
       expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('detail-playback');
     });
 
@@ -228,7 +366,7 @@ describe('TV title page', () => {
       try {
         mount(container, {}, { titles: [title()], household: { ...empty, continueWatching: [resumeItem()] }, initialNav: nav({ route: 'continue', focusKey: 'library-a-0-0-0' }), restoreFocus: 'library-a-0-0-0' });
         await wait(80);
-        expect(container.querySelector('.tv-top h1')!.textContent).toBe('Continue watching');
+        expect(container.querySelector('[data-hub-tab][aria-selected="true"]')!.textContent).toBe('Continue watching');
         expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('library-a-0-0-0');
       } finally {
         delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetWidth;
@@ -254,7 +392,7 @@ describe('TV title page', () => {
     it('starts on Home as before when there is no initialNav', async () => {
       mount(container, {}, { titles: [title()] });
       await wait(80);
-      expect(container.querySelector('.tv-top h1')!.textContent).toBe('Home');
+      expect(container.querySelector('.tv-app')!.getAttribute('data-route')).toBe('home');
       expect(key('detail-playback')).toBeNull();
     });
 

@@ -138,25 +138,31 @@ describe('TV series page: episode list, then full-screen Versions', () => {
       expect(container.querySelector('.episode-pane .source-button')).toBeNull();
     });
 
-    it('heads the list "Episodes" with the season it belongs to, and follows the season bar', async () => {
+    // The "Series page" board: the season pills sit straight under the actions and the list straight under them, with no
+    // "Seasons" or "Episodes · Season 2" heading repeating what the selected pill says; the names stay for assistive tech.
+    it('draws no heading over the season pills or the list, and names both for assistive tech', async () => {
       await open(() => detail({}));
       key('season-2').click();
       await wait();
-      const heading = container.querySelector('.season-browser .episode-heading')!;
-      expect(heading.tagName).toBe('H3');
-      expect(heading.textContent).toBe('Episodes · Season 2');
-      expect(heading.nextElementSibling).toBe(container.querySelector('.episode-pane'));
+      expect(container.querySelector('.season-browser h2, .season-browser h3')).toBeNull();
+      expect(container.querySelector('.season-tabs')!.getAttribute('aria-label')).toBe('Seasons');
+      expect(container.querySelector('.episode-pane')!.getAttribute('aria-label')).toBe('Season 2 episodes');
       key('season-3').click();
       await wait();
-      expect(container.querySelector('.episode-heading')!.textContent).toBe('Episodes · Season 3');
+      expect(container.querySelector('.episode-pane')!.getAttribute('aria-label')).toBe('Season 3 episodes');
     });
 
-    it('keeps the heading while the episode list is still being prepared', async () => {
+    it('says the list is still being prepared', async () => {
       await open(() => detail({ s2: [] }));
       key('season-2').click();
       await wait();
-      expect(container.querySelector('.episode-heading')!.textContent).toBe('Episodes · Season 2');
       expect(container.querySelector('.episode-pane .episode-loading')).not.toBeNull();
+    });
+
+    it('shows no series overview on the page: the Info panel carries it', async () => {
+      await open(() => detail({}));
+      expect(container.textContent).not.toContain('A series overview.');
+      expect(key('detail-info')).not.toBeNull();
     });
 
     it('is one column, one level: the list is the only pane under the season bar, with no side preview', async () => {
@@ -169,11 +175,11 @@ describe('TV series page: episode list, then full-screen Versions', () => {
       expect(container.querySelector('.episode-preview, .preview-pane')).toBeNull();
     });
 
-    it('swaps the heading for the Versions view and brings it back with the list', async () => {
+    it('swaps the list for the Versions view and brings it back', async () => {
       await openVersions('episode-2:4');
-      expect(container.querySelector('.episode-heading')).toBeNull();
+      expect(listShown()).toBe(false);
       await press('GoBack');
-      expect(container.querySelector('.episode-heading')!.textContent).toBe('Episodes · Season 2');
+      expect(listShown()).toBe(true);
     });
 
     it('focusing another episode moves the selection after a short pause, not on every pass', async () => {
@@ -335,10 +341,24 @@ describe('TV series page: episode list, then full-screen Versions', () => {
       key('season-2').click();
       await wait();
       const row = rowOf('2:4');
-      expect(row.querySelector('.info-row-copy b')!.textContent).toBe('E04 · Episode 4');
-      expect(row.querySelector('.info-chevron')!.textContent).toBe('›');
+      // The board's name line: the code in the quiet tone, then the name.
+      expect(row.querySelector('.info-row-copy b')!.textContent).toBe('E04 Episode 4');
+      expect(row.querySelector('.info-row-copy b .episode-code')!.textContent).toBe('E04');
+      expect(row.querySelector('svg.info-chevron')).not.toBeNull();
+      expect(row.querySelector('.info-chevron')!.textContent).toBe('');
       expect(row.querySelector('.info-still-small')).not.toBeNull();
       expect(row.querySelectorAll('button, a, input')).toHaveLength(0);
+    });
+
+    it('ends each row with its one library-state word, and none for an episode with no state', async () => {
+      await open(() => detail({ s2: [1, 2, 3].map(n => episode(2, n, n === 1 ? { libraryState: watched } : n === 2 ? { libraryState: { downloadState: 'downloaded', watchState: 'unwatched' } } : {})) }));
+      key('season-2').click();
+      await wait();
+      expect(rowOf('2:1').querySelector('.episode-state')!.textContent).toBe('Watched');
+      expect(rowOf('2:2').querySelector('.episode-state')!.textContent).toBe('Downloaded');
+      expect(rowOf('2:3').querySelector('.episode-state')).toBeNull();
+      // The word replaces the badge pair, so the state is said once.
+      expect(rowOf('2:1').querySelector('.tv-state-badges')).toBeNull();
     });
 
     it('shows no synopsis line on a row without detailed info, and never the series overview', async () => {
@@ -454,8 +474,8 @@ describe('TV series page: episode list, then full-screen Versions', () => {
     it('keep their rows and columns, and Down from the hero reaches the bar', async () => {
       await open(() => detail({}));
       const at = (name: string) => [name, key(name).dataset.focusRow, key(name).dataset.focusCol];
-      expect(['detail-back', 'detail-playback', 'detail-versions', 'detail-favorite', 'detail-refresh', 'detail-info', 'season-1', 'season-2', 'season-3'].map(at)).toEqual([
-        ['detail-back', '0', '0'], ['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-refresh', '1', '3'], ['detail-info', '1', '4'],
+      expect(['detail-back', 'detail-playback', 'detail-versions', 'detail-favorite', 'detail-info', 'detail-more', 'season-1', 'season-2', 'season-3'].map(at)).toEqual([
+        ['detail-back', '0', '0'], ['detail-playback', '1', '0'], ['detail-versions', '1', '1'], ['detail-favorite', '1', '2'], ['detail-info', '1', '4'], ['detail-more', '1', '5'],
         ['season-1', '2', '0'], ['season-2', '2', '1'], ['season-3', '2', '2'],
       ]);
       expect(focused()).toBe('detail-playback');

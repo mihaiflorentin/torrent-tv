@@ -1,4 +1,4 @@
-/* Torrent TV browser app, direction "Velvet Booth" (DESIGN.md). Every color,
+/* Torrent TV browser app, direction "Night Screen" (DESIGN.md). Every color,
    size, radius and duration comes from the shared --tt- tokens in
    clients/shared/design/tokens.css, imported before this sheet; only layout
    locals are defined here, prefixed --w-. The desktop shell reuses this sheet
@@ -89,12 +89,16 @@ svg {
  height: 1.25rem;
  fill: none;
  stroke: currentColor;
- stroke-width: 1.8;
+ stroke-width: 2;
  stroke-linecap: round;
  stroke-linejoin: round;
 }
 
-/* ---------- Focus: a saffron-light ring outside an offset gap, plus a white edge on the control's own border ---------- */
+/* ---------- Focus: a white ring outside an offset gap, plus a fill change ----------
+   Two signals, as on the TV (#53): the white outline outside an offset gap, and a
+   change of fill. A compact control (button, chip, tab, rail item) turns white with
+   ground-coloured text; a row or card keeps its own look on a lighter fill inside
+   the ring (see "Rows" under Controls). Hover mirrors focus without the ring. */
 
 :focus-visible {
  outline: var(--tt-focus-width-web) solid var(--tt-focus-ring);
@@ -115,9 +119,9 @@ a:focus-visible {
  top: -200px;
  z-index: 300;
  padding: var(--tt-space-2) var(--tt-space-4);
- border-radius: var(--tt-radius-md);
- background: var(--tt-accent);
- color: var(--tt-on-accent);
+ border-radius: var(--tt-radius-pill);
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
  font-weight: var(--tt-weight-bold);
  text-decoration: none;
 }
@@ -126,7 +130,15 @@ a:focus-visible {
  top: var(--tt-space-3);
 }
 
-/* ---------- Controls ---------- */
+/* ---------- Controls ----------
+   Buttons and chips are fully rounded translucent pills with no hairline: the
+   border stays as a transparent 1 px edge so focus never changes geometry. The
+   primary action is the brighter --tt-fill-strong pill with the bold word, white
+   when hovered or focused; saffron is never a button fill. Secondary pills go one
+   step lighter on hover and white on keyboard focus. Selected tabs, chips and
+   toggles take the selected fill, the bold word and a short saffron bar, never
+   white (white is where the cursor is). Destructive actions put the danger word
+   on the ordinary pill and fill with the danger colour on focus. */
 
 button,
 input,
@@ -141,18 +153,18 @@ button {
  justify-content: center;
  gap: var(--tt-space-2);
  min-height: var(--tt-target-web);
- padding: 0 var(--tt-space-4);
- border: 1px solid var(--tt-line-strong);
- border-radius: var(--tt-radius-md);
- background: var(--tt-raised);
+ padding: 0 var(--tt-space-5);
+ border: 1px solid transparent;
+ border-radius: var(--tt-radius-pill);
+ background: var(--tt-fill);
  color: var(--tt-text);
- font-weight: var(--tt-weight-medium);
+ font-weight: var(--tt-weight-semibold);
  cursor: pointer;
- transition: background-color var(--tt-dur-fast) var(--tt-ease-out), border-color var(--tt-dur-fast) var(--tt-ease-out), transform var(--tt-dur-fast) var(--tt-ease-out);
+ transition: background-color var(--tt-dur-fast) var(--tt-ease-out), color var(--tt-dur-fast) var(--tt-ease-out), border-color var(--tt-dur-fast) var(--tt-ease-out), transform var(--tt-dur-fast) var(--tt-ease-out);
 }
 
 button:hover {
- background: var(--tt-overlay);
+ background: var(--tt-fill-selected);
 }
 
 button:active {
@@ -164,50 +176,133 @@ button:disabled {
  cursor: not-allowed;
 }
 
+/* The compact control under the keyboard turns white. Rows and cards are left out
+   here and take a lighter fill in their own sections. */
+button:not(.media-card, .source-main, .episode-select, .info-row, .family-tile, .portal-account, [role="menuitem"]):focus-visible {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
+}
+
 button.primary {
- border-color: var(--tt-accent);
- background: var(--tt-accent);
- color: var(--tt-on-accent);
+ background: var(--tt-fill-strong);
+ color: var(--tt-text);
  font-weight: var(--tt-weight-bold);
 }
 
-button.primary:hover {
- border-color: var(--tt-accent-hover);
- background: var(--tt-accent-hover);
-}
-
-button.primary:active {
- background: var(--tt-accent-deep);
+button.primary:hover:not(:disabled),
+button.primary:focus-visible {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
 }
 
 button.ghost {
- border-color: transparent;
  background: transparent;
  color: var(--tt-text-muted);
 }
 
 button.ghost:hover {
+ background: var(--tt-fill);
  color: var(--tt-text);
+}
+
+/* Round icon buttons (My List, Info, More): the label is spoken, the icon is drawn. */
+.icon-button {
+ width: var(--tt-target-web);
+ padding: 0;
+}
+
+/* Selected tabs, chips and toggles: lighter fill, bold word and a short saffron bar
+   under the label (selection never rests on colour alone). Focused, the pill turns
+   white and the bar darkens to stay visible on it. */
+.family-chips button[aria-pressed="true"],
+.season-tabs button.selected,
+.hub-tabs button.selected,
+.engine-toggle-options button[aria-pressed="true"],
+.video button[aria-expanded="true"] {
+ background: linear-gradient(var(--tt-accent), var(--tt-accent)) no-repeat 50% calc(100% - 6px) / 20px 3px, var(--tt-fill-selected);
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold);
+}
+
+.family-chips button[aria-pressed="true"]:focus-visible,
+.season-tabs button.selected:focus-visible,
+.hub-tabs button.selected:focus-visible,
+.engine-toggle-options button[aria-pressed="true"]:focus-visible,
+.video button[aria-expanded="true"]:focus-visible {
+ background: linear-gradient(var(--tt-accent-deep), var(--tt-accent-deep)) no-repeat 50% calc(100% - 6px) / 20px 3px, var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
 }
 
 .danger-button {
  color: var(--tt-danger);
 }
 
+button.danger-button:focus-visible {
+ background: var(--tt-danger);
+ color: var(--tt-on-fill-focus);
+}
+
 .danger {
  color: var(--tt-danger);
+}
+
+/* ---------- More menu ---------- */
+/* Opens below its button; on the title overlay, whose hero clips, it opens above. */
+
+.more-menu {
+ position: relative;
+ display: inline-flex;
+}
+
+.more-menu-list {
+ position: absolute;
+ right: 0;
+ top: calc(100% + var(--tt-space-2));
+ z-index: 60;
+ display: flex;
+ flex-direction: column;
+ min-width: 200px;
+ padding: var(--tt-space-2);
+ border-radius: var(--tt-radius-lg);
+ background: var(--tt-menu-surface);
+ box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.detail .more-menu-list {
+ top: auto;
+ bottom: calc(100% + var(--tt-space-2));
+}
+
+.more-menu-list button {
+ justify-content: flex-start;
+ width: 100%;
+ border-radius: var(--tt-radius-md);
+ background: transparent;
+ white-space: nowrap;
+}
+
+.more-menu-list button:hover,
+.more-menu-list button:focus-visible {
+ background: var(--tt-fill-selected);
+}
+
+.more-menu-list button.danger-button:focus-visible {
+ background: var(--tt-danger);
+ color: var(--tt-on-fill-focus);
 }
 
 .success {
  color: var(--tt-ok);
 }
 
+/* Fields stay fields: the raised fill and the 3:1 edge an input needs, rounded
+   like the pills around them. */
 input,
 select {
  min-height: var(--tt-target-web);
- padding: 0 var(--tt-space-3);
+ padding: 0 var(--tt-space-4);
  border: 1px solid var(--tt-line-strong);
- border-radius: var(--tt-radius-md);
+ border-radius: var(--tt-radius-pill);
  background: var(--tt-raised);
  color: var(--tt-text);
 }
@@ -229,12 +324,12 @@ progress {
  height: 6px;
  border: 0;
  border-radius: var(--tt-radius-pill);
- background: var(--tt-line);
+ background: var(--tt-fill-selected);
  overflow: hidden;
 }
 
 progress::-webkit-progress-bar {
- background: var(--tt-line);
+ background: var(--tt-fill-selected);
 }
 
 progress::-webkit-progress-value {
@@ -253,10 +348,10 @@ progress::-moz-progress-bar {
  align-items: center;
  min-height: 24px;
  padding: 0 var(--tt-space-2);
- border: 1px solid var(--tt-line-strong);
  border-radius: var(--tt-radius-pill);
+ background: var(--tt-fill);
  font-size: var(--tt-text-xs);
- font-weight: var(--tt-weight-medium);
+ font-weight: var(--tt-weight-semibold);
 }
 
 .status-badge {
@@ -265,9 +360,8 @@ progress::-moz-progress-bar {
  gap: 6px;
  min-height: 28px;
  padding: 0 var(--tt-space-3) 0 var(--tt-space-2);
- border: 1px solid currentColor;
  border-radius: var(--tt-radius-pill);
- background: var(--tt-raised);
+ background: var(--tt-fill);
  font-size: var(--tt-text-xs);
  font-weight: var(--tt-weight-bold);
  color: var(--tt-text-muted);
@@ -348,8 +442,8 @@ progress::-moz-progress-bar {
  align-self: flex-start;
  min-height: 22px;
  padding: 0 var(--tt-space-2);
- border: 1px solid var(--tt-line-strong);
  border-radius: var(--tt-radius-pill);
+ background: var(--tt-fill);
  font-size: var(--tt-text-xs);
  font-weight: var(--tt-weight-medium);
  color: var(--tt-text-muted);
@@ -375,9 +469,8 @@ dl .tracker-badge,
  gap: 6px;
  min-height: 28px;
  padding: 0 var(--tt-space-3);
- border: 1px solid var(--tt-line-strong);
  border-radius: var(--tt-radius-pill);
- background: var(--tt-surface);
+ background: var(--tt-fill);
  font-size: var(--tt-text-xs);
  color: var(--tt-text-muted);
 }
@@ -387,7 +480,6 @@ dl .tracker-badge,
 }
 
 .tracker-chip.off {
- border-color: var(--tt-warn);
  color: var(--tt-warn);
 }
 
@@ -471,45 +563,32 @@ dl .tracker-badge,
  letter-spacing: -0.02em;
 }
 
-.brand strong span,
-.shell-brand strong span {
- color: var(--tt-accent);
-}
-
+/* The app mark (#63, as on the TV rail): a saffron rounded square with a play shape. */
 .brand-mark {
- display: grid;
- place-items: center;
+ display: flex;
+ align-items: center;
+ justify-content: center;
  flex: none;
  width: 36px;
  height: 36px;
  border-radius: var(--tt-radius-md);
  background: var(--tt-accent);
  color: var(--tt-on-accent);
- font-size: var(--tt-text-sm);
- font-weight: var(--tt-weight-black);
- letter-spacing: -0.04em;
 }
 
-.nav-group {
- padding: var(--tt-space-2) 0;
- border-top: 1px solid var(--tt-line);
+.brand-mark svg {
+ width: 20px;
+ height: 20px;
 }
 
-.nav-group:first-child {
- border-top: 0;
- padding-top: 0;
+/* The six hubs (#64, as on the TV rail): one list, no group labels. */
+.nav-items {
+ display: flex;
+ flex-direction: column;
+ gap: var(--tt-space-1);
 }
 
-.nav-group p {
- margin: var(--tt-space-1) var(--tt-space-3) var(--tt-space-1);
- color: var(--tt-text-muted);
- font-size: var(--tt-text-xs);
- text-transform: uppercase;
- letter-spacing: 0.08em;
- white-space: nowrap;
-}
-
-.nav-group button,
+.nav-items button,
 .portal-account {
  position: relative;
  display: flex;
@@ -523,34 +602,47 @@ dl .tracker-badge,
  border-radius: var(--tt-radius-md);
  background: transparent;
  color: var(--tt-text-muted);
+ font-weight: var(--tt-weight-medium);
  text-align: left;
  white-space: nowrap;
 }
 
-.nav-group button:hover,
+/* Rail items follow the TV rail: the current page on the selected fill with the
+   bold word and a short saffron bar, hover one fill step, the keyboard focus white. */
+.nav-items button:hover,
 .portal-account:hover {
- background: var(--tt-raised);
+ background: var(--tt-fill);
  color: var(--tt-text);
 }
 
-.nav-group button.selected {
- background: var(--tt-accent-soft);
+.portal-account:focus-visible {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text);
+}
+
+.nav-items button.selected {
+ background: var(--tt-fill-selected);
  color: var(--tt-text);
  font-weight: var(--tt-weight-bold);
 }
 
-.nav-group button.selected::before {
+.nav-items button:focus-visible {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
+}
+
+.nav-items button.selected::before {
  content: "";
  position: absolute;
- left: -1px;
- top: 10px;
- bottom: 10px;
+ left: 4px;
+ top: 14px;
+ bottom: 14px;
  width: 3px;
  border-radius: var(--tt-radius-pill);
  background: var(--tt-accent);
 }
 
-.nav-group svg,
+.nav-items svg,
 .portal-account svg {
  flex: none;
  width: 1.25rem;
@@ -592,7 +684,7 @@ dl .tracker-badge,
 }
 
 .portal-promo a:hover {
- border-color: var(--tt-accent-line);
+ border-color: var(--tt-line-strong);
 }
 
 .portal-promo img {
@@ -640,7 +732,9 @@ dl .tracker-badge,
 
 .topbar {
  display: flex;
+ flex-wrap: wrap;
  align-items: center;
+ gap: var(--tt-space-3) var(--tt-space-6);
  min-height: 48px;
  margin: 0 0 var(--tt-space-4);
 }
@@ -648,6 +742,84 @@ dl .tracker-badge,
 .topbar h1 {
  margin: 0;
  font-size: var(--tt-text-xl);
+}
+
+/* Library and Discover (#64, as on the TV): the hub's sections as pills on the heading's line,
+   the selected one in the shared selected look. A strip that does not fit scrolls sideways on its own. */
+.visually-hidden {
+ position: absolute;
+ width: 1px;
+ height: 1px;
+ overflow: hidden;
+ clip-path: inset(50%);
+ white-space: nowrap;
+}
+
+.hub-tabs {
+ display: flex;
+ flex: 0 1 auto;
+ gap: var(--tt-space-2);
+ min-width: 0;
+ max-width: 100%;
+ padding: 4px;
+ margin: -4px;
+ overflow-x: auto;
+ scrollbar-width: none;
+}
+
+.hub-tabs button {
+ flex: none;
+}
+
+/* Settings (#64): the screens that left the rail, as quiet pills at the end of its heading line;
+   Background jobs and Other projects lead back with a Settings pill before their heading. */
+.settings-links {
+ display: flex;
+ gap: var(--tt-space-2);
+ min-width: 0;
+ max-width: 100%;
+ padding: 4px;
+ margin: -4px -4px -4px auto;
+ overflow-x: auto;
+ scrollbar-width: none;
+}
+
+.settings-links > * {
+ flex: none;
+}
+
+.settings-links svg,
+.topbar-back svg {
+ flex: none;
+ width: 1.125rem;
+ height: 1.125rem;
+}
+
+.settings-links a {
+ display: inline-flex;
+ align-items: center;
+ gap: var(--tt-space-2);
+ min-height: var(--tt-target-web);
+ padding: 0 var(--tt-space-5);
+ border-radius: var(--tt-radius-pill);
+ background: var(--tt-fill);
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-semibold);
+ text-decoration: none;
+}
+
+.settings-links a:hover {
+ background: var(--tt-fill-selected);
+}
+
+.settings-links a:focus-visible {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
+}
+
+.topbar-back {
+ margin-right: calc(-1 * var(--tt-space-4));
+ padding-left: var(--tt-space-3);
 }
 
 .load-more {
@@ -673,7 +845,7 @@ dl .tracker-badge,
 
 .hero-kicker {
  margin: 0 0 var(--tt-space-2);
- color: var(--tt-accent);
+ color: var(--tt-text-muted);
  font-size: var(--tt-text-xs);
  font-weight: var(--tt-weight-bold);
  text-transform: uppercase;
@@ -782,8 +954,8 @@ dl .tracker-badge,
 }
 
 .rail-arrow:hover {
- background: var(--tt-raised);
- border-color: var(--tt-accent-line);
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
 }
 
 .rail-arrow.left {
@@ -837,6 +1009,7 @@ dl .tracker-badge,
 
 .media-card:focus-visible .card-art {
  border-color: var(--tt-focus-edge);
+ transform: translateY(-3px);
 }
 
 .card-art img {
@@ -967,7 +1140,8 @@ dl .tracker-badge,
  transition: transform var(--tt-dur-slow) var(--tt-ease-out);
 }
 
-.family-tile:hover img {
+.family-tile:hover img,
+.family-tile:focus-visible img {
  transform: scale(1.04);
 }
 
@@ -1029,13 +1203,7 @@ dl .tracker-badge,
  border-radius: var(--tt-radius-pill);
 }
 
-/* Selected: a check mark and weight as well as the saffron border, so it never rests on colour alone. */
-.family-chips button[aria-pressed="true"] {
- border-color: var(--tt-accent);
- background: var(--tt-accent-soft);
- font-weight: var(--tt-weight-bold);
-}
-
+/* Selected: the shared selected pill (see Controls) plus a check mark, so it never rests on colour alone. */
 .family-chips button[aria-pressed="true"]::before {
  content: "\2713";
  margin-right: var(--tt-space-2);
@@ -1055,8 +1223,8 @@ dl .tracker-badge,
  align-items: center;
  min-height: 28px;
  padding: 0 var(--tt-space-3);
- border: 1px solid var(--tt-line-strong);
  border-radius: var(--tt-radius-pill);
+ background: var(--tt-fill);
  color: var(--tt-text-muted);
  font-size: var(--tt-text-xs);
  font-weight: var(--tt-weight-bold);
@@ -1085,9 +1253,9 @@ dl .tracker-badge,
  flex: 1 1 280px;
  min-width: 0;
  min-height: var(--tt-target-web);
- padding: 0 var(--tt-space-3);
+ padding: 0 var(--tt-space-4);
  border: 1px solid var(--tt-line-strong);
- border-radius: var(--tt-radius-md);
+ border-radius: var(--tt-radius-pill);
  background: var(--tt-raised);
  color: var(--tt-text-muted);
 }
@@ -1146,9 +1314,6 @@ dl .tracker-badge,
 
 .catalog-update {
  margin: 0 0 var(--tt-space-4);
- border-color: var(--tt-accent-line);
- background: var(--tt-accent-soft);
- color: var(--tt-accent);
 }
 
 /* ---------- Empty and error states ---------- */
@@ -1298,8 +1463,9 @@ dl .tracker-badge,
  margin-left: var(--tt-space-2);
  padding: 0;
  border-radius: var(--tt-radius-pill);
- color: var(--tt-accent);
+ color: var(--tt-text-muted);
  font-size: var(--tt-text-xs);
+ font-weight: var(--tt-weight-bold);
  vertical-align: middle;
 }
 
@@ -1473,12 +1639,6 @@ dl .tracker-badge,
  text-shadow: none;
 }
 
-.season-tabs button.selected {
- border-color: var(--tt-accent);
- background: var(--tt-accent-soft);
- font-weight: var(--tt-weight-bold);
-}
-
 .season-tabs .media-badge span {
  display: none;
 }
@@ -1573,17 +1733,25 @@ dl .tracker-badge,
  padding: var(--tt-space-4) var(--tt-space-6) var(--tt-space-6);
 }
 
+/* Episode rows are rows, not boxes: no hairline, a quiet fill on hover, the selected
+   fill under the cursor and on the selected episode, which also keeps its saffron edge. */
 .episode-list article {
  min-width: 0;
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
+ border-radius: var(--tt-radius-lg);
  background: transparent;
  overflow: hidden;
 }
 
+.episode-list article:hover {
+ background: var(--tt-fill-quiet);
+}
+
+.episode-list article:focus-within,
 .episode-list article.selected {
- border-color: var(--tt-accent-line);
- background: var(--tt-accent-soft);
+ background: var(--tt-fill-selected);
+}
+
+.episode-list article.selected {
  box-shadow: inset 4px 0 0 var(--tt-accent);
 }
 
@@ -1626,7 +1794,7 @@ dl .tracker-badge,
 }
 
 .episode-heading-label {
- color: var(--tt-accent);
+ color: var(--tt-text);
 }
 
 .episode-pane {
@@ -1700,9 +1868,18 @@ dl .tracker-badge,
  width: 100%;
  padding: var(--tt-space-2) var(--tt-space-4);
  border: 0;
- border-radius: 0;
+ border-radius: var(--tt-radius-lg);
  background: transparent;
  text-align: left;
+ font-weight: var(--tt-weight-regular);
+}
+
+.episode-select:hover {
+ background: transparent;
+}
+
+.episode-select:focus-visible {
+ outline-offset: calc(var(--tt-focus-offset) * -1 - var(--tt-focus-width-web));
 }
 
 .episode-select .info-still-small {
@@ -1767,18 +1944,20 @@ dl .tracker-badge,
  padding: 0 var(--tt-space-3) var(--tt-space-3);
 }
 
+/* Version rows (Title board): a quiet fill with no hairline, the selected fill under
+   the pointer or the keyboard. The row's action is a pill that turns white with it. */
 .source-row {
  display: grid;
  grid-template-columns: minmax(0, 1fr) auto;
  align-items: center;
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
- background: var(--tt-raised);
+ border-radius: var(--tt-radius-lg);
+ background: var(--tt-fill-quiet);
  overflow: hidden;
 }
 
-.source-rows.compact .source-row {
- background: var(--tt-surface);
+.source-row:hover,
+.source-row:focus-within {
+ background: var(--tt-fill-selected);
 }
 
 .source-row {
@@ -1797,10 +1976,18 @@ dl .tracker-badge,
  min-width: 0;
  padding: var(--tt-space-3) var(--tt-space-4);
  border: 0;
- border-radius: 0;
+ border-radius: var(--tt-radius-lg);
  background: transparent;
  text-align: left;
  font-weight: var(--tt-weight-regular);
+}
+
+.source-main:hover {
+ background: transparent;
+}
+
+.source-main:focus-visible {
+ outline-offset: calc(var(--tt-focus-offset) * -1 - var(--tt-focus-width-web));
 }
 
 .source-spec {
@@ -1851,14 +2038,16 @@ dl .tracker-badge,
  align-items: center;
  min-height: 36px;
  padding: 0 var(--tt-space-4);
- border-radius: var(--tt-radius-md);
- background: var(--tt-accent);
- color: var(--tt-on-accent);
+ border-radius: var(--tt-radius-pill);
+ background: var(--tt-fill-strong);
+ color: var(--tt-text);
  white-space: nowrap;
 }
 
-.source-main:hover .source-action > b {
- background: var(--tt-accent-hover);
+.source-main:hover .source-action > b,
+.source-main:focus-visible .source-action > b {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
 }
 
 /* A narrow row stacks spec, facts and action so chips and badges never squeeze each other. */
@@ -1993,13 +2182,20 @@ dl .tracker-badge,
  grid-template-columns: minmax(0, 1fr) auto;
  gap: var(--tt-space-5);
  padding: var(--tt-space-4) var(--tt-space-5);
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-lg);
- background: var(--tt-surface);
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet);
+}
+
+/* Rows as on the Downloads board: no hairline, the selected fill while the pointer
+   or the keyboard is inside the row. A row that needs attention keeps a danger edge
+   beside its "Needs attention" word. */
+.download-list article:hover,
+.download-list article:focus-within {
+ background: var(--tt-fill-selected);
 }
 
 .download-list article[data-tone="error"] {
- border-color: var(--tt-danger);
+ box-shadow: inset 4px 0 0 var(--tt-danger);
 }
 
 .download-identity {
@@ -2308,7 +2504,7 @@ dl .tracker-badge,
 }
 
 .settings-tabs button:hover {
- background: var(--tt-raised);
+ background: var(--tt-fill);
  color: var(--tt-text);
 }
 
@@ -2534,29 +2730,14 @@ dl .tracker-badge,
  min-height: var(--tt-target-web);
 }
 
+/* Two pills; the chosen one is the shared selected pill (see Controls). */
 .engine-toggle-options {
  display: inline-flex;
- border: 1px solid var(--tt-line-strong);
- border-radius: var(--tt-radius-md);
- overflow: hidden;
+ gap: var(--tt-space-2);
 }
 
 .engine-toggle-options button {
- border: 0;
- border-right: 1px solid var(--tt-line-strong);
- border-radius: 0;
- background: transparent;
  color: var(--tt-text-muted);
-}
-
-.engine-toggle-options button:last-child {
- border-right: 0;
-}
-
-.engine-toggle-options button[aria-pressed="true"] {
- background: var(--tt-accent);
- color: var(--tt-on-accent);
- font-weight: var(--tt-weight-bold);
 }
 
 .switch-list {
@@ -2923,7 +3104,7 @@ dl .tracker-badge,
 }
 
 .project-card:hover {
- border-color: var(--tt-accent-line);
+ border-color: var(--tt-line-strong);
  color: var(--tt-text);
 }
 
@@ -3072,7 +3253,6 @@ dl .tracker-badge,
  align-items: center;
  gap: var(--tt-space-2) var(--tt-space-5);
  padding: var(--tt-space-3) var(--tt-space-4);
- border: 1px solid var(--tt-line);
  border-radius: var(--tt-radius-lg);
  background: var(--tt-controls-surface);
 }
@@ -3087,17 +3267,17 @@ dl .tracker-badge,
  margin-left: auto;
 }
 
+/* Play/Pause is the player's primary pill: brighter fill and bold word, white when
+   hovered or focused. */
 .player-play {
  min-width: 96px;
- border-color: var(--tt-accent);
- background: var(--tt-accent);
- color: var(--tt-on-accent);
+ background: var(--tt-fill-strong);
  font-weight: var(--tt-weight-bold);
 }
 
 .player-play:hover {
- border-color: var(--tt-accent-hover);
- background: var(--tt-accent-hover);
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
 }
 
 .player-volume {
@@ -3114,11 +3294,6 @@ dl .tracker-badge,
  padding: 0;
  border: 0;
  background: transparent;
-}
-
-.video button[aria-expanded="true"] {
- border-color: var(--tt-accent);
- background: var(--tt-accent-soft);
 }
 
 .subtitle-panel {
@@ -3159,9 +3334,18 @@ dl .tracker-badge,
  overflow-wrap: anywhere;
 }
 
+/* Panel rows: the selected fill and a check mark on the chosen track, the same fill
+   under the keyboard inside the ring. */
+.subtitle-panel button {
+ border-radius: var(--tt-radius-md);
+ background: var(--tt-fill-quiet);
+}
+
+.subtitle-panel button:hover,
+.subtitle-panel button:focus-visible,
 .subtitle-panel button.selected {
- border-color: var(--tt-accent);
- background: var(--tt-accent-soft);
+ background: var(--tt-fill-selected);
+ color: var(--tt-text);
 }
 
 .subtitle-panel button.selected::after {
@@ -3345,8 +3529,7 @@ dl .tracker-badge,
  }
 
  .brand strong,
- .nav-label,
- .nav-group p {
+ .nav-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -3355,7 +3538,7 @@ dl .tracker-badge,
   white-space: nowrap;
  }
 
- .nav-group button,
+ .nav-items button,
  .portal-account {
   justify-content: center;
   padding: 0;
@@ -3395,6 +3578,11 @@ dl .tracker-badge,
 /* ---------- Phone: the rail becomes a bottom bar, every list is one column ---------- */
 
 @media (max-width: 640px) {
+ /* The Settings strip wraps under the heading: start it on the page edge. */
+ .settings-links {
+  margin-left: -4px;
+ }
+
  .versions-view {
   padding-left: var(--tt-space-4);
   padding-right: var(--tt-space-4);
@@ -3428,32 +3616,33 @@ dl .tracker-badge,
   display: none;
  }
 
+ /* Six hubs share the bar's width (each its label's width plus an equal share of the rest),
+    so all of them fit a 320 px phone without scrolling or clipping a label. */
  .sidebar nav {
   display: flex;
-  flex: none;
+  flex: 1 1 auto;
+  min-width: 0;
  }
 
- .nav-group {
-  display: flex;
-  padding: 0;
-  border-top: 0;
-  border-left: 1px solid var(--tt-line);
+ .nav-items {
+  flex: 1 1 auto;
+  flex-direction: row;
+  gap: 0;
+  min-width: 0;
  }
 
- .nav-group:first-child {
-  border-left: 0;
- }
-
- .nav-group button {
+ .nav-items button {
+  flex: 1 1 auto;
   flex-direction: column;
   justify-content: center;
   gap: 2px;
-  width: 84px;
-  min-width: 84px;
+  width: auto;
+  min-width: 0;
   min-height: 63px;
-  padding: var(--tt-space-1);
+  padding: var(--tt-space-1) 0;
   border-radius: 0;
   font-size: var(--tt-text-xs);
+  letter-spacing: -0.01em;
  }
 
  .nav-label {
@@ -3462,14 +3651,14 @@ dl .tracker-badge,
   height: auto;
   clip-path: none;
   max-width: 100%;
-  overflow: visible;
+  overflow: hidden;
   line-height: 1.1;
   text-align: center;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
  }
 
- .nav-group button.selected::before {
+ .nav-items button.selected::before {
   left: 12px;
   right: 12px;
   top: 0;
@@ -3489,7 +3678,7 @@ dl .tracker-badge,
  .portal-account {
   flex-direction: column;
   gap: 2px;
-  width: 84px;
+  width: 64px;
   min-height: 63px;
   border-radius: 0;
   font-size: var(--tt-text-xs);
@@ -3714,7 +3903,7 @@ dl .tracker-badge,
   border: 2px solid Highlight;
  }
 
- .nav-group button.selected,
+ .nav-items button.selected,
  .season-tabs button.selected,
  .settings-tabs button[aria-selected="true"],
  .subtitle-panel button.selected {
@@ -3722,7 +3911,7 @@ dl .tracker-badge,
   font-weight: bold;
  }
 
- .nav-group button.selected::before,
+ .nav-items button.selected::before,
  .settings-tabs button[aria-selected="true"]::after,
  .settings-tabs .led.pass,
  .settings-tabs .led.fail,
@@ -3813,7 +4002,7 @@ dl .tracker-badge,
 
 .info-meta {
  margin: 0 0 var(--tt-space-3);
- color: var(--tt-accent);
+ color: var(--tt-text-muted);
  font-weight: var(--tt-weight-bold);
 }
 
@@ -3947,7 +4136,7 @@ dl .tracker-badge,
 .info-crumbs li + li::before {
  content: "›";
  margin: 0 var(--tt-space-2);
- color: var(--tt-accent);
+ color: var(--tt-text-muted);
 }
 
 .info-crumb {
@@ -3982,13 +4171,15 @@ dl .tracker-badge,
  width: 100%;
  min-width: 0;
  padding: var(--tt-space-3) var(--tt-space-4);
- border-color: var(--tt-line);
- background: transparent;
+ border-radius: var(--tt-radius-lg);
+ background: var(--tt-fill-quiet);
+ font-weight: var(--tt-weight-regular);
  text-align: left;
 }
 
-.info-row:hover {
- background: var(--tt-raised);
+.info-row:hover,
+.info-row:focus-visible {
+ background: var(--tt-fill-selected);
 }
 
 .info-seasons {
@@ -4015,12 +4206,16 @@ dl .tracker-badge,
 }
 
 .info-chevron {
+ display: flex;
  flex: 0 0 auto;
  margin-left: var(--tt-space-3);
  color: var(--tt-accent);
- font-size: var(--tt-text-xl);
- font-weight: var(--tt-weight-bold);
  line-height: 1;
+}
+
+.info-chevron svg {
+ width: 1.5rem;
+ height: 1.5rem;
 }
 
 .info-poster,

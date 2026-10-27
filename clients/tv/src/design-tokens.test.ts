@@ -34,11 +34,22 @@ describe('TV design token wiring', () => {
     expect(html).toMatch(/font-family:\s*var\(--tt-font-sans,\s*Arial,\s*sans-serif\)/);
     expect(html).not.toMatch(/font-family:\s*Arial/);
   });
+
+  // The boot screen and the fatal-error page paint before app.css loads (or when it never does), so their var()
+  // fallbacks are the palette the viewer sees first. They must be the token values, not a stale copy.
+  it.each(['../index.html', '../../webos/index.html', '../../android-tv/app/assets/index.html', '../fatal-error.js', '../startup.js'])('%s falls back to the current token values', name => {
+    const tokens = new Map<string, string>();
+    const sheet = readFileSync(resolve(here, '../../shared/design/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const declaration of sheet.matchAll(/(--tt-[\w-]+)\s*:\s*([^;]+);/g)) tokens.set(declaration[1], declaration[2].trim());
+    const fallbacks = Array.from(source(name).matchAll(/var\((--tt-[\w-]+),\s*(#[0-9a-fA-F]{3,6})\)/g), match => [match[1], match[2].toLowerCase()]);
+    expect(fallbacks.length, `${name} has colour fallbacks`).toBeGreaterThan(0);
+    for (const [token, fallback] of fallbacks) expect(fallback, `${token} fallback in ${name}`).toBe(tokens.get(token));
+  });
 });
 
 // The TV stylesheets read the shared tokens; screens never carry their own palette, the old teal
 // variables are gone, and nothing the viewer reads falls under the 26 px TV floor (DESIGN.md).
-describe('TV stylesheets use the Velvet Booth tokens', () => {
+describe('TV stylesheets use the shared tokens', () => {
   const sheets = ['tv.css', 'performance.css'];
   const css = (name: string) => source(name).replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -101,14 +112,52 @@ describe('TV stylesheets use the Velvet Booth tokens', () => {
     expect(scrim).toMatch(/linear-gradient\(90deg,[^;]*var\(--tt-scrim-text\)/);
   });
 
-  it('fades the player bar as one layer and hides it after the fade so it cannot take focus', () => {
+  it('fades the player controls as one layer and hides them after the fade so they cannot take focus', () => {
     const text = css('tv.css');
     const hidden = /\.player-controls\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
     expect(hidden).toMatch(/opacity:\s*0/);
     expect(hidden).toMatch(/visibility:\s*hidden/);
     expect(hidden).toMatch(/transition:\s*opacity var\(--tt-controls-fade\),\s*visibility 0s linear var\(--tt-controls-fade\)/);
-    expect(hidden).toMatch(/background:\s*linear-gradient\(transparent, var\(--tt-scrim-bottom\)\)/);
-    expect(/\.player-bar\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-controls-surface)');
+  });
+
+  // #61: no boxed bar. The heading reads over a top scrim and the controls over a bottom scrim, both in the one faded layer.
+  it('puts the heading and the controls straight on the picture over a top and a bottom scrim', () => {
+    const text = css('tv.css');
+    const layer = /\.player-controls\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(layer).toMatch(/linear-gradient\(180deg, var\(--tt-scrim-text\)/);
+    expect(layer).toMatch(/linear-gradient\(0deg, var\(--tt-scrim-bottom\)/);
+    expect(/\.player-bar\s*\{([^{}]*)\}/.exec(text)?.[1]).not.toMatch(/background|border/);
+  });
+
+  it('draws round toolbar controls, a larger Play/Pause, and turns the focused circle white', () => {
+    const text = css('tv.css');
+    const glyph = /\.player-glyph\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(glyph).toMatch(/width:\s*80px/);
+    expect(glyph).toMatch(/height:\s*80px/);
+    expect(glyph).toMatch(/border-radius:\s*50%/);
+    const play = /\.player-toolbar \[data-player-control="play"\] \.player-glyph\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(play).toMatch(/width:\s*96px/);
+    const focused = /\.player-toolbar \[data-player-control\]:focus \.player-glyph\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(focused).toContain('background: var(--tt-fill-focus)');
+    expect(focused).toContain('color: var(--tt-on-fill-focus)');
+    expect(focused).not.toMatch(/width|height|margin|padding/);
+  });
+
+  it('keeps the open control distinguishable: a lighter circle and the saffron marker under its label', () => {
+    const text = css('tv.css');
+    expect(/\.player-toolbar button\.open \.player-glyph\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-fill-strong)');
+    expect(/\.player-toolbar button\.open,[^{}]*\{([^{}]*)\}/.exec(text)?.[1]).toMatch(/linear-gradient\(var\(--tt-accent\), var\(--tt-accent\)\)/);
+  });
+
+  it('draws the downloaded range in a lighter tone than the track', () => {
+    const text = css('tv.css');
+    expect(/\.player-buffered\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-line-strong)');
+  });
+
+  it('makes every Player panel row the 72 px TV target', () => {
+    const text = css('tv.css');
+    const escape = (literal: string) => literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    for (const row of ['.player-dialog button', '.player-dialog p']) expect(/min-height:\s*var\(--tt-tv-target\)/.test(new RegExp(`\\n${escape(row)}\\s*\\{([^{}]*)\\}`).exec(text)?.[1] ?? ''), row).toBe(true);
   });
 
   it('puts the player menu on the solid menu surface and every control at the TV target height', () => {
@@ -125,10 +174,26 @@ describe('TV stylesheets use the Velvet Booth tokens', () => {
     expect(/\.source-button:focus \.source-filename\s*\{([^{}]*)\}/.exec(text)?.[1]).toMatch(/opacity:\s*1/);
   });
 
-  it('keeps the hero and detail text on their own scrim panel over the backdrop', () => {
+  it('puts the Home hero and the title page text straight on the art under their scrims', () => {
     const text = css('tv.css');
-    expect(/\.tv-hero-copy\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-scrim-text)');
-    expect(/\.detail-copy\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-scrim-text)');
+    // No hero panel on Home (#55): the Home scrims darken the left under the copy and the bottom under the rows,
+    // over the same base scrim as every other screen, so no corner of the art is lighter than before.
+    expect(/\.tv-hero\s*\{([^{}]*)\}/.exec(text)?.[1]).not.toMatch(/background/);
+    expect(text).not.toContain('.tv-hero-copy');
+    const home = /\.tv-app\[data-route="home"\] \.tv-backdrop-scrim\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(home).toMatch(/linear-gradient\(90deg,\s*var\(--tt-scrim-bottom\) 0,\s*var\(--tt-scrim-text\)/);
+    expect(home).toMatch(/linear-gradient\(0deg,\s*var\(--tt-scrim-bottom\) 0/);
+    expect(home.trim()).toMatch(/var\(--tt-scrim-top\)$/);
+    // No boxed header on the title page (#56): the left and bottom scrims of the sharp backdrop carry the contrast.
+    expect(/\.detail-copy\s*\{([^{}]*)\}/.exec(text)?.[1]).not.toMatch(/background/);
+    const scrim = /\.tv-backdrop\.sharp \.tv-backdrop-scrim\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(scrim).toMatch(/linear-gradient\(90deg,\s*var\(--tt-scrim-bottom\) 0,\s*var\(--tt-scrim-text\) 38%/);
+  });
+
+  it('makes every poster rail a stacking context, so its cards paint into the rail layer instead of a layer each', () => {
+    const rule = /\.poster-rail\s*\{([^{}]*)\}/.exec(css('performance.css'))?.[1] ?? '';
+    expect(rule).toMatch(/position:\s*relative/);
+    expect(rule).toMatch(/z-index:\s*0/);
   });
 
   it('grows the focused timeline track to the token height without moving the controls below', () => {

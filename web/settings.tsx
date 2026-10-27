@@ -56,7 +56,7 @@ function TrackerReadiness({ tick }: { tick: number }) {
   const [trackers, setTrackers] = useState<TrackerStatus[] | null>(null);
   useEffect(() => {
     let alive = true;
-    sharedApi().trackers().then(value => { if (alive) setTrackers(value); }).catch(() => { if (alive) setTrackers([]); });
+    sharedApi().trackers().then(value => { if (alive) setTrackers(Array.isArray(value) ? value : []); }).catch(() => { if (alive) setTrackers([]); });
     return () => { alive = false; };
   }, [tick]);
   if (!trackers) return null;

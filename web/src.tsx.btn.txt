@@ -1,0 +1,40 @@
+  18 
+   3 Close
+   2 Cancel
+   2  !
+   1 {term}
+   1 {tab.label}
+   1 {p.searching ? 'Searching…' : 'Search'}
+   1 {open ? 'Hide details' 
+   1 {muted ? 'Unmute' : 'Mute'}
+   1 {loading ? 'Loading…' : 'Show more titles'}
+   1 {key !== unknownKey && 
+   1 {deleting ? 'Deleting…' : '
+   1 {busy ? `$
+   1 {busy ? 'Starting…' : 'Down
+   1 {busy ? 'Retrying…' : 'Retry'}
+   1 Previous episode
+   1 Open Settings
+   1 Ope
+   1 Off
+   1 Next episode
+   1 Keep editing
+   1 Info
+   1 Hide
+   1 Fullscreen
+   1 Dismiss
+   1 Discard and leave
+   1 Delete download
+   1 Clear search
+   1 Clear recent
+   1 Catalog updates available · 
+   1 <MoreMenu items={[{ label: refreshing ? 'Refreshing…' : 'Refresh data', disabled: refreshing, onSelect: () =
+   1  { void save(); onClose() }} aria-label="Close pla
+   1  { p.setDraftQuery(''); p.onSubmit(undefined, '') 
+   1  restartAt(position - 10000)} disabled={!mediaInfo
+   1  restartAt(position + 10000)} disabled={!mediaInfo
+   1  onResume(resume)} aria-label={`${resumeActionLabe
+   1  onOpen(title)} onPointerEnter={follow} onFocus={f
+   1  onOpen(item)} onPointerEnter={follow} onFocus={fo
+   1  onHub(hub)} aria-current={current === hub.id ? 'p
+   1  onChoose(rankSources(versionPool, { season: seaso

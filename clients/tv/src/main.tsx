@@ -1,26 +1,33 @@
 import { Fragment, render, type JSX } from 'preact';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, rankSources, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSeason, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SettingsField, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, TrackerStatus, UpdateStatus } from '@torrent-tv/shared';
-import { episodeAirLabel, episodePageView, infoCrumbs, type InfoSeasonDetail } from '@torrent-tv/shared';
-import { chooseStructuredTarget, focusElement, remoteAction, revealElement, useTVNavigation, visibleFocusables } from './navigation';
+import { API, clearRecentSearches, deviceStorage, loadRecentSearches, recordRecentSearch, bestSourceForDetail, playActionLabel, rankSources, canonicalHouseholdItems, cueDisplayText, canonicalLanguage, ControlsVisibility, autoSubtitleOrder, fallbackSubtitleLanguage, subtitleItemDetail, subtitlePreferenceLanguage, languageDisplayName, CatalogDetail, CatalogEpisode, CatalogFacets, CatalogSeason, CatalogSource, CatalogTitle, Download, DownloadSort, downloadTransferActions, DownloadTransferAction, formatBytes, groupDownloadsByTorrent, HouseholdItem, HouseholdState, Job, JobLog, LibraryCategory, MediaState, orderDownloadIDs, PlaybackPreferences, PortalPromotion, PortalState, promotionScreenTimeMs, reconcileDownloads, Release, resumeActionLabel, resumeForTitle, seasonPackActionLabel, SubtitleCandidate, subtitleItemLabel, subtitleMenuGroups, UpdateStatus, type DownloadGroup, SettingsField } from '@torrent-tv/shared';
+import { episodeAirLabel, episodePageView, formatRuntime, infoCrumbs, releaseLine, type InfoSeasonDetail, type TitleInfo } from '@torrent-tv/shared';
+import { centredScrollTop, chooseStructuredTarget, focusElement, remoteAction, revealElement, useTVNavigation, visibleFocusables } from './navigation';
 import { LANDING_REQUEST_EVENT, landingTarget, requestLanding, useLanding } from './landing';
-import { PROJECTS_MENU_ROW, REBUILD_DIALOG_REGION, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_DIAGNOSTICS_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_REBUILD_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION, UPDATE_RELEASE_LINK_ROW, confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed, updateApplyDisabled, updateApplyOutcome, updateNoticeVisible } from './portal';
+import { confirmDialogStale, dialogRestoreKey, promotionsVisible, recoverySettles, snapshotEventAllowed } from './portal';
 import { AVTrack, clampSeek, formatTime, isDownloadComplete, isEditableTarget, normalizeTrack, parseVTT, playerAction, preferredAudio, preferredSubtitle, SubtitleCue, subtitleAt } from './player';
 import { PlayerKeyController, type PlayerFocus } from './player-keys';
 import { HOME_ROW, homeExtraRowsDue, homeHero, homeRowItems, homeRowSpecs, householdSections, nearEnd } from './catalog-data';
 import { discoverServers, DiscoveredServer, normalizeServerURL } from './discovery';
 import { Backdrop } from './backdrop';
-import { captureNav, type NavSnapshot } from './nav-snapshot';
-import { cardMeta, episodeMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
+import { captureNav, type NavSnapshot, type NavSort } from './nav-snapshot';
+import { Icon, AppMark } from './icons';
+import { cardMeta, cardRating, continueCardLine, heroKind, heroTitleParts, episodeState, timeLeft, playsLine, titleKind, episodeMeta, episodeCode, prepareHint, readyLine, readyPercent, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, watchProgress, jobState, jobWhatRan, relativeTime, allocationUse, downloadFilterOf, downloadRow, type DownloadFilter } from './display';
 import { appIdentity } from './app-name';
 import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL, registerMediaKeys } from './platform';
 import { applyGraphicsClass, detectCapabilities } from './capability';
 import { memo, useStableCallback } from './memo';
 import { createStatusStore, useStatus, type StatusStore } from './status-store';
-import { inReach, inRowReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach, useListArtReach, useRowReach } from './lazy-art';
+import { ART_SETTLE_MS, inReach, inRowReach, railWindows, resetFocusPoint, setFocusPoint, useArtReach, useListArtReach, useRowReach } from './lazy-art';
 import { FamilyChips, FamilyTiles } from './families';
 import type { CategoryFamily } from '@torrent-tv/shared';
 import { TitleInfoPanel } from './title-info-panel';
+import { MoreMenu, MoreMenuLayer } from './more-menu';
+import { SETTINGS_GROUPS_REGION, TVSettings, settingsBack, settingsDirection } from './settings';
+import { groupOfKey, type SettingsGroupId } from './settings-groups';
+export { TVSettings };
+import { serverHost, trackerStatuses } from './server';
+import { HUBS, drawsTitleGrid, hasSortChips, hubDestination, hubOf, isHouseholdShelf, knownRoute, loadHubMemory, rememberTab, saveHubMemory, screenHeading, showsCatalogTitles, type HubMemory, type TVRoute } from './hubs';
 import '@torrent-tv/shared/design/fonts.css';
 import '@torrent-tv/shared/design/tokens.css';
 import './tv.css';
@@ -33,7 +40,21 @@ const emptyFacets: CatalogFacets = { categories: [], kinds: [], resolutions: [],
 const needsEpisodeExpansion = (detail: CatalogDetail) => detail.title.kind === 'series' && detail.seasons.some(season => (season.packSources?.length || 0) > 0 && season.episodes.length === 0);
 type DetailTarget = { season?: number; episode?: number };
 
-function TVStateBadges({ state }: { state?: MediaState }) { if (!state?.downloadState || !state.watchState) return null; const download = state.downloadState; const watch = state.watchState; return <span class="tv-state-badges">{download !== 'none' && <span class={`tv-state-badge download ${download}`}><i aria-hidden="true" /><b>{download === 'downloaded' ? 'Downloaded' : download === 'partial' ? 'Some downloaded' : download === 'error' ? 'Needs attention' : download === 'queued' ? 'Queued' : `Downloading ${Math.round((state.progress || 0) * 100)}%`}</b></span>}{watch !== 'unwatched' && <span class={`tv-state-badge watch ${watch}`}><i aria-hidden="true" /><b>{watch === 'watched' ? 'Watched' : watch === 'partial' ? 'Some watched' : 'In progress'}</b></span>}</span> }
+// Library state as words with a dot, so it never rests on colour alone. On a ~210 px card (`compact`) the words are the
+// short ones that fit whole and the dot is dropped; the full state stays in the label.
+function TVStateBadges({ state, compact }: { state?: MediaState; compact?: boolean }) {
+ if (!state?.downloadState || !state.watchState) return null;
+ const download = state.downloadState; const watch = state.watchState; const percent = Math.round((state.progress || 0) * 100);
+ const downloadWords = DOWNLOAD_WORDS[download] || { long: `Downloading ${percent}%`, short: `${percent}% done` };
+ const watchWords = WATCH_WORDS[watch] || WATCH_WORDS.inProgress;
+ const shown = (words: StateWords) => compact ? words.short : words.long;
+ return <span class="tv-state-badges">{download !== 'none' && <span class={`tv-state-badge download ${download}`} aria-label={downloadWords.long}>{!compact && <i aria-hidden="true" />}<b>{shown(downloadWords)}</b></span>}{watch !== 'unwatched' && <span class={`tv-state-badge watch ${watch}`} aria-label={watchWords.long}>{!compact && <i aria-hidden="true" />}<b>{shown(watchWords)}</b></span>}</span>;
+}
+type StateWords = { long: string; short: string };
+// Each library state's words: the full ones, and the short ones a compact card shows. A download in flight (any
+// other state) says its percentage.
+const DOWNLOAD_WORDS: Record<string, StateWords> = { downloaded: { long: 'Downloaded', short: 'Downloaded' }, partial: { long: 'Some downloaded', short: 'Partial' }, error: { long: 'Needs attention', short: 'Failed' }, queued: { long: 'Queued', short: 'Queued' } };
+const WATCH_WORDS: Record<string, StateWords> = { watched: { long: 'Watched', short: 'Watched' }, partial: { long: 'Some watched', short: 'Started' }, inProgress: { long: 'In progress', short: 'Started' } };
 
 type TVDownloadAnchor = { id: string; top: number; scrollTop: number };
 function captureTVDownloadAnchor(): TVDownloadAnchor | null { const container = document.querySelector<HTMLElement>('.tv-content'); if (!container) return null; const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-download-id]')); const row = rows.find(item => item.getBoundingClientRect().bottom > container.getBoundingClientRect().top); return row ? { id: row.dataset.downloadId || '', top: row.getBoundingClientRect().top, scrollTop: container.scrollTop } : null }
@@ -57,22 +78,15 @@ function subtitleMenuRows(candidates: SubtitleCandidate[], firstRow: number, key
 }
 
 const defaultPlayerPreferences: PlaybackPreferences = { audioLanguage: 'en', audioTrackIndex: -1, subtitleLanguage: 'ro', subtitleMode: 'auto' };
-// Player control icons: 24 px viewBox, drawn at 40 px by the stylesheet, always paired with a visible label.
-const ICON_PATHS: Record<string, string> = {
- restart: 'M6 5h2.5v14H6zM20 5v14L10 12z',
- 'back-10': 'M11 6v12L2.5 12zM21 6v12l-8.5-6z',
- play: 'M8 5v14l11-7z',
- pause: 'M6 5h4v14H6zM14 5h4v14h-4z',
- 'forward-10': 'M13 6v12l8.5-6zM3 6v12l8.5-6z',
- audio: 'M4 9v6h4l5 4V5L8 9z',
- subtitles: 'M5 10h5v2H5zM12 10h7v2h-7zM5 14h8v2H5z',
- options: 'M4 7h6v2H4zM14 7h6v2h-6zM10 5h4v6h-4zM4 15h2v2H4zM10 15h10v2H10zM6 13h4v6H6z',
- back: 'M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z',
- hide: 'M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z',
-};
-function Icon({ name }: { name: string }) {
- return <svg class="tv-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={ICON_PATHS[name]} />{name === 'audio' && <path d="M16 9a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />}{name === 'subtitles' && <rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" />}</svg>;
+
+// One Player toolbar control: a round icon button with its label under the circle. The label is the accessible
+// name unless `name` adds a detail the screen does not print (the track count). Row 1 and the column are the pinned
+// Control focus order (DESIGN.md "TV interaction").
+function PlayerControl({ control, col, icon, label, name, primary, open, onClick }: { control: string; col: number; icon: string; label: string; name?: string; primary?: boolean; open?: boolean; onClick: () => void }) {
+ const menu = open !== undefined;
+ return <button data-player-control={control} data-focus-region="player-controls" data-focus-row="1" data-focus-col={String(col)} data-focus-key={`player-${control}`} class={primary ? 'primary' : open ? 'open' : undefined} aria-label={name} aria-haspopup={menu ? 'true' : undefined} aria-expanded={menu ? open : undefined} onClick={onClick}><span class="player-glyph"><Icon name={icon} /></span><span class="player-label">{label}</span></button>;
 }
+const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 
 export function Player({ api, download, resumeMs, preferences, onClose, onStateChanged, onComplete, onEpisode }: { api: API; download: Download; resumeMs: number; preferences?: PlaybackPreferences; onClose: () => void; onStateChanged: () => void; onComplete: (preferences: PlaybackPreferences) => void; onEpisode?: (next: Download, preferences: PlaybackPreferences) => void }) {
  const [message, setMessage] = useState('Opening stream…');
@@ -446,6 +460,9 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  function changeDelay(delta: number) { const next = Math.max(-10_000, Math.min(10_000, subtitleDelay + delta)); setSubtitleDelay(next); try { window.webapis?.avplay.setSubtitlePosition(next); } catch { } }
  function changeAspect(value: string) { setAspect(value); try { window.webapis?.avplay.setDisplayMethod(value); } catch { } }
  const percent = total > 0 ? Math.min(100, position / total * 100) : liveDownload.progress * 100;
+ // The downloaded share of the file, drawn under the played range; the latest record the Player polled (getting ready, waiting) wins.
+ const buffered = Math.max(percent, Math.min(100, Math.max(liveDownload.progress, readyDownload?.progress ?? 0) * 100));
+ const heading = playerHeading(download);
  const audioTracks = tracks.filter(track => track.type === 'AUDIO');
  const subtitleTracks = tracks.filter(track => track.type === 'TEXT');
  // The server lists every embedded text track already; the device's own list stays only when it has none (picture subtitles or a failed probe), so one physical track is never offered twice.
@@ -458,19 +475,25 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
   {externalSubtitle && <div class="external-subtitle">{externalSubtitle}</div>}
   {gettingReady && readyDownload && <div class="player-ready" aria-live="polite"><strong class="player-ready-title">{readyTitle(download)}</strong><div class="player-ready-bar"><span class="player-ready-fill" style={{ width: `${readyPercent(readyDownload)}%` }} /></div><div class="player-ready-facts"><b>{readyPercent(readyDownload)}%</b>{readyLine(readyDownload) && <span>{readyLine(readyDownload)}</span>}</div></div>}
   {osd && <div class={`player-message${message ? ' on' : ''}`} aria-live="polite">{osd}</div>}
-  <div class="player-controls"><div class="player-bar">
-   <div class="player-heading"><div class="player-title">{download.displayTitle || download.filePath}</div>{choice && <div class="player-choice">{choice}</div>}</div>
-   <button class="player-timeline" data-player-control="timeline" data-focus-region="player-controls" data-focus-row="0" data-focus-col="0" data-focus-key="player-timeline" onClick={() => { revealControls(); focusControl('timeline') }} aria-label="Playback timeline; use left and right to seek"><span class="player-fill" style={{ width: `${percent}%` }}><i /></span></button>
-   <div class="player-time"><span>{formatTime(position)}</span><span>{formatTime(total)}</span></div>
+  <div class="player-controls">
+   <div class="player-heading"><div class="player-name">{heading.kicker && <div class="player-kicker">{heading.kicker}</div>}<div class="player-title">{heading.title}</div></div>{choice && <div class="player-choice">{choice}</div>}</div>
+   <div class="player-bar">
+   <button class="player-timeline" data-player-control="timeline" data-focus-region="player-controls" data-focus-row="0" data-focus-col="0" data-focus-key="player-timeline" onClick={() => { revealControls(); focusControl('timeline') }} aria-label="Playback timeline; use left and right to seek"><span class="player-buffered" style={{ width: `${buffered}%` }} /><span class="player-fill" style={{ width: `${percent}%` }}><i /></span></button>
+   <div class="player-time"><span>{formatTime(position)}</span><span>{remainingTime(position, total)}</span></div>
    <div class="player-toolbar">
-    <button data-player-control="restart" data-focus-region="player-controls" data-focus-row="1" data-focus-col="0" data-focus-key="player-restart" onClick={() => keepControl('restart', () => keysRef.current?.seekTo(0))}><Icon name="restart" />Restart</button><button data-player-control="back-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="1" data-focus-key="player-back-10" onClick={() => keepControl('back-10', () => keysRef.current?.seekBy(-10_000))}><Icon name="back-10" />−10s</button>
-    <button data-player-control="play" data-focus-region="player-controls" data-focus-row="1" data-focus-col="2" data-focus-key="player-play" class="primary" onClick={() => keepControl('play', () => togglePlayback())}><Icon name={playing.current ? 'pause' : 'play'} />{playing.current ? 'Pause' : 'Play'}</button><button data-player-control="forward-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="3" data-focus-key="player-forward-10" onClick={() => keepControl('forward-10', () => keysRef.current?.seekBy(10_000))}><Icon name="forward-10" />+10s</button>
-    <button data-player-control="audio" data-focus-region="player-controls" data-focus-row="1" data-focus-col="4" data-focus-key="player-audio" class={menu === 'audio' ? 'open' : ''} aria-haspopup="true" aria-expanded={menu === 'audio'} onClick={() => openMenu('audio', 'audio')}><Icon name="audio" />Audio ({audioTracks.length})</button><button data-player-control="subtitles" data-focus-region="player-controls" data-focus-row="1" data-focus-col="5" data-focus-key="player-subtitles" class={menu === 'subtitles' || menu === 'find-subtitles' ? 'open' : ''} aria-haspopup="true" aria-expanded={menu === 'subtitles' || menu === 'find-subtitles'} onClick={() => { openMenu('subtitles', 'subtitles'); void findSubtitles(false, 'local') }}><Icon name="subtitles" />Subtitles ({nativeSubtitleTracks.length + subtitleCandidates.length})</button>
-    <button data-player-control="options" data-focus-region="player-controls" data-focus-row="1" data-focus-col="6" data-focus-key="player-options" class={menu === 'options' || menu === 'info' ? 'open' : ''} aria-haspopup="true" aria-expanded={menu === 'options' || menu === 'info'} onClick={() => openMenu('options', 'options')}><Icon name="options" />Options</button><button data-player-control="back" data-focus-region="player-controls" data-focus-row="1" data-focus-col="7" data-focus-key="player-back" onClick={() => { save(); onClose(); }}><Icon name="back" />Back</button><button data-player-control="hide" data-focus-region="player-controls" data-focus-row="1" data-focus-col="8" data-focus-key="player-hide" onClick={hideControls}><Icon name="hide" />Hide</button>
+    <PlayerControl control="restart" col={0} icon="restart" label="Restart" onClick={() => keepControl('restart', () => keysRef.current?.seekTo(0))} />
+    <PlayerControl control="back-10" col={1} icon="back-10" label="−10 s" onClick={() => keepControl('back-10', () => keysRef.current?.seekBy(-10_000))} />
+    <PlayerControl control="play" col={2} icon={playing.current ? 'pause' : 'play'} label={playing.current ? 'Pause' : 'Play'} primary onClick={() => keepControl('play', () => togglePlayback())} />
+    <PlayerControl control="forward-10" col={3} icon="forward-10" label="+10 s" onClick={() => keepControl('forward-10', () => keysRef.current?.seekBy(10_000))} />
+    <PlayerControl control="audio" col={4} icon="audio" label="Audio" name={`Audio, ${trackCount(audioTracks.length)}`} open={menu === 'audio'} onClick={() => openMenu('audio', 'audio')} />
+    <PlayerControl control="subtitles" col={5} icon="subtitles" label="Subtitles" name={`Subtitles, ${trackCount(nativeSubtitleTracks.length + subtitleCandidates.length)}`} open={menu === 'subtitles' || menu === 'find-subtitles'} onClick={() => { openMenu('subtitles', 'subtitles'); void findSubtitles(false, 'local') }} />
+    <PlayerControl control="options" col={6} icon="options" label="Options" open={menu === 'options' || menu === 'info'} onClick={() => openMenu('options', 'options')} />
+    <PlayerControl control="back" col={7} icon="back" label="Back" onClick={() => { save(); onClose(); }} />
+    <PlayerControl control="hide" col={8} icon="hide" label="Hide" onClick={hideControls} />
    </div>
    {phase === 'failed' && <button class="player-retry primary" data-player-control="retry" data-focus-region="player-controls" data-focus-row="2" data-focus-col="2" data-focus-key="player-retry" onClick={() => { completedRetryUsed.current = false; openPlayer(current.current); }}>Retry playback</button>}
   </div></div>
-  {menu && <div class="player-dialog">
+  {menu && <div class="player-dialog" data-player-menu={menu}>
    {menu === 'audio' && <><h2>Audio track</h2><button data-focus-region="player-menu" data-focus-row="0" data-focus-col="0" data-focus-key="player-audio-refresh" onClick={refreshTracks}>Refresh tracks</button>{audioTracks.map((track, index) => <button data-focus-region="player-menu" data-focus-row={index + 1} data-focus-col="0" data-focus-key={`player-audio-${track.index}`} onClick={() => chooseTrack('AUDIO', track.index)}>{track.label}</button>)}</>}
    {menu === 'subtitles' && <><h2>Subtitles</h2><button data-focus-region="player-menu" data-focus-row="0" data-focus-col="0" data-focus-key="player-subtitles-off" onClick={() => chooseTrack('TEXT', null)}>Off</button>{subtitleRows.map(item => <Fragment key={item.key}>{item.heading ? <h3>{item.heading}</h3> : null}<button data-focus-region="player-menu" data-focus-row={item.row} data-focus-col="0" data-focus-key={item.key} onClick={() => void installSubtitle(item.candidate)}><strong>{subtitleItemLabel(item.candidate, item.position)}</strong>{item.detail ? <><br /><small>{item.detail}</small></> : null}</button></Fragment>)}{nativeSubtitleTracks.length > 0 && <><h3>Built-in tracks</h3>{nativeSubtitleTracks.map((track, index) => <button data-focus-region="player-menu" data-focus-row={subtitleRows.length + index + 1} data-focus-col="0" data-focus-key={`player-native-subtitle-${track.index}`} onClick={() => chooseTrack('TEXT', track.index)}>{track.label}</button>)}</>}<button data-focus-region="player-menu" data-focus-row={subtitleRows.length + nativeSubtitleTracks.length + 1} data-focus-col="0" data-focus-key="player-subtitles-find" onClick={() => void findSubtitles(false, 'remote')}>Find online subtitles…</button></>}
    {menu === 'find-subtitles' && <><h2>Download subtitles</h2>{foundRows.length === 0 ? <p>No matching provider subtitles are available.</p> : foundRows.map(item => <Fragment key={item.key}>{item.heading ? <h3>{item.heading}</h3> : null}<button data-focus-region="player-menu" data-focus-row={item.row} data-focus-col="0" data-focus-key={item.key} onClick={() => void installSubtitle(item.candidate)}><strong>{subtitleItemLabel(item.candidate, item.position)}</strong>{item.detail ? <><br /><small>{item.detail}</small></> : null}{item.candidate.releaseName ? <><br /><small>{item.candidate.releaseName}</small></> : null}</button></Fragment>)}</>}
@@ -519,7 +542,7 @@ export function Setup({ draft, server, status, onDraft, onConnect, onForget }: {
  useEffect(() => { if (!server) void scan() }, []);
  useEffect(() => { if (!results.length) return; const timer = window.setTimeout(() => { if (document.activeElement === rescan.current) focusElement(document.querySelector<HTMLElement>('[data-focus-key="discovered-server-0"]')) }, 0); return () => window.clearTimeout(timer) }, [results.length]);
  useTVNavigation({ getInitialFocus: () => rescan.current || connect.current, inputExitTarget: () => connect.current, onBack: () => { if (manual && !server) { setManual(false); window.setTimeout(() => focusElement(rescan.current), 0) } else exitApplication() } });
- return <main class="setup"><span class="setup-mark" aria-hidden="true">{appIdentity().monogram}</span><h1>{appIdentity().name}</h1><p class="setup-lead">Choose a Torrent TV server on this private network.</p><div class="setup-mode-actions"><button ref={rescan} data-focus-region="setup" data-focus-row="0" data-focus-col="0" data-focus-key="setup-rescan" class={!manual ? 'primary' : ''} aria-disabled={searching ? 'true' : undefined} onClick={() => void scan()}>{searching ? 'Searching…' : 'Rescan'}</button><button data-focus-region="setup" data-focus-row="0" data-focus-col="1" data-focus-key="setup-manual" class={manual ? 'primary' : ''} onClick={() => setManual(value => !value)}>Manual address</button></div><p class="focus-hint" aria-live="polite">{discoveryStatus || 'Automatic discovery checks only the television’s local network.'}</p>{results.length > 0 && <section class="setup-results" aria-label="Discovered servers">{results.map((item, index) => <button data-focus-region="setup" data-focus-row={1 + index} data-focus-col="0" data-focus-key={`discovered-server-${index}`} onClick={() => onConnect(item.url)}><strong>{item.info.instanceName || item.info.name}</strong><span>{item.url}</span><small>Version {item.info.version}{item.info.configured ? ' · Ready' : ' · Setup required'}</small></button>)}</section>}{manual && <section class="setup-manual"><h2>Manual address</h2><div class="setup-controls"><input ref={address} readOnly data-focus-region="setup" data-focus-row="40" data-focus-col="0" data-focus-key="setup-address" type="url" inputMode="url" autoComplete="off" spellcheck={false} value={draft} onInput={event => onDraft(event.currentTarget.value)} placeholder="http://server.lan:8097" /><button ref={connect} data-focus-region="setup" data-focus-row="40" data-focus-col="1" data-focus-key="setup-connect" class="primary" onClick={() => onConnect(draft)}>Connect</button></div><p class="focus-hint">Select the address and press OK to edit it. Select Connect when ready.</p></section>}<p class="setup-status" aria-live="polite">{status}</p>{server && <button data-focus-region="setup" data-focus-row="41" data-focus-col="0" data-focus-key="setup-forget" onClick={onForget}>Forget saved server</button>}</main>;
+ return <main class="setup"><AppMark class="setup-mark" /><h1>{appIdentity().name}</h1><p class="setup-lead">Choose a Torrent TV server on this private network.</p><div class="setup-mode-actions"><button ref={rescan} data-focus-region="setup" data-focus-row="0" data-focus-col="0" data-focus-key="setup-rescan" class={!manual ? 'primary' : ''} aria-disabled={searching ? 'true' : undefined} onClick={() => void scan()}>{searching ? 'Searching…' : 'Rescan'}</button><button data-focus-region="setup" data-focus-row="0" data-focus-col="1" data-focus-key="setup-manual" class={manual ? 'primary' : ''} onClick={() => setManual(value => !value)}>Manual address</button></div><p class="focus-hint" aria-live="polite">{discoveryStatus || 'Automatic discovery checks only the television’s local network.'}</p>{results.length > 0 && <section class="setup-results" aria-label="Discovered servers">{results.map((item, index) => <button data-focus-region="setup" data-focus-row={1 + index} data-focus-col="0" data-focus-key={`discovered-server-${index}`} onClick={() => onConnect(item.url)}><strong>{item.info.instanceName || item.info.name}</strong><span>{item.url}</span><small>Version {item.info.version}{item.info.configured ? ' · Ready' : ' · Setup required'}</small></button>)}</section>}{manual && <section class="setup-manual"><h2>Manual address</h2><div class="setup-controls"><input ref={address} readOnly data-focus-region="setup" data-focus-row="40" data-focus-col="0" data-focus-key="setup-address" type="url" inputMode="url" autoComplete="off" spellcheck={false} value={draft} onInput={event => onDraft(event.currentTarget.value)} placeholder="http://server.lan:8097" /><button ref={connect} data-focus-region="setup" data-focus-row="40" data-focus-col="1" data-focus-key="setup-connect" class="primary" onClick={() => onConnect(draft)}>Connect</button></div><p class="focus-hint">Select the address and press OK to edit it. Select Connect when ready.</p></section>}<p class="setup-status" aria-live="polite">{status}</p>{server && <button data-focus-region="setup" data-focus-row="41" data-focus-col="0" data-focus-key="setup-forget" onClick={onForget}>Forget saved server</button>}</main>;
 }
 
 // Art for the backdrop: the title's backdrop, then its poster; empty when it has neither.
@@ -532,17 +555,16 @@ const HOUSEHOLD_EMPTY: Record<string, string> = {
  recent: 'Nothing viewed recently. Titles you open appear here.',
  watched: 'Nothing watched yet. Titles you finish appear here.',
 };
-function StatusLine({ store, fixed = '' }: { store?: StatusStore; fixed?: string }) { const text = useStatus(store, fixed); return <span class="tv-status" aria-live="polite">{text}</span> }
+// The server connection: '' before the event stream first answers, 'connected', or the lost message
+// ("Server connection lost. Reconnecting in 4s…"). Its own store, so a reconnect tick re-renders two small nodes.
+const CONNECTED = 'connected';
+function connectionLost(value: string) { return value !== '' && value !== CONNECTED }
+// The foot of the rail: where the household checks the connection without a line on every screen.
+function RailConnection({ store, host }: { store?: StatusStore; host: string }) { const value = useStatus(store, ''); const lost = connectionLost(value); return <p class={`tv-rail-connection ${lost ? 'lost' : value === CONNECTED ? 'ok' : ''}`}><i aria-hidden="true" /><span>{lost ? 'Reconnecting…' : value === CONNECTED ? `Connected to ${host}` : `Connecting to ${host}`}</span></p> }
+// A banner on the screen only while something is wrong: the server is unreachable, or a tracker needs setting up.
+function ScreenBanner({ store, tracker }: { store?: StatusStore; tracker: string }) { const value = useStatus(store, ''); const text = connectionLost(value) ? value : tracker ? `${tracker} needs setting up before it can find new titles. Open Settings to finish it.` : ''; return text ? <p class="tv-banner" role="alert">{text}</p> : null }
 // One empty or error state: what happened, then what to do next.
-function EmptyState({ title, children }: { title: string; children: string }) { return <div class="tv-empty" role="status"><h2>{title}</h2><p>{children}</p></div> }
-
-type TVRoute = 'home' | 'search' | 'library' | 'continue' | 'favorites' | 'watched' | 'downloads' | 'library-categories' | 'tracker' | 'browse' | 'categories' | 'jobs' | 'settings' | 'projects';
-const menuGroups: Array<{ label: string; items: Array<{ id: TVRoute; label: string; icon: string }> }> = [
- { label: '', items: [{ id: 'home', label: 'Home', icon: '⌂' }, { id: 'search', label: 'Search', icon: '⌕' }] },
- { label: 'My Library', items: [{ id: 'library', label: 'Dashboard', icon: '◫' }, { id: 'continue', label: 'Continue watching', icon: '▶' }, { id: 'favorites', label: 'My List', icon: '★' }, { id: 'watched', label: 'Watched', icon: '✓' }, { id: 'downloads', label: 'Downloads', icon: '↓' }, { id: 'library-categories', label: 'Categories', icon: '≡' }] },
- { label: 'Tracker', items: [{ id: 'tracker', label: 'Dashboard', icon: '◉' }, { id: 'browse', label: 'Browse', icon: '▦' }, { id: 'categories', label: 'Categories', icon: '≡' }] },
- { label: '', items: [{ id: 'jobs', label: 'Jobs', icon: '↻' }, { id: 'settings', label: 'Settings', icon: '⚙' }] },
-];
+function EmptyState({ title, children, action }: { title: string; children: string; action?: JSX.Element }) { return <div class="tv-empty" role="status"><h2>{title}</h2><p>{children}</p>{action}</div> }
 
 export type TVPreparingState = {
  trackerName: string;
@@ -567,10 +589,19 @@ function PrepareElapsed({ seeders }: { seeders?: number }) {
  return <div class="tv-prepare-wait" role="status"><span class="tv-prepare-elapsed">{seconds} s</span>{hint && <p class="supporting">{hint}</p>}</div>;
 }
 
-export function Catalog({ api, status, statusStore, titles, facets, household, downloads, jobs, restoreFocus, portal, updateStatus, onUpdateStatus, onFocus, onRetry, onChangeServer, onForgetServer, onPlay, onPlayDownload, onManageDownload, onManageSeasonPack, onRefreshDownloads, onFavorite, preparing, onCancelPrepare, onRetryPrepare, initialNav, onNav }: { api: API; status?: string; statusStore?: StatusStore; titles: CatalogTitle[]; facets: CatalogFacets; household: HouseholdState; downloads: Download[]; jobs: Job[]; restoreFocus: string | null; portal: PortalState | null; updateStatus: UpdateStatus | null; onUpdateStatus: (status: UpdateStatus) => void; onFocus: (key: string) => void; onRetry: () => void; onChangeServer: () => void; onForgetServer: () => void; onPlay: (release: Release, fileIndex?: number, resumeMs?: number) => void; onPlayDownload: (download: Download) => void; onManageDownload: (download: Download, action: string) => Promise<void>; onManageSeasonPack: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onRefreshDownloads: () => Promise<void>; onFavorite: (title: CatalogTitle, value: boolean) => void; preparing?: TVPreparingState | null; onCancelPrepare?: () => void; onRetryPrepare?: () => void ; initialNav?: NavSnapshot; onNav?: (snapshot: NavSnapshot) => void }) {
+export function Catalog({ api, status, statusStore, connectionStore, titles, facets, household, downloads, jobs, restoreFocus, portal, updateStatus, onUpdateStatus, onFocus, onRetry, onChangeServer, onForgetServer, onPlay, onPlayDownload, onManageDownload, onManageSeasonPack, onRefreshDownloads, onFavorite, preparing, onCancelPrepare, onRetryPrepare, initialNav, onNav }: { api: API; status?: string; statusStore?: StatusStore; connectionStore?: StatusStore; titles: CatalogTitle[]; facets: CatalogFacets; household: HouseholdState; downloads: Download[]; jobs: Job[]; restoreFocus: string | null; portal: PortalState | null; updateStatus: UpdateStatus | null; onUpdateStatus: (status: UpdateStatus) => void; onFocus: (key: string) => void; onRetry: () => void; onChangeServer: () => void; onForgetServer: () => void; onPlay: (release: Release, fileIndex?: number, resumeMs?: number) => void; onPlayDownload: (download: Download) => void; onManageDownload: (download: Download, action: string) => Promise<void>; onManageSeasonPack: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean>; onRefreshDownloads: () => Promise<void>; onFavorite: (title: CatalogTitle, value: boolean) => void; preparing?: TVPreparingState | null; onCancelPrepare?: () => void; onRetryPrepare?: () => void ; initialNav?: NavSnapshot; onNav?: (snapshot: NavSnapshot) => void }) {
  // initialNav (absent: Home, nothing open) rehydrates where the viewer was before playback took the screen.
- const [route, setRoute] = useState<TVRoute>(() => initialNav ? initialNav.route as TVRoute : 'home');
+ const [route, setRoute] = useState<TVRoute>(() => initialNav ? knownRoute(initialNav.route) : 'home');
  const [menuOpen, setMenuOpen] = useState(false);
+ // Each hub's last-used tab (Library, Discover): its rail item opens there. The selected tab itself is the route.
+ const [hubMemory, setHubMemory] = useState<HubMemory>(loadHubMemory);
+ useEffect(() => { setHubMemory(memory => { const next = rememberTab(memory, route); if (next !== memory) saveHubMemory(next); return next }) }, [route]);
+ // A control to focus once the next route has drawn (Back from Background jobs lands on its Settings entry), instead of the landing.
+ const pendingFocus = useRef('');
+ useEffect(() => { const key = pendingFocus.current; if (!key) return; pendingFocus.current = ''; const timer = window.setTimeout(() => { const target = document.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`); if (target) focusElement(target); else landing.arm() }, 0); return () => window.clearTimeout(timer) }, [route]);
+ // Trackers that are switched on but not set up: the banner names the first.
+ const [trackerAttention, setTrackerAttention] = useState('');
+ useEffect(() => { void trackerStatuses(api).then(list => { if (!catalogMounted.current || !list) return; const pending = list.filter(tracker => tracker && tracker.enabled && !tracker.configured)[0]; setTrackerAttention(pending ? pending.name : '') }) }, [api]);
  const [projectsMessage, setProjectsMessage] = useState('');
  const [updateConfirm, setUpdateConfirm] = useState(false);
  const updateReturnKey = useRef<string | null>(null);
@@ -581,14 +612,27 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  const [draftQuery, setDraftQuery] = useState(() => initialNav ? initialNav.query : '');
  const [query, setQuery] = useState(() => initialNav ? initialNav.query : '');
  const [searching, setSearching] = useState(false);
+ // How many titles the current query found (the server's total, not the loaded pages); the field shows it.
+ const [resultTotal, setResultTotal] = useState<number | null>(null);
  const [recent, setRecent] = useState(() => loadRecentSearches(deviceStorage()));
  const [category, setCategory] = useState(() => initialNav ? initialNav.category : '');
  // The open Category family and its category chip (Categories pages). Catalog keeps them so a title page or the Player can come and go; familyBack lets Back close the family first.
  const [familyKey, setFamilyKey] = useState(() => initialNav?.family || '');
  const [familyChip, setFamilyChip] = useState(() => initialNav?.familyCategory || '');
  const familyBack = useRef<(() => string) | null>(null);
+ // The open Settings group (#60): kept here so a return from Background jobs or Other projects opens its pane.
+ const [settingsGroup, setSettingsGroup] = useState<SettingsGroupId>(() => groupOfKey(restoreFocus || ''));
  const familyCache = useRef<Record<string, FamilyCacheEntry>>({});
- const [sort, setSort] = useState<'newest' | 'seeders' | 'title' | 'rating'>(() => initialNav ? initialNav.sort : 'newest');
+ // The query and its sort belong to Search: Browse, Tracker, Home and the Categories pages show the catalog
+ // unfiltered in their own (shared) order, and Search finds its query and sort again when the viewer comes back.
+ // The navigation snapshot keeps the sort of the screen playback started from.
+ const [sort, setSort] = useState<NavSort>(() => initialNav && initialNav.route !== 'search' ? initialNav.sort : 'newest');
+ const [searchSort, setSearchSort] = useState<NavSort>(() => initialNav && initialNav.route === 'search' ? initialNav.sort : 'newest');
+ const viewQuery = route === 'search' ? query : '';
+ const viewSort = route === 'search' ? searchSort : sort;
+ const setViewSort = route === 'search' ? setSearchSort : setSort;
+ // The latest first-page request: an answer for a view the viewer already left is dropped.
+ const pageRequest = useRef(0);
  const [remoteTitles, setRemoteTitles] = useState(titles.slice(0, 12));
  // Discovery rows under Recently added load one at a time as focus reaches the row before. They are dropped with the route, so Home holds at most four extra rows of ten posters.
  const [extraRows, setExtraRows] = useState<Record<string, CatalogTitle[]>>({});
@@ -622,14 +666,14 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  detailRef.current = detail;
  refreshDownloadsRef.current = onRefreshDownloads;
  const favoriteIDs = new Set(household.favorites.map(item => item.titleId || item.catalog?.id).filter(Boolean));
- const fetchPage = (cursor = '') => api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor }).then(page => { setRemoteTitles(page.items); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); return page; });
- useEffect(() => { void fetchPage('').catch(() => { }) }, [query, category, sort]);
+ const fetchPage = (cursor = '') => { const request = ++pageRequest.current; return api.titles({ search: viewQuery.trim().length >= 3 ? viewQuery.trim() : undefined, category, sort: viewSort, pageSize: 12, cursor }).then(page => { if (request !== pageRequest.current) return page; setRemoteTitles(page.items); setNextCursor(page.nextCursor); setResultTotal(page.total); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); return page; }) };
+ useEffect(() => { void fetchPage('').catch(() => { }) }, [viewQuery, category, viewSort]);
  // App-level titles only change identity on an explicit snapshot refresh
  // (visible-return). The newest-first snapshot only matches the unfiltered
  // view; under a query, category or other sort, reload the first page with
  // the current ones. Accumulated pages release with it either way.
  const seenTitles = useRef(titles);
- useEffect(() => { if (seenTitles.current === titles) return; seenTitles.current = titles; if (query.trim().length < 3 && !category && sort === 'newest') setRemoteTitles(titles.slice()); else void fetchPage('').catch(() => { }) }, [titles]);
+ useEffect(() => { if (seenTitles.current === titles) return; seenTitles.current = titles; if (viewQuery.trim().length < 3 && !category && viewSort === 'newest') setRemoteTitles(titles.slice()); else void fetchPage('').catch(() => { }) }, [titles]);
  // A metadata update patches the matching card in place so loaded pages,
  // query, category and sort survive it.
  useEffect(() => { const patch = (event: Event) => { const updated = (event as CustomEvent).detail?.title as CatalogTitle | undefined; if (!updated?.id) return; setRemoteTitles(current => current.some(item => item.id === updated.id) ? current.map(item => item.id === updated.id ? updated : item) : current) }; window.addEventListener('catalog-metadata-updated', patch); return () => window.removeEventListener('catalog-metadata-updated', patch) }, []);
@@ -651,16 +695,16 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  useLayoutEffect(() => { const active = document.activeElement; if (route === 'home' && active instanceof HTMLElement && active.dataset.focusRegion === 'content') revealElement(active) }, [extraRows]);
  // Entering a catalog view with nothing held loads its first page; leaving
  // one drops the accumulated pages so memory resets between sections.
- useEffect(() => { if (['home', 'browse', 'search', 'tracker'].includes(route) && remoteTitles.length === 0) void fetchPage('').catch(() => { }) }, [route]);
- useEffect(() => { const refresh = (event: Event) => { const searched = String((event as CustomEvent).detail?.query || '').toLowerCase(); if (query && searched === query.toLowerCase()) { setDetailMessage('Catalog search completed.'); void fetchPage('').catch(error => setDetailMessage((error as Error).message)); } }; window.addEventListener('catalog-search-completed', refresh); return () => window.removeEventListener('catalog-search-completed', refresh) }, [query, category, sort]);
- const submitSearch = async () => { if (searching) return; const mark = landing.mark(); const value = draftQuery.trim(); setSearching(true); try { if (value) { setRecent(recordRecentSearch(deviceStorage(), value)); const page = await api.searchTitles(value); setRemoteTitles(page.items); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); } setQuery(value); landing.arm({ cardsOnly: true, since: mark }); } catch (error) { setDetailMessage((error as Error).message); } finally { setSearching(false) } };
+ useEffect(() => { if (showsCatalogTitles(route) && remoteTitles.length === 0) void fetchPage('').catch(() => { }) }, [route]);
+ useEffect(() => { const refresh = (event: Event) => { const searched = String((event as CustomEvent).detail?.query || '').toLowerCase(); if (viewQuery && searched === viewQuery.toLowerCase()) { setDetailMessage('Catalog search completed.'); void fetchPage('').catch(error => setDetailMessage((error as Error).message)); } }; window.addEventListener('catalog-search-completed', refresh); return () => window.removeEventListener('catalog-search-completed', refresh) }, [viewQuery, category, viewSort]);
+ const submitSearch = async () => { if (searching) return; const mark = landing.mark(); const value = draftQuery.trim(); setSearching(true); try { if (value) { setRecent(recordRecentSearch(deviceStorage(), value)); const page = await api.searchTitles(value); pageRequest.current++; setRemoteTitles(page.items); setNextCursor(page.nextCursor); setResultTotal(page.total); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); } setQuery(value); landing.arm({ cardsOnly: true, since: mark }); } catch (error) { setDetailMessage((error as Error).message); } finally { setSearching(false) } };
  // Typing never contacts the trackers: when the IME closes the cache results follow the field (three characters or more).
  // Only the Search button asks the trackers. A recent chip re-runs its term from the cache too.
  const refreshFromCache = (value: string) => { const term = value.trim(); if (term.length >= 3 && term !== query) setQuery(term) };
  const focusSearchField = () => window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="search-input"]')), 0);
  const runRecent = (term: string) => { setDraftQuery(term); setQuery(term); setRecent(recordRecentSearch(deviceStorage(), term)); focusSearchField() };
  const forgetRecent = () => { clearRecentSearches(deviceStorage()); setRecent([]); focusSearchField() };
- const loadMore = () => { if (loadingMore.current || !nextCursor) return; loadingMore.current = true; api.titles({ search: query.trim().length >= 3 ? query.trim() : undefined, category, sort, pageSize: 12, cursor: nextCursor }).then(page => { setRemoteTitles(current => [...current, ...page.items]); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); }).catch(() => { }).then(() => { loadingMore.current = false; }); };
+ const loadMore = () => { if (loadingMore.current || !nextCursor) return; loadingMore.current = true; api.titles({ search: viewQuery.trim().length >= 3 ? viewQuery.trim() : undefined, category, sort: viewSort, pageSize: 12, cursor: nextCursor }).then(page => { setRemoteTitles(current => [...current, ...page.items]); setNextCursor(page.nextCursor); void api.ensureMetadata(page.items.map(item => item.id)).catch(error => setDetailMessage((error as Error).message)); }).catch(() => { }).then(() => { loadingMore.current = false; }); };
  useEffect(() => { const updated = (event: Event) => { const titleId = String((event as CustomEvent).detail?.titleId || ''); if (!titleId || detailRef.current?.title.id !== titleId) return; void loadDetail(titleId).then(next => { setDetail(next); setDetailMessage(needsEpisodeExpansion(next) ? 'Preparing the individual episode list…' : '') }).catch(error => setDetailMessage((error as Error).message)) }; window.addEventListener('catalog-title-updated', updated); return () => window.removeEventListener('catalog-title-updated', updated) }, [api]);
  useEffect(() => {
   const titleId = detail?.title.kind === 'series' ? detail.title.id : ''; if (!titleId) return; let stopped = false; let running = false; const refresh = async () => {
@@ -681,7 +725,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  const openLibraryItem = useStableCallback(async (item: HouseholdItem) => { const id = item.titleId || item.catalog?.id; if (!id) { setDetailMessage('This library item is not linked to a catalog title yet. Refresh the catalog and try again.'); return } const title = item.catalog || { id, title: item.release.name, kind: 'movie', trackers: item.release.trackerId ? [{ id: item.release.trackerId, name: item.release.trackerName }] : [], categories: [], resolutions: [], sourceCount: 1, bestSeeders: item.release.seeders, largestSizeBytes: item.release.sizeBytes } as CatalogTitle; await openTitle(title, { season: item.seasonNumber, episode: item.episodeNumber }) });
  // Rehydrate the open title through the same path as a normal open (fresh fetch, so Resume reflects the new position; failure falls back to the route list with the usual notice), and report the current spot so App can keep it while the Player owns the screen.
  useEffect(() => { if (initialNav && initialNav.titleId) void openTitle({ id: initialNav.titleId, title: initialNav.titleName, kind: 'movie', trackers: [], categories: [], resolutions: [], sourceCount: 0, bestSeeders: 0, largestSizeBytes: 0 } as CatalogTitle, initialNav.target) }, []);
- useEffect(() => { onNav?.(captureNav({ route, detail: detail ? { id: detail.title.id, title: detail.title.title } : null, target: detailTarget, query, category, sort, family: familyKey, familyCategory: familyChip, versions: detail ? versionsKey : '' })) }, [route, detail?.title.id, detailTarget, query, category, sort, familyKey, familyChip, versionsKey]);
+ useEffect(() => { onNav?.(captureNav({ route, detail: detail ? { id: detail.title.id, title: detail.title.title } : null, target: detailTarget, query, category, sort: viewSort, family: familyKey, familyCategory: familyChip, versions: detail ? versionsKey : '' })) }, [route, detail?.title.id, detailTarget, query, category, viewSort, familyKey, familyChip, versionsKey]);
  const manageSeasonPack = async (source: CatalogSource, season: number, action: SeasonPackAction) => {
   const isAcquire = action === 'download' || (action === 'retry' && !source.libraryState?.downloadId);
   if (!isAcquire) setDetailMessage(`Updating season ${season} download…`);
@@ -700,7 +744,7 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
    if (!isAcquire) { setDetailMessage((error as Error).message); throw error; }
   }
  };
- const chooseRoute = (next: TVRoute) => { resetFocusPoint(); setNotice(''); homeGeneration.current++; homeRequested.current = {}; setExtraRows({}); setHomeDepth(0); if (!['home', 'browse', 'search', 'tracker'].includes(next)) { setRemoteTitles([]); setNextCursor(null); } lastContent.current = null; familyCache.current = {}; setFamilyKey(''); setFamilyChip(''); setRoute(next); setDetail(null); setMenuOpen(false); landing.arm(); };
+ const chooseRoute = (next: TVRoute, focusKey = '') => { resetFocusPoint(); setNotice(''); homeGeneration.current++; homeRequested.current = {}; setExtraRows({}); setHomeDepth(0); if (!showsCatalogTitles(next)) { setRemoteTitles([]); setNextCursor(null); } lastContent.current = null; familyCache.current = {}; setFamilyKey(''); setFamilyChip(''); setSettingsGroup(groupOfKey(focusKey)); setRoute(next); setDetail(null); setMenuOpen(false); if (focusKey) { landing.cancel(); pendingFocus.current = focusKey } else landing.arm(); };
  // Projects route: activation hands the link to the platform browser. When
  // no browser takes it (several ATV boxes ship none) the address stays on
  // the card and the hint says so — the URL is the fallback.
@@ -751,9 +795,10 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
      focusElement(prepareCancelRef.current);
      return;
     }
-    const active = document.activeElement;
-    if (active === prepareCloseRef.current) focusElement(prepareRetryRef.current);
-    else focusElement(prepareCloseRef.current);
+    // Retry and Close are one row: Left and Right move along it and stop at its ends, Up and Down stay.
+    if (action === 'right') focusElement(prepareCloseRef.current);
+    else if (action === 'left') focusElement(prepareRetryRef.current);
+    else if (document.activeElement !== prepareCloseRef.current) focusElement(prepareRetryRef.current);
    }
   };
   document.addEventListener('keydown', key, true);
@@ -761,47 +806,63 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  }, [preparing?.error, preparing?.label, onCancelPrepare]);
  // Back to the card the viewer left, or, when it is gone (another route, a reload), land like a fresh screen.
  const restoreContentFocus = () => { const key = lastContent.current; const target = key ? document.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`) : null; if (target) focusElement(target); else landing.arm() };
- const onBack = () => { if (preparing) { onCancelPrepare?.(); return; } if (updateConfirm) { closeUpdateConfirm(); return; } if (rebuildConfirm) { closeRebuildConfirm(); return; } if (detail) { setDetail(null); window.setTimeout(restoreContentFocus, 0); return; } if (menuOpen) { setMenuOpen(false); window.setTimeout(restoreContentFocus, 0); return; } const closedFamily = familyBack.current?.(); if (closedFamily) { window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closedFamily}"]`); if (tile) focusElement(tile); else landing.arm() }, 0); return; } setMenuOpen(true); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-menu-route="${route}"]`)), 0); };
+ const onBack = () => { if (preparing) { onCancelPrepare?.(); return; } if (updateConfirm) { closeUpdateConfirm(); return; } if (rebuildConfirm) { closeRebuildConfirm(); return; } if (detail) { setDetail(null); window.setTimeout(restoreContentFocus, 0); return; } if (menuOpen) { setMenuOpen(false); window.setTimeout(restoreContentFocus, 0); return; } const closedFamily = familyBack.current?.(); if (closedFamily) { window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closedFamily}"]`); if (tile) focusElement(tile); else landing.arm() }, 0); return; } if (route === 'jobs' || route === 'projects') { chooseRoute('settings', `settings-${route}`); return; } if (route === 'settings' && settingsBack()) return; openRail(); };
+ const openRail = () => { setMenuOpen(true); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-menu-hub="${hubOf(route).id}"]`) || document.querySelector<HTMLElement>('[data-focus-region="sidebar"]')), 0) };
  useTVNavigation({
-  getInitialFocus: () => landingTarget() || first.current, restoreKey: restoreFocus, onFocusKey: key => { onFocus(key); if (route === 'home' && document.activeElement instanceof HTMLElement) { const row = Number(document.activeElement.dataset.focusRow); if (row >= HOME_ROW.recent) setHomeDepth(depth => Math.max(depth, row)) } if (document.activeElement instanceof HTMLElement && document.activeElement.dataset.focusRegion === 'content' && !detail) { lastContent.current = key; setFocusPoint(Number(document.activeElement.dataset.focusRow), Number(document.activeElement.dataset.focusCol)) } }, onBack, onLongBack: exitApplication, onDirection: (direction, current) => {
+  getInitialFocus: () => landingTarget() || first.current, restoreKey: restoreFocus, onFocusKey: key => { onFocus(key); if (route === 'home' && document.activeElement instanceof HTMLElement) { const row = Number(document.activeElement.dataset.focusRow); if (row >= HOME_ROW.recent) setHomeDepth(depth => Math.max(depth, row)) } if (document.activeElement instanceof HTMLElement && (document.activeElement.dataset.focusRegion === 'content' || document.activeElement.dataset.focusRegion === SETTINGS_GROUPS_REGION) && !detail) { lastContent.current = key; setFocusPoint(Number(document.activeElement.dataset.focusRow), Number(document.activeElement.dataset.focusCol)) } }, onBack, onLongBack: exitApplication, onDirection: (direction, current) => {
    if (detail || updateConfirm || rebuildConfirm) return false;
-   // Near the end of a title rail, fire the next page without consuming the
-   // keypress: focus still moves while the append lands.
-   if (direction === 'right' && (current.dataset.focusKey || '').startsWith('title-') && nearEnd(Number(current.dataset.focusCol || -1), visible.length)) loadMore();
+   if (route === 'settings' && settingsDirection(direction, current)) return true;
+   // Near the end of a title rail (Tracker), or within two lines of the end of the Search and Browse grid, fire the
+   // next page without consuming the keypress: focus still moves while the append lands.
+   if ((current.dataset.focusKey || '').startsWith('title-')) {
+    const col = Number(current.dataset.focusCol || -1);
+    if (drawsTitleGrid(route)) { if ((direction === 'down' || direction === 'right') && nearEnd(gridIndex(Number(current.dataset.focusRow), col, GRID_FIRST_ROW), visible.length, GRID_COLUMNS * 2)) loadMore() }
+    else if (direction === 'right' && nearEnd(col, visible.length)) loadMore();
+   }
    if (route === 'jobs' && direction === 'down' && (current.dataset.focusKey || '').startsWith('job-')) window.dispatchEvent(new CustomEvent('tv-jobs-near-end'));
    const region = current.dataset.focusRegion;
-   if (region === 'content' && direction === 'left' && current.dataset.focusCol === '0') { setMenuOpen(true); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-menu-route="${route}"]`) || document.querySelector<HTMLElement>('[data-focus-region="sidebar"]')), 0); return true; }
+   if ((region === 'content' || region === SETTINGS_GROUPS_REGION) && direction === 'left' && current.dataset.focusCol === '0') { openRail(); return true; }
+   // Down from a tab enters the content at its first stop (the first card of the first line), whatever tab it left.
+   if (region === 'content' && direction === 'down' && current.dataset.hubTab) { const below = visibleFocusables().filter(element => element.dataset.focusRegion === 'content' && !element.dataset.hubTab && Number.isFinite(Number(element.dataset.focusRow)) && Number(element.dataset.focusRow) > 0).sort((a, b) => Number(a.dataset.focusRow) - Number(b.dataset.focusRow) || Number(a.dataset.focusCol) - Number(b.dataset.focusCol))[0]; if (below) focusElement(below); return true; }
+   // Up from the content into the tab strip lands on the selected tab, whatever column the cursor was in.
+   if (region === 'content' && direction === 'up' && !current.dataset.hubTab) { const above = chooseStructuredTarget(current, visibleFocusables(), 'up'); if (above && above.dataset.hubTab) { focusElement(document.querySelector<HTMLElement>('[data-hub-tab][aria-selected="true"]') || above); return true; } }
    if (region === 'sidebar' && direction === 'right') { setMenuOpen(false); window.setTimeout(restoreContentFocus, 0); return true; }
    return false;
   }
  });
  const librarySections = useMemo(() => householdSections(route, household), [route, household]);
- // On Search the recent chips take row 2, so the sort chips sit one row lower; every other route keeps row 2.
- const sortRow = route === 'search' ? 3 : 2;
+ // The chip line (row 2): Sort and its chips, then on Search the recent searches other than the one in the field.
+ const recentShown = recent.filter(term => term.toLocaleLowerCase() !== query.trim().toLocaleLowerCase()).slice(0, RECENT_CHIPS);
+ const recentCol = category ? 5 : 4;
  const visible = useMemo(() => {
   let list = remoteTitles;
   if (category) list = list.filter(title => title.categories.includes(category));
-  if (sort === 'seeders') list = [...list].sort((a, b) => b.bestSeeders - a.bestSeeders); if (sort === 'title') list = [...list].sort((a, b) => a.title.localeCompare(b.title)); if (sort === 'rating') list = [...list].sort((a, b) => Number(Boolean(b.ratingVotes)) - Number(Boolean(a.ratingVotes)) || (b.rating || 0) - (a.rating || 0));
+  if (viewSort === 'seeders') list = [...list].sort((a, b) => b.bestSeeders - a.bestSeeders); if (viewSort === 'title') list = [...list].sort((a, b) => a.title.localeCompare(b.title)); if (viewSort === 'rating') list = [...list].sort((a, b) => Number(Boolean(b.ratingVotes)) - Number(Boolean(a.ratingVotes)) || (b.rating || 0) - (a.rating || 0));
   return list;
- }, [remoteTitles, category, sort]);
- const heading = menuGroups.reduce<Array<{ id: TVRoute; label: string; icon: string }>>((items, group) => items.concat(group.items), []).find(item => item.id === route)?.label || (route === 'projects' ? 'Other projects' : 'Home');
+ }, [remoteTitles, category, viewSort]);
+ const hub = hubOf(route);
+ const heading = screenHeading(route);
+ // The Downloads count: torrents moving right now (a season pack's files count once).
+ const activeTransfers = useMemo(() => { const moving: Record<string, true> = {}; for (const item of downloads) if (downloadStatus(item).tone === 'active') moving[item.releaseId || item.id] = true; return Object.keys(moving).length }, [downloads]);
  const resumeHero = route === 'home' ? homeHero(librarySections.filter(section => section.key === 'continue').reduce<HouseholdItem[]>((all, section) => all.concat(section.items), []), undefined) : undefined;
  const hero = resumeHero?.title || visible[0] || titles[0];
  const rows = useMemo<Array<{ key: string; title: string; items: CatalogTitle[]; row?: number; keyPrefix?: string }>>(() => route === 'home' ? [
   { key: 'new', title: 'Recently added', items: remoteTitles, row: HOME_ROW.recent },
   ...HOME_SPECS.map((spec, index) => ({ key: `rail-${spec.key}`, title: spec.title, items: extraRows[spec.key] || [], row: HOME_ROW.extra + index, keyPrefix: `rail-${spec.key}` })),
- ] : route === 'tracker' ? [{ key: 'tracker-new', title: 'Recently added', items: visible }, { key: 'tracker-seeded', title: 'Strong swarms', items: [...visible].sort((a, b) => b.bestSeeders - a.bestSeeders) }] : ['continue', 'favorites', 'watched', 'library', 'downloads', 'library-categories', 'jobs', 'settings', 'categories'].includes(route) ? [] : [{ key: route, title: heading, items: visible }], [route, remoteTitles, extraRows, visible, heading]);
+ ] : route === 'tracker' ? [{ key: 'tracker-new', title: 'Recently added', items: visible }, { key: 'tracker-seeded', title: 'Strong swarms', items: [...visible].sort((a, b) => b.bestSeeders - a.bestSeeders), keyPrefix: 'tracker-seeded' }] : !showsCatalogTitles(route) ? [] : [{ key: route, title: '', items: visible }], [route, remoteTitles, extraRows, visible]);
  // Rails whose artwork loads: the focused rail and its neighbours (lazy-art.ts). Rail rows are ascending in document order.
  const homeLibrary = librarySections.filter(section => route !== 'home' || section.key === 'continue');
  const homeFavorites = route === 'home' ? librarySections.filter(section => section.key === 'favorites') : [];
  const shownRows = rows.filter(row => row.items.length > 0);
+ // Household rails take rows 3 + index and title rails 10 up; they cannot meet: the most household rails (three, rows 3-5) are on
+ // the Library dashboard, which draws no title rails, and Home, the only screen with both, draws one (Continue watching, row 3).
  const railRows = [...homeLibrary.map((section, index) => section.items.length > 0 ? 3 + index : -1).filter(row => row >= 0), ...shownRows.map((row, rowIndex) => row.row ?? rowIndex + 10), ...homeFavorites.filter(section => section.items.length > 0).map(() => HOME_ROW.favorites)];
  const railSpans = railWindows(railRows);
  const spanOf = (row: number) => railSpans[railRows.indexOf(row)] || { from: -Infinity, until: Infinity };
  const libraryArt = librarySections[0]?.items[0]?.catalog;
  const initialArt = artURL(api, route === 'home' ? hero : librarySections.length > 0 ? libraryArt : visible[0]);
  const preparingModal = preparing ? (
-  <section role="dialog" aria-modal="true" aria-labelledby="tv-prepare-heading" class="tv-settings tv-removal-confirm tv-prepare-confirm">
+  <section role="dialog" aria-modal="true" aria-labelledby="tv-prepare-heading" class="tv-prepare-confirm">
    <h2 id="tv-prepare-heading">{preparing.error ? 'Could not start this download' : `Preparing from ${preparing.trackerName}`}</h2>
    <strong class="release-name">{preparing.label}</strong>
    {preparing.error ? <>
@@ -819,21 +880,22 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
   </section>
  ) : null;
  if (detail) return <><TitleDetail key={`${detail.title.id}:${detailTarget.season || 0}:${detailTarget.episode || 0}`} api={api} detail={detail} target={detailTarget} message={detailMessage} resume={resumeForTitle(household.continueWatching, detail.title.id)} initialVersions={initialNav?.titleId === detail.title.id ? restoreVersions.current : ''} restoreKey={initialNav?.focusKey || ''} onVersions={reportVersions} favorite={favoriteIDs.has(detail.title.id)} onClose={onBack} onFavorite={onFavorite} onResume={item => onPlay(item.release, item.fileIndex, item.positionMs)} onPlay={onPlay} onPackAction={manageSeasonPack} />{preparingModal}</>;
- return <div class={`tv-app ${menuOpen ? 'menu-open' : ''}`}>
+ return <div class={`tv-app ${menuOpen ? 'menu-open' : ''}`} data-route={route}>
   <Backdrop key={route} initial={initialArt} />
-  <aside class="tv-sidebar"><div class="tv-brand"><span>{appIdentity().monogram}</span><b>{appIdentity().name}</b></div>{menuGroups.map((group, groupIndex) => <div class="tv-menu-group">{group.label && <small>{group.label}</small>}{group.items.map((item, index) => <button data-menu-route={item.id} data-focus-region="sidebar" data-focus-row={groupIndex * 10 + index} data-focus-col="0" data-focus-key={`menu-${item.id}`} class={route === item.id ? 'active' : ''} aria-current={route === item.id ? 'page' : undefined} onClick={() => chooseRoute(item.id)}><i>{item.icon}</i><span>{item.label}</span></button>)}</div>)}{portal && portal.links.length > 0 && <button data-menu-route="projects" data-focus-region="sidebar" data-focus-row={PROJECTS_MENU_ROW} data-focus-col="0" data-focus-key="menu-projects" class={route === 'projects' ? 'active' : ''} aria-current={route === 'projects' ? 'page' : undefined} onClick={() => chooseRoute('projects')}><i>↗</i><span>Other projects</span></button>}</aside>
+  <i class="tv-veil" aria-hidden="true" />
+  <aside class="tv-sidebar"><div class="tv-brand"><AppMark /><b>{appIdentity().name}</b></div><nav class="tv-rail" aria-label="Main">{HUBS.map((item, index) => <button data-menu-hub={item.id} data-focus-region="sidebar" data-focus-row={index} data-focus-col="0" data-focus-key={`menu-${item.id}`} class={hub.id === item.id ? 'active' : ''} aria-current={hub.id === item.id ? 'page' : undefined} onClick={() => chooseRoute(hubDestination(item, hubMemory))}><i><Icon name={item.icon} /></i><span><b>{item.label}</b><small class="tv-rail-hint">{item.hint}</small></span>{item.id === 'downloads' && activeTransfers > 0 && <em class="tv-rail-count" aria-label={`${activeTransfers} active`}>{activeTransfers}</em>}</button>)}</nav><RailConnection store={connectionStore} host={serverHost(api.base)} /></aside>
   <main class="tv-content">
-   <header class="tv-top"><h1>{heading}</h1><StatusLine store={statusStore} fixed={status} /><button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="header-retry" data-landing="chrome" onClick={onRetry}>Refresh</button></header>
+   {(heading || hub.tabs) && <header class="tv-top">{heading && <h1>{heading}</h1>}{hub.tabs && <div class="tv-tabs" role="tablist" aria-label={hub.label}>{hub.tabs.map((tab, index) => <button role="tab" data-hub-tab={tab.route} data-focus-region="content" data-focus-row="0" data-focus-col={index} data-focus-key={`tab-${tab.route}`} data-landing="chrome" class={tab.route === route ? 'active' : ''} aria-selected={tab.route === route ? 'true' : 'false'} onClick={() => { if (tab.route !== route) chooseRoute(tab.route) }}>{tab.label}</button>)}</div>}</header>}
+   <ScreenBanner store={connectionStore} tracker={trackerAttention} />
    {notice && <p class="tv-notice" role="status">{notice}</p>}
-   {route === 'search' && <div class="tv-search"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="search-input" data-landing="control" value={draftQuery} onInput={event => setDraftQuery(event.currentTarget.value)} onBlur={event => refreshFromCache(event.currentTarget.value)} placeholder="Search titles; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="search-submit" class="primary" aria-disabled={searching ? 'true' : undefined} onClick={() => void submitSearch()}>{searching ? 'Searching…' : 'Search'}</button>{query && <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="search-clear" onClick={() => { setDraftQuery(''); setQuery('') }}>Clear</button>}</div>}
-   {route === 'search' && !draftQuery && recent.length > 0 && <div class="tv-recent" role="group" aria-label="Recent searches">{recent.map((term, index) => <button data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`recent-${index}`} onClick={() => runRecent(term)}>{term}</button>)}<button data-focus-region="content" data-focus-row="2" data-focus-col={recent.length} data-focus-key="recent-clear" onClick={forgetRecent}>Clear recent</button></div>}
-   {['tracker', 'browse', 'search'].includes(route) && <div class="tv-filters"><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="0" data-focus-key="sort-newest" class={sort === 'newest' ? 'active' : ''} onClick={() => setSort('newest')}>Newest</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="1" data-focus-key="sort-seeders" class={sort === 'seeders' ? 'active' : ''} onClick={() => setSort('seeders')}>Most seeded</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="2" data-focus-key="sort-rating" class={sort === 'rating' ? 'active' : ''} onClick={() => setSort('rating')}>Rating</button><button data-focus-region="content" data-focus-row={sortRow} data-focus-col="3" data-focus-key="sort-title" class={sort === 'title' ? 'active' : ''} onClick={() => setSort('title')}>A–Z</button>{category && <button data-focus-region="content" data-focus-row={sortRow} data-focus-col="4" data-focus-key="clear-category" onClick={() => setCategory('')}>Clear {category}</button>}</div>}
-   {route === 'projects' ? <section class="tv-projects"><p class="tv-muted">Project sites published with this server. Press OK on a card to open it.</p>{portal && portal.links.length > 0 ? portal.links.map((link, index) => <button class="tv-project" key={link.id} data-landing="card" data-focus-region="content" data-focus-row={3 + index} data-focus-col="0" data-focus-key={`project-${link.id}`} onClick={() => openProjectLink(link)}><strong>{link.title}</strong>{link.description && <p>{link.description}</p>}<code>{link.url}</code></button>) : <EmptyState title="No project links yet">They appear here when the server publishes them.</EmptyState>}{projectsMessage && <p class="focus-hint" aria-live="polite">{projectsMessage}</p>}</section> : route === 'settings' ? <TVSettings api={api} onChangeServer={onChangeServer} onForgetServer={onForgetServer} updateStatus={updateStatus} onUpdateStatus={onUpdateStatus} confirmOpen={updateConfirm} onConfirmOpen={openUpdateConfirm} onConfirmClose={closeUpdateConfirm} rebuildConfirmOpen={rebuildConfirm} onRebuildConfirmOpen={openRebuildConfirm} onRebuildConfirmClose={closeRebuildConfirm} /> : route === 'downloads' ? <TVDownloads items={downloads} eager={Boolean(lastContent.current)} onPlay={onPlayDownload} onManage={onManageDownload} /> : route === 'library-categories' ? <TVFamilies api={api} mode="library" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : route === 'jobs' ? <TVJobs api={api} items={jobs} /> : route === 'categories' ? <TVFamilies api={api} mode="catalog" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : <>
-    {route === 'home' && hero && <section class="tv-hero"><div class="tv-hero-copy"><span class="eyebrow">{heroFacts(hero).join(' · ')}</span><h2>{hero.title}</h2>{hero.overview && <p class="tv-hero-overview">{hero.overview}</p>}{hero.genres && hero.genres.length > 0 && <p class="tv-hero-genres">{hero.genres.slice(0, 3).join(' · ')}</p>}{resumeHero?.resume && <p class="tv-hero-genres">{libraryCardLine(resumeHero.resume)}</p>}<button ref={first} data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key={`hero-${hero.id}`} data-landing="control" data-art={followArtURL(api, hero)} class="primary" onClick={() => { const resume = resumeHero?.resume; if (resume) onPlay(resume.release, resume.fileIndex, resume.positionMs); else void openTitle(hero) }}>{resumeHero?.resume ? resumeActionLabel(resumeHero.resume, hero.kind) : 'View versions'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key={`hero-info-${hero.id}`} onClick={() => setHeroInfo(hero)}>Info</button></div></section>}
-    {homeLibrary.map((section, index) => <HouseholdRail api={api} title={section.title} items={section.items} row={3 + index} from={spanOf(3 + index).from} until={spanOf(3 + index).until} empty={route === 'home' ? '' : HOUSEHOLD_EMPTY[section.key]} onOpen={openLibraryItem} />)}
-    <div class="tv-rows">{shownRows.map((row, rowIndex) => { const railRow = row.row ?? rowIndex + 10; const span = spanOf(railRow); return <TitleRail api={api} heading={row.title} items={row.items} row={railRow} from={span.from} until={span.until} keyPrefix={row.keyPrefix} seeders={row.key === 'tracker-seeded'} focusRef={!hero && rowIndex === 0 ? first : undefined} onOpen={openTitleStable} /> })}</div>
+   {route === 'search' && <div class="tv-search"><span class="tv-search-field"><Icon name="search" /><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="search-input" data-landing="control" value={draftQuery} onInput={event => setDraftQuery(event.currentTarget.value)} onBlur={event => refreshFromCache(event.currentTarget.value)} placeholder="Search titles; press OK to type" />{query && resultTotal !== null && <span class="tv-search-count" aria-live="polite">{resultTotal === 1 ? '1 result' : `${resultTotal} results`}</span>}</span><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="search-submit" class="primary" aria-disabled={searching ? 'true' : undefined} onClick={() => void submitSearch()}>{searching ? 'Searching…' : 'Search'}</button>{query && <button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="search-clear" onClick={() => { setDraftQuery(''); setQuery('') }}>Clear</button>}</div>}
+   {hasSortChips(route) && <div class="tv-filters tv-chip-line" role="group" aria-label={route === 'search' ? 'Sort and recent searches' : 'Sort titles'}><span class="tv-chip-label">Sort</span><button data-focus-region="content" data-focus-row="2" data-focus-col="0" data-focus-key="sort-newest" class={viewSort === 'newest' ? 'active' : ''} onClick={() => setViewSort('newest')}>Newest</button><button data-focus-region="content" data-focus-row="2" data-focus-col="1" data-focus-key="sort-seeders" class={viewSort === 'seeders' ? 'active' : ''} onClick={() => setViewSort('seeders')}>Most seeded</button><button data-focus-region="content" data-focus-row="2" data-focus-col="2" data-focus-key="sort-rating" class={viewSort === 'rating' ? 'active' : ''} onClick={() => setViewSort('rating')}>Rating</button><button data-focus-region="content" data-focus-row="2" data-focus-col="3" data-focus-key="sort-title" class={viewSort === 'title' ? 'active' : ''} onClick={() => setViewSort('title')}>A–Z</button>{category && <button data-focus-region="content" data-focus-row="2" data-focus-col="4" data-focus-key="clear-category" onClick={() => setCategory('')}>Clear {category}</button>}{route === 'search' && recent.length > 0 && <><span class="tv-chip-label tv-chip-label-next">Recent</span>{recentShown.map((term, index) => <button class="tv-recent-chip" data-focus-region="content" data-focus-row="2" data-focus-col={recentCol + index} data-focus-key={`recent-${index}`} onClick={() => runRecent(term)}>{term}</button>)}<button data-focus-region="content" data-focus-row="2" data-focus-col={recentCol + recentShown.length} data-focus-key="recent-clear" onClick={forgetRecent}>Clear recent</button></>}</div>}
+   {route === 'projects' ? <section class="tv-projects"><p class="tv-muted">Project sites published with this server. Press OK on a card to open it.</p>{portal && portal.links.length > 0 ? portal.links.map((link, index) => <button class="tv-project" key={link.id} data-landing="card" data-focus-region="content" data-focus-row={3 + index} data-focus-col="0" data-focus-key={`project-${link.id}`} onClick={() => openProjectLink(link)}><strong>{link.title}</strong>{link.description && <p>{link.description}</p>}<code>{link.url}</code></button>) : <EmptyState title="No project links yet">They appear here when the server publishes them.</EmptyState>}{projectsMessage && <p class="focus-hint" aria-live="polite">{projectsMessage}</p>}</section> : route === 'settings' ? <TVSettings api={api} hasProjects={Boolean(portal && portal.links.length > 0)} projectCount={portal ? portal.links.length : 0} jobs={jobs} group={settingsGroup} onGroup={setSettingsGroup} onOpen={next => chooseRoute(next)} onReload={onRetry} onChangeServer={onChangeServer} onForgetServer={onForgetServer} updateStatus={updateStatus} onUpdateStatus={onUpdateStatus} confirmOpen={updateConfirm} onConfirmOpen={openUpdateConfirm} onConfirmClose={closeUpdateConfirm} rebuildConfirmOpen={rebuildConfirm} onRebuildConfirmOpen={openRebuildConfirm} onRebuildConfirmClose={closeRebuildConfirm} /> : route === 'downloads' ? <TVDownloads api={api} items={downloads} eager={Boolean(lastContent.current)} onPlay={onPlayDownload} onManage={onManageDownload} /> : route === 'library-categories' ? <TVFamilies api={api} mode="library" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : route === 'jobs' ? <TVJobs api={api} items={jobs} /> : route === 'categories' ? <TVFamilies api={api} mode="catalog" familyKey={familyKey} chip={familyChip} sort={sort} setFamilyKey={setFamilyKey} setChip={setFamilyChip} setSort={setSort} cache={familyCache} backRef={familyBack} onOpenTitle={openTitleStable} onOpenLibraryItem={openLibraryItem} /> : <>
+    {route === 'home' && hero && <HomeHero api={api} hero={hero} resume={resumeHero?.resume} favorite={favoriteIDs.has(hero.id)} primaryRef={first} onPlay={onPlay} onOpen={openTitle} onInfo={setHeroInfo} onFavorite={onFavorite} />}
+    {homeLibrary.map((section, index) => <HouseholdRail api={api} title={isHouseholdShelf(route) ? '' : section.title} items={section.items} landscape={section.key === 'continue'} row={3 + index} from={spanOf(3 + index).from} until={spanOf(3 + index).until} empty={route === 'home' ? '' : HOUSEHOLD_EMPTY[section.key]} onOpen={openLibraryItem} />)}
+    <div class="tv-rows">{shownRows.map((row, rowIndex) => { const railRow = row.row ?? rowIndex + 10; const span = spanOf(railRow); if (drawsTitleGrid(route)) return <TitleGrid api={api} items={row.items} firstRow={GRID_FIRST_ROW} focusRef={!hero && rowIndex === 0 ? first : undefined} onOpen={openTitleStable} />; return <TitleRail api={api} heading={row.title} items={row.items} row={railRow} from={span.from} until={span.until} keyPrefix={row.keyPrefix} seeders={row.key === 'tracker-seeded'} focusRef={!hero && rowIndex === 0 ? first : undefined} onOpen={openTitleStable} /> })}</div>
     {homeFavorites.map(section => <HouseholdRail api={api} title={section.title} items={section.items} row={HOME_ROW.favorites} from={spanOf(HOME_ROW.favorites).from} until={spanOf(HOME_ROW.favorites).until} empty="" onOpen={openLibraryItem} />)}
-    {['home', 'search', 'browse', 'tracker'].includes(route) && rows.every(row => row.items.length === 0) && (query ? <EmptyState title={`No titles match “${query}”`}>Try fewer or different words, or press Clear to see everything.</EmptyState> : route === 'search' ? <EmptyState title="Search the catalog">Press OK on the search field, type a title, then choose Search.</EmptyState> : <EmptyState title="No titles to show yet">The catalog may still be syncing. Wait a minute and press Refresh, or check that a tracker is enabled in Settings.</EmptyState>)}
+    {showsCatalogTitles(route) && rows.every(row => row.items.length === 0) && (viewQuery ? <EmptyState title={`No titles match “${viewQuery}”`}>Try fewer or different words, or press Clear to see everything.</EmptyState> : route === 'search' ? <EmptyState title="Search the catalog">Press OK on the search field, type a title, then choose Search.</EmptyState> : <EmptyState title="No titles to show yet" action={<button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="empty-reload" data-landing="chrome" onClick={onRetry}>Reload library</button>}>Wait a minute for the catalog to sync and choose Reload library, or turn on a tracker in Settings.</EmptyState>)}
    </>}
   </main>
   {route === 'home' && promotionsVisible(portal) && <TVPromotions api={api} />}
@@ -842,45 +904,137 @@ export function Catalog({ api, status, statusStore, titles, facets, household, d
  </div>;
 }
 
-const LibraryCard = memo(function LibraryCard({ api, item, row, col, focusKey, loadArt, onOpen }: { api: API; item: HouseholdItem; row: number; col: number; focusKey: string; loadArt?: boolean; onOpen: (item: HouseholdItem) => void }) {
+// Home's hero (DESIGN.md "Home"): straight on the focus-following backdrop, no panel. The kind line, the title (a
+// "Title: Subtitle" splits into a title and a subtitle line), facts with the resolution chip, a two-line overview, then
+// the primary (Resume says what is left) and Info and My List as round icon buttons in the next columns.
+function HomeHero({ api, hero, resume, favorite, primaryRef, onPlay, onOpen, onInfo, onFavorite }: { api: API; hero: CatalogTitle; resume?: HouseholdItem; favorite: boolean; primaryRef: { current: HTMLButtonElement | null }; onPlay: (release: Release, fileIndex?: number, resumeMs?: number) => void; onOpen: (title: CatalogTitle) => void; onInfo: (title: CatalogTitle) => void; onFavorite: (title: CatalogTitle, value: boolean) => void }) {
+ const [main, sub] = heroTitleParts(hero.title);
+ const facts = heroFacts(hero);
+ const resolution = hero.resolutions?.[0];
+ const left = resume ? timeLeft(resume) : '';
+ const art = followArtURL(api, hero);
+ return <section class="tv-hero">
+  <p class="tv-hero-kind">{resume && <i class="tv-hero-dot" aria-hidden="true" />}{heroKind(hero, Boolean(resume))}</p>
+  <h2 aria-label={hero.title}><span class="tv-hero-title">{main}</span>{sub && <span class="tv-hero-subtitle">{sub}</span>}</h2>
+  {(facts.length > 0 || resolution) && <p class="tv-hero-facts">{facts.map((fact, index) => <Fragment key={index}>{index > 0 && <i class="detail-dot" aria-hidden="true">·</i>}{fact}</Fragment>)}{resolution && <span class="tv-hero-chip">{resolution}</span>}</p>}
+  {hero.overview && <p class="tv-hero-overview">{hero.overview}</p>}
+  <div class="tv-hero-actions">
+   <button ref={primaryRef} data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key={`hero-${hero.id}`} data-landing="control" data-art={art} class="primary" onClick={() => { if (resume) onPlay(resume.release, resume.fileIndex, resume.positionMs); else onOpen(hero) }}>{resume ? <><Icon name="play" />{resumeActionLabel(resume, hero.kind)}{left && <span class="detail-primary-note">{` · ${left}`}</span>}</> : 'View versions'}</button>
+   <button class="tv-hero-icon" data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key={`hero-info-${hero.id}`} data-art={art} aria-haspopup="dialog" aria-label="Info" onClick={() => onInfo(hero)}><Icon name="info" /></button>
+   <button class="tv-hero-icon" data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key={`hero-favorite-${hero.id}`} data-art={art} aria-pressed={favorite} aria-label={favorite ? 'In My List' : 'Add to My List'} onClick={() => onFavorite(hero, !favorite)}><Icon name={favorite ? 'check' : 'plus'} /></button>
+  </div>
+ </section>;
+}
+
+// One card for the household's titles: a poster (My List, Watched, Library grids) or, for Continue watching, a 16:9
+// landscape card on the title's w780 backdrop (the picture the backdrop follow already decodes) with the progress
+// bar on the art and the episode code and time left under it.
+const LibraryCard = memo(function LibraryCard({ api, item, row, col, focusKey, loadArt, landscape, onOpen }: { api: API; item: HouseholdItem; row: number; col: number; focusKey: string; loadArt?: boolean; landscape?: boolean; onOpen: (item: HouseholdItem) => void }) {
  // A raw release row (no catalog match) keeps the release name as its title: nothing better exists.
  const label = item.catalog?.title || item.release.name;
  const progress = watchProgress(item);
- return <button class="poster-card library-poster-card" data-landing="card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey} data-art={followArtURL(api, item.catalog)} onClick={() => onOpen(item)}>{item.catalog?.posterUrl ? <PosterArt src={api.streamURL(item.catalog.posterUrl)} load={loadArt !== false} /> : <div class="poster-fallback">{label.slice(0, 1)}</div>}<TVStateBadges state={item.catalog?.libraryState} /><div class="poster-copy"><strong>{label}</strong><span>{libraryCardLine(item)}</span></div>{item.positionMs > 0 && !item.watched && <i class="tv-card-progress" aria-label={`${progress}% watched`}><b style={{ width: `${progress}%` }} /></i>}</button>;
+ const art = landscape ? followArtURL(api, item.catalog) : item.catalog?.posterUrl ? api.streamURL(item.catalog.posterUrl) : '';
+ return <button class={`poster-card library-poster-card${landscape ? ' landscape-card' : ''}`} data-landing="card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey} data-art={followArtURL(api, item.catalog)} onClick={() => onOpen(item)}><span class="card-art">{art ? <PosterArt src={art} load={loadArt !== false} /> : <span class="poster-fallback">{label.slice(0, 1)}</span>}<TVStateBadges state={item.catalog?.libraryState} compact />{item.positionMs > 0 && !item.watched && <i class="tv-card-progress" aria-label={`${progress}% watched`}><b style={{ width: `${progress}%` }} /></i>}</span><span class="poster-copy"><strong>{label}</strong><span>{landscape ? continueCardLine(item) : libraryCardLine(item)}</span></span></button>;
 });
-const HouseholdRail = memo(function HouseholdRail({ api, title, items, row, from, until, empty, onOpen }: { api: API; title: string; items: HouseholdState['continueWatching']; row: number; from: number; until: number; empty: string; onOpen: (item: HouseholdItem) => void }) {
+const HouseholdRail = memo(function HouseholdRail({ api, title, items, row, from, until, empty, landscape, onOpen }: { api: API; title: string; items: HouseholdState['continueWatching']; row: number; from: number; until: number; empty: string; landscape?: boolean; onOpen: (item: HouseholdItem) => void }) {
  const reach = useArtReach({ from, until });
  // The Home route passes no empty copy: an empty rail there simply is not drawn, so discovery leads.
- if (items.length === 0) return empty ? <section><div class="row-heading"><h2>{title}</h2></div><p class="tv-muted">{empty}</p></section> : null;
- return <section><div class="row-heading"><h2>{title}</h2></div><div class="poster-rail">{items.map((item, col) => <LibraryCard api={api} item={item} row={row} col={col} focusKey={`library-${item.titleId || item.catalog?.id || item.release.id}-${item.seasonNumber || 0}-${item.episodeNumber || 0}-${col}`} loadArt={inReach(reach, col)} onOpen={onOpen} />)}</div></section>
+ if (items.length === 0) return empty ? <section>{title && <div class="row-heading"><h2>{title}</h2></div>}<p class="tv-muted">{empty}</p></section> : null;
+ return <section>{title && <div class="row-heading"><h2>{title}</h2></div>}<div class={`poster-rail${landscape ? ' landscape-rail' : ''}`}>{items.map((item, col) => <LibraryCard api={api} item={item} row={row} col={col} landscape={landscape} focusKey={`library-${item.titleId || item.catalog?.id || item.release.id}-${item.seasonNumber || 0}-${item.episodeNumber || 0}-${col}`} loadArt={inReach(reach, col)} onOpen={onOpen} />)}</div></section>
 });
 // A poster is requested only once its rail and column are near focus (lazy-art.ts); the placeholder keeps the card's geometry and surface.
 function PosterArt({ src, load }: { src: string; load: boolean }) { return load ? <img src={src} alt="" decoding="async" /> : <div class="poster-pending" /> }
 const TitleRail = memo(function TitleRail({ api, heading, items, row, from, until, keyPrefix, seeders, focusRef, onOpen }: { api: API; heading: string; items: CatalogTitle[]; row: number; from: number; until: number; keyPrefix?: string; seeders?: boolean; focusRef?: { current: HTMLButtonElement | null }; onOpen: (title: CatalogTitle) => void }) {
  const reach = useArtReach({ from, until });
- return <section><div class="row-heading"><h2>{heading}</h2></div><div class="poster-rail">{items.map((title, col) => <TitleCard api={api} title={title} row={row} focusKey={keyPrefix ? `${keyPrefix}-${title.id}` : undefined} col={col} seeders={seeders} focusRef={col === 0 ? focusRef : undefined} loadArt={inReach(reach, col)} onOpen={onOpen} />)}</div></section>
+ return <section>{heading && <div class="row-heading"><h2>{heading}</h2></div>}<div class="poster-rail">{items.map((title, col) => <TitleCard api={api} title={title} row={row} focusKey={keyPrefix ? `${keyPrefix}-${title.id}` : undefined} col={col} seeders={seeders} focusRef={col === 0 ? focusRef : undefined} loadArt={inReach(reach, col)} onOpen={onOpen} />)}</div></section>
 });
+// The poster grid of Search, Browse and the family pages (#58): the shared cards seven to a line, wrapped with flex
+// and margins (tv.css), focus rows numbered as the lines are drawn. Artwork loads by line around focus (lazy-art.ts).
+const GRID_COLUMNS = 7;
+const GRID_FIRST_ROW = 10;
+const gridIndex = (row: number, col: number, firstRow: number) => (row - firstRow) * GRID_COLUMNS + col;
+const gridLines = (count: number) => Math.ceil(count / GRID_COLUMNS);
+const TitleGrid = memo(function TitleGrid({ api, items, firstRow, keyPrefix, focusRef, onOpen }: { api: API; items: CatalogTitle[]; firstRow: number; keyPrefix?: string; focusRef?: { current: HTMLButtonElement | null }; onOpen: (title: CatalogTitle) => void }) {
+ const reach = useRowReach(firstRow);
+ return <div class="tv-poster-grid">{items.map((title, index) => { const row = firstRow + Math.floor(index / GRID_COLUMNS); return <TitleCard api={api} title={title} row={row} col={index % GRID_COLUMNS} focusKey={keyPrefix ? `${keyPrefix}-${title.id}` : undefined} focusRef={index === 0 ? focusRef : undefined} loadArt={inRowReach(reach, row)} onOpen={onOpen} /> })}</div>;
+});
+// Recent searches drawn on the chip line beside the sort chips: two, as on the board, so the line fits 1656 px.
+const RECENT_CHIPS = 2;
 type PendingDownloadRemoval = { download: Download; scope: 'torrent' | 'file' };
-// A route change draws the first few downloads at once and the rest in following tasks, so a long list never holds
-// the main thread (one long task, and the remote dead for that long) while the screen opens. A screen reopened with
-// a focus key to restore draws everything at once: the key may sit in a row that has not been drawn yet.
+// A route change draws the first screenful of downloads at once and the rest once the screen has opened, a few rows
+// per task, so a long list never holds the main thread (one long task, and the remote dead for that long) while the
+// screen opens. A screen reopened with a focus key to restore draws everything at once: the key may sit in a row that
+// has not been drawn yet.
 const DOWNLOADS_FIRST_DRAW = 6;
 const DOWNLOADS_DRAW_STEP = 6;
-function TVDownloads({ items, eager = false, onPlay, onManage }: { items: Download[]; eager?: boolean; onPlay: (download: Download) => void; onManage: (download: Download, action: string) => Promise<void> }) {
+// "The screen has opened": the rows below the first screenful, the row thumbnails and the Allocation wait this long
+// after the screen mounts, so the route change itself draws, asks and decodes only what the first frame needs.
+const DOWNLOADS_SETTLED_MS = 400;
+type DownloadsFilter = 'all' | DownloadFilter;
+const DOWNLOAD_FILTERS: Array<[DownloadsFilter, string]> = [['all', 'All'], ['active', 'Active'], ['done', 'Downloaded'], ['paused', 'Paused'], ['attention', 'Needs attention']];
+const DOWNLOAD_SORTS: Array<[DownloadSort, string]> = [['recent', 'Recent'], ['title', 'Title A–Z'], ['progress', 'Progress'], ['size', 'File size'], ['speed', 'Speed']];
+// The row's thumbnail is the title's w780 backdrop (the one the focus-following backdrop uses), drawn small.
+const downloadThumb = (api: API, download: Download) => download.titleId ? api.streamURL(`/api/v1/artwork/${encodeURIComponent(download.titleId)}/backdrop-small`) : '';
+// One Downloads row. Memoized: a progressive draw step, a poll tick or a busy action re-diffs only the rows whose
+// download, art or state changed (a group object is rebuilt on every list change, so its rows are compared instead).
+const sameGroup = (a: DownloadGroup, b: DownloadGroup) => a === b || (a.totalSizeBytes === b.totalSizeBytes && a.rows.length === b.rows.length && a.rows.every((row, index) => row === b.rows[index]));
+type TVDownloadRowProps = { group: DownloadGroup; index: number; thumb: string; busy: string; detailsShown: boolean; expanded: boolean; onPlay: (download: Download) => void; onAction: (download: Download, action: DownloadTransferAction) => void; onMore: (id: string) => void; onRemoveFile: (download: Download) => void };
+const TVDownloadRow = memo(function TVDownloadRow({ group, index, thumb, busy, detailsShown, expanded, onPlay, onAction, onMore, onRemoveFile }: TVDownloadRowProps) {
+ const download = group.representative;
+ const band = 2 + index * 20;
+ const multi = group.rows.length > 1;
+ const view = downloadRow(download, group.rows.length);
+ return <div role="group" aria-label={download.displayTitle || download.filePath} data-download-id={download.id} data-download-index={index} data-active-row="" class="tv-download-row">
+  <div class="tv-download-line">
+   <span class="tv-download-thumb" aria-hidden="true">{thumb && <img src={thumb} alt="" decoding="async" onError={hideImage} />}</span>
+   <div class="tv-download-main"><strong class="tv-download-title" title={download.displayTitle || download.filePath}>{download.displayTitle || download.filePath}</strong><span class="tv-download-state"><b class={`tv-download-status ${view.tone}`}>{view.state}</b>{view.meter && <i class={`tv-meter ${view.tone}`} role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.percent}><b style={{ width: `${view.percent}%` }} /></i>}<small class="tv-download-facts">{view.facts}</small></span></div>
+   <span class="tv-download-size">{formatBytes(group.totalSizeBytes)}</span>
+   <div class="tv-download-actions"><button data-landing="card" data-focus-region="content" data-focus-row={band} data-focus-col="0" data-focus-key={`download-${download.id}-play`} class="primary" onClick={() => onPlay(download)}><Icon name="play" />Play</button>{downloadTransferActions(download).map(item => <button key={item.action} aria-disabled={busy ? 'true' : undefined} data-focus-region="content" data-focus-row={band} data-focus-col="1" data-focus-key={`download-${download.id}-${item.action}`} onClick={() => onAction(download, item.action)}>{busy === download.id + ':' + item.action ? item.pendingLabel : item.label}</button>)}<button class="tv-download-more" data-focus-region="content" data-focus-row={band} data-focus-col="2" data-focus-key={`download-${download.id}-more`} aria-haspopup="dialog" aria-label={multi ? 'More: Details, Show files, Delete download' : 'More: Details, Delete download'} onClick={() => onMore(download.id)}><Icon name="more" /></button></div>
+  </div>
+  {detailsShown && <dl class="tv-download-details"><dt>Release</dt><dd>{download.releaseName || download.filePath}</dd><dt>{multi ? 'Files' : 'File'}</dt><dd>{multi ? `${group.rows.length} files in this torrent` : `${download.filePath} (file ${download.fileIndex})`}</dd><dt>Tracker</dt><dd>{download.trackerName} release {download.releaseId}{download.trackerSeeders !== undefined ? ` · ${download.trackerSeeders} seeders` : ''}{download.releaseSizeBytes ? ` · ${formatBytes(download.releaseSizeBytes)} total` : ''}</dd><dt>Transfer</dt><dd>{download.seeds} connected seeds · {download.peers} peers</dd></dl>}
+  {multi && expanded && <div class="tv-download-files">{group.rows.map((row, rowIndex) => <div key={row.id} class="tv-download-file"><strong title={row.displayTitle || row.filePath}>{row.displayTitle || row.filePath}</strong><small>{formatBytes(row.sizeBytes)}</small><span><button data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="2" data-focus-key={`download-${row.id}-file-${row.fileIndex}-play`} onClick={() => onPlay(row)}>Play</button><button class="danger-button" data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="3" data-focus-key={`download-${row.id}-file-${row.fileIndex}-remove`} onClick={() => onRemoveFile(row)}>Remove</button></span></div>)}</div>}
+ </div>;
+}, (a, b) => sameGroup(a.group, b.group) && a.index === b.index && a.thumb === b.thumb && a.busy === b.busy && a.detailsShown === b.detailsShown && a.expanded === b.expanded);
+
+// The heading's storage line. It asks the server's settings for the Allocation itself, so the answer re-renders this
+// line only, not the list.
+function TVAllocationUse({ api, storedBytes }: { api: API; storedBytes: number }) {
+ const [allocation, setAllocation] = useState<number | undefined>(undefined);
+ useEffect(() => {
+  // Asked once the screen has opened, so the request and its answer stay out of the route change.
+  let live = true;
+  const timer = window.setTimeout(() => api.call<Record<string, unknown>>('/settings').then(settings => { const value = Number(settings?.allocationGb); if (live && Number.isFinite(value)) setAllocation(value) }).catch(() => { }), DOWNLOADS_SETTLED_MS);
+  return () => { live = false; window.clearTimeout(timer) };
+ }, []);
+ const use = allocationUse(storedBytes, allocation);
+ return <p class="tv-download-use">{use.label}{use.percent >= 0 && <i class="tv-meter" role="progressbar" aria-label="Storage used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={use.percent}><b style={{ width: `${use.percent}%` }} /></i>}</p>;
+}
+function TVDownloads({ api, items, eager = false, onPlay, onManage }: { api: API; items: Download[]; eager?: boolean; onPlay: (download: Download) => void; onManage: (download: Download, action: string) => Promise<void> }) {
  const [pending, setPending] = useState<PendingDownloadRemoval | null>(null);
  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
  const [removing, setRemoving] = useState(false);
  const [detailsOpen, setDetailsOpen] = useState<Set<string>>(() => new Set());
  const [busyAction, setBusyAction] = useState('');
+ // The download whose More sheet is open (its id), or ''.
+ const [more, setMore] = useState('');
  // A failed action shows its message here and leaves the list where it was; the fatal panel is for startup failures only.
  const [actionMessage, setActionMessage] = useState('');
  const [query, setQuery] = useState('');
- const [filter, setFilter] = useState<'all' | 'streaming' | 'complete' | 'paused' | 'errors'>('all');
+ const [filter, setFilter] = useState<DownloadsFilter>('all');
  const [sort, setSort] = useState<DownloadSort>('recent');
  const [order, setOrder] = useState<string[]>(() => orderDownloadIDs(items, 'recent'));
  const cancelButton = useRef<HTMLButtonElement>(null);
  const confirmButton = useRef<HTMLButtonElement>(null);
- const closeConfirmation = () => { if (removing) return; const key = pending ? (pending.scope === 'file' ? `download-${pending.download.id}-file-${pending.download.fileIndex}-remove` : `download-${pending.download.id}-delete`) : ''; setPending(null); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="${key}"]`) || document.querySelector<HTMLElement>('[data-focus-key="downloads-search"]')), 0) };
+ const art = useListArtReach();
+ const artTimer = useRef(0);
+ // Thumbnails wait until the screen has opened and focus rests, so the route change itself decodes no pictures.
+ const [artReady, setArtReady] = useState(false);
+ useEffect(() => {
+  const ready = window.setTimeout(() => setArtReady(true), DOWNLOADS_SETTLED_MS);
+  return () => { window.clearTimeout(ready); window.clearTimeout(artTimer.current) };
+ }, []);
+ const focusKey = (key: string) => window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="${key}"]`) || document.querySelector<HTMLElement>('[data-focus-key="downloads-search"]')), 0);
+ const closeConfirmation = () => { if (removing) return; const key = pending ? (pending.scope === 'file' ? `download-${pending.download.id}-file-${pending.download.fileIndex}-remove` : `download-${pending.download.id}-more`) : ''; setPending(null); focusKey(key) };
  useEffect(() => {
   if (!pending) return;
   const timer = removing ? 0 : window.setTimeout(() => focusElement(cancelButton.current), 0);
@@ -903,35 +1057,52 @@ function TVDownloads({ items, eager = false, onPlay, onManage }: { items: Downlo
  }, [pending?.download.id, removing]);
  const idsKey = items.map(item => item.id).join('\u0000');
  useEffect(() => setOrder(current => { const available = new Set(items.map(item => item.id)); const retained = current.filter(id => available.has(id)); const known = new Set(retained); const added = items.filter(item => !known.has(item.id)).map(item => item.id); return [...added, ...retained] }), [idsKey]);
- const visible = useMemo(() => { const term = query.trim().toLocaleLowerCase(); const byID = new Map(items.map(item => [item.id, item])); const ordered = (order.length ? order : items.map(item => item.id)).map(id => byID.get(id)).filter((item): item is Download => Boolean(item)); return ordered.filter(download => { const text = [download.displayTitle, download.releaseName, download.filePath, download.category, download.state].filter(Boolean).join(' ').toLocaleLowerCase(); const matchesFilter = filter === 'all' || filter === 'streaming' && download.playbackMode === 'progressive' || filter === 'complete' && download.playbackMode === 'local' || filter === 'paused' && /^(paused|stopped)/.test(download.state.toLocaleLowerCase()) || filter === 'errors' && Boolean(download.error); return (!term || text.includes(term)) && matchesFilter }) }, [items, order, query, filter]);
+ const counts = useMemo(() => { const result: Record<DownloadsFilter, number> = { all: items.length, active: 0, done: 0, paused: 0, attention: 0 }; for (const item of items) result[downloadFilterOf(item)]++; return result }, [items]);
+ const storedBytes = useMemo(() => items.reduce((sum, item) => sum + Math.max(0, item.sizeBytes || 0), 0), [items]);
+ const visible = useMemo(() => { const term = query.trim().toLocaleLowerCase(); const byID = new Map(items.map(item => [item.id, item])); const ordered = (order.length ? order : items.map(item => item.id)).map(id => byID.get(id)).filter((item): item is Download => Boolean(item)); return ordered.filter(download => { const text = [download.displayTitle, download.releaseName, download.filePath, download.category, download.state].filter(Boolean).join(' ').toLocaleLowerCase(); return (!term || text.includes(term)) && (filter === 'all' || downloadFilterOf(download) === filter) }) }, [items, order, query, filter]);
  const groups = useMemo(() => groupDownloadsByTorrent(visible), [visible]);
  const [progressive] = useState(!eager);
  const [drawn, setDrawn] = useState(DOWNLOADS_FIRST_DRAW);
  useEffect(() => {
   if (!progressive || drawn >= groups.length) return;
-  const timer = window.setTimeout(() => setDrawn(count => count + DOWNLOADS_DRAW_STEP), 0);
+  const timer = window.setTimeout(() => setDrawn(count => count + DOWNLOADS_DRAW_STEP), drawn === DOWNLOADS_FIRST_DRAW ? DOWNLOADS_SETTLED_MS : 0);
   return () => window.clearTimeout(timer);
  }, [progressive, drawn, groups.length]);
  const shownGroups = progressive && drawn < groups.length ? groups.slice(0, drawn) : groups;
  const toggleDetails = (id: string) => setDetailsOpen(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next });
  const toggleFiles = (engineId: string) => setExpandedGroups(current => { const next = new Set(current); if (next.has(engineId)) next.delete(engineId); else next.add(engineId); return next });
- const cycle = <T extends string,>(value: T, values: T[], set: (value: T) => void) => set(values[(values.indexOf(value) + 1) % values.length]);
- const cycleSort = () => { const values: DownloadSort[] = ['recent', 'title', 'progress', 'size', 'speed']; const next = values[(values.indexOf(sort) + 1) % values.length]; setSort(next); setOrder(orderDownloadIDs(items, next)) };
+ const chooseFilter = (value: DownloadsFilter) => { if (value === filter) return; setFilter(value); art.reset() };
+ const cycleSort = () => { const values = DOWNLOAD_SORTS.map(([value]) => value); const next = values[(values.indexOf(sort) + 1) % values.length]; setSort(next); setOrder(orderDownloadIDs(items, next)) };
+ const playRow = useStableCallback((download: Download) => onPlay(download));
+ const actRow = useStableCallback((download: Download, action: DownloadTransferAction) => void runAction(download, action));
+ const removeFile = useStableCallback((download: Download) => setPending({ download, scope: 'file' }));
  const runAction = async (download: Download, action: DownloadTransferAction) => { if (busyAction) return; setActionMessage(''); setBusyAction(`${download.id}:${action}`); try { await onManage(download, action) } catch (error) { setActionMessage((error as Error).message) } finally { setBusyAction('') } };
  const confirmRemoval = async () => { if (!pending || removing) return; setActionMessage(''); setRemoving(true); try { await onManage(pending.download, pending.scope === 'file' ? 'remove-file' : 'remove'); setPending(null); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="downloads-search"]')), 0) } catch (error) { setActionMessage((error as Error).message) } finally { setRemoving(false) } };
+ // Thumbnails load around the row that holds focus once focus rests, so a held key decodes no new pictures.
+ const followFocus = (event: FocusEvent) => { const row = (event.target as HTMLElement | null)?.closest?.('[data-download-index]') as HTMLElement | null; if (!row) return; const index = Number(row.dataset.downloadIndex); window.clearTimeout(artTimer.current); artTimer.current = window.setTimeout(() => art.focus(index), ART_SETTLE_MS) };
  if (pending) return <section role="dialog" aria-modal="true" aria-labelledby="download-delete-heading" aria-describedby="download-delete-description" class="tv-settings tv-removal-confirm">{pending.scope === 'file' ? <><h2 id="download-delete-heading">Remove episode from downloads?</h2><strong>{pending.download.displayTitle || pending.download.filePath}</strong><p id="download-delete-description">The episode leaves the download list. Its file stays on the server until the whole download is deleted.</p></> : <><h2 id="download-delete-heading">Delete download?</h2><strong>{pending.download.displayTitle || pending.download.releaseName || pending.download.filePath}</strong><p>{formatBytes(pending.download.sizeBytes)} · {pending.download.trackerName}</p><p id="download-delete-description">This permanently deletes the download and every file it stored, including unfinished ones. You can download the title again later.</p></>}{actionMessage && <p role="alert" class="focus-hint">{actionMessage}</p>}<button ref={cancelButton} aria-disabled={removing ? 'true' : undefined} data-focus-region="download-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="download-cancel" onClick={closeConfirmation}>Cancel</button><button ref={confirmButton} aria-disabled={removing ? 'true' : undefined} class="danger-button" data-focus-region="download-dialog" data-focus-row="2" data-focus-col="0" data-focus-key="download-confirm" onClick={() => void confirmRemoval()}>{removing ? (pending.scope === 'file' ? 'Removing…' : 'Deleting…') : pending.scope === 'file' ? 'Remove episode' : 'Delete download'}</button></section>;
- const filterLabel = { all: 'All', streaming: 'Still downloading', complete: 'Downloaded', paused: 'Paused', errors: 'Needs attention' }[filter];
- const sortLabel = { recent: 'Recent', title: 'Title A–Z', progress: 'Progress', size: 'File size', speed: 'Speed' }[sort];
- const narrowed = filter !== 'all' || query.trim() !== '';
- return <section class="tv-list tv-download-list">{actionMessage && <p role="status" class="focus-hint">{actionMessage}</p>}<div class="tv-filters tv-download-tools"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="downloads-search" value={query} onInput={event => setQuery(event.currentTarget.value)} placeholder="Search downloads; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="downloads-filter" onClick={() => cycle(filter, ['all', 'streaming', 'complete', 'paused', 'errors'], setFilter)}>Filter: {filterLabel}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="downloads-sort" onClick={cycleSort}>Sort: {sortLabel}</button></div><p class="tv-download-count" aria-live="polite">{items.length === 0 ? '' : narrowed ? `${groups.length} of ${items.length} downloads` : `${items.length} download${items.length === 1 ? '' : 's'}`}</p>{groups.length === 0 ? (items.length === 0 ? <EmptyState title="No downloads yet">Open a title, choose a version and press Play and download. It appears here while it transfers.</EmptyState> : <EmptyState title="No downloads match">{`Change the filter or clear the search to see all ${items.length} downloads.`}</EmptyState>) : shownGroups.map((group, groupIndex) => {
-  const download = group.representative;
-  const band = 2 + groupIndex * 20;
-  const expanded = expandedGroups.has(download.engineId);
-  const detailsShown = detailsOpen.has(download.id);
-  const multi = group.rows.length > 1;
-  const status = downloadStatus(download);
-  return <article key={download.id} data-download-id={download.id} class="tv-download-row"><div class="tv-download-main"><strong class="tv-download-title" title={download.displayTitle || download.filePath}>{download.displayTitle || download.filePath}</strong><span class={`tv-download-status ${status.tone}`}>{downloadProgressLine(download)}</span><i class={`tv-meter ${status.tone}`} role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={status.percent}><b style={{ width: `${status.percent}%` }} /></i><small class="tv-download-facts">{downloadFacts(download, { sizeBytes: group.totalSizeBytes, files: multi ? group.rows.length : 0 })}</small>{detailsShown && <dl class="tv-download-details"><dt>Release</dt><dd>{download.releaseName || download.filePath}</dd><dt>{multi ? 'Files' : 'File'}</dt><dd>{multi ? `${group.rows.length} files in this torrent` : `${download.filePath} (file ${download.fileIndex})`}</dd><dt>Tracker</dt><dd>{download.trackerName} release {download.releaseId}{download.trackerSeeders !== undefined ? ` · ${download.trackerSeeders} seeders` : ''}{download.releaseSizeBytes ? ` · ${formatBytes(download.releaseSizeBytes)} total` : ''}</dd><dt>Transfer</dt><dd>{download.seeds} connected seeds · {download.peers} peers</dd></dl>}</div><div class="tv-download-actions"><button data-landing="card" data-focus-region="content" data-focus-row={band} data-focus-col="0" data-focus-key={`download-${download.id}-play`} class="primary" onClick={() => onPlay(download)}>Play</button>{downloadTransferActions(download).map(item => <button key={item.action} aria-disabled={busyAction.startsWith(download.id + ':') ? 'true' : undefined} data-focus-region="content" data-focus-row={band} data-focus-col="1" data-focus-key={`download-${download.id}-${item.action}`} onClick={() => void runAction(download, item.action)}>{busyAction === download.id + ':' + item.action ? item.pendingLabel : item.label}</button>)}<button class="danger-button" data-focus-region="content" data-focus-row={band} data-focus-col="2" data-focus-key={`download-${download.id}-delete`} onClick={() => setPending({ download, scope: 'torrent' })}>Delete download</button><button data-focus-region="content" data-focus-row={band} data-focus-col="3" data-focus-key={`download-${download.id}-details`} aria-expanded={detailsShown} onClick={() => toggleDetails(download.id)}>{detailsShown ? 'Hide details' : 'Details'}</button>{multi && <button data-focus-region="content" data-focus-row={band} data-focus-col="4" data-focus-key={`download-${download.id}-files`} aria-expanded={expanded} onClick={() => toggleFiles(download.engineId)}>{expanded ? 'Hide files' : 'Show files'}</button>}</div>{multi && expanded && <div class="tv-download-files">{group.rows.map((row, rowIndex) => <div key={row.id} class="tv-download-file"><strong title={row.displayTitle || row.filePath}>{row.displayTitle || row.filePath}</strong><small>{formatBytes(row.sizeBytes)}</small><span><button data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="0" data-focus-key={`download-${row.id}-file-${row.fileIndex}-play`} onClick={() => onPlay(row)}>Play</button><button class="danger-button" data-focus-region="content" data-focus-row={band + 1 + rowIndex} data-focus-col="1" data-focus-key={`download-${row.id}-file-${row.fileIndex}-remove`} onClick={() => setPending({ download: row, scope: 'file' })}>Remove</button></span></div>)}</div>}</article>;
- })}</section>
+ const sortLabel = DOWNLOAD_SORTS.find(([value]) => value === sort)?.[1];
+ const moreGroup = more ? groups.find(group => group.representative.id === more) : undefined;
+ const moreSheet = moreGroup && (() => {
+  const download = moreGroup.representative;
+  const moreKey = `download-${download.id}-more`;
+  const close = () => setMore('');
+  const after = (run: () => void) => { close(); run(); focusKey(moreKey) };
+  const files = moreGroup.rows.length;
+  return <MoreMenuLayer title={download.displayTitle || download.filePath} returnKey={moreKey} onClose={close} items={[
+   { key: 'details', label: detailsOpen.has(download.id) ? 'Hide details' : 'Details', detail: 'Release, file, tracker and peers', onSelect: () => after(() => toggleDetails(download.id)) },
+   ...(files > 1 ? [{ key: 'files', label: expandedGroups.has(download.engineId) ? 'Hide files' : 'Show files', detail: `${files} files in this torrent, each to play or remove`, onSelect: () => after(() => toggleFiles(download.engineId)) }] : []),
+   { key: 'delete', label: 'Delete download', danger: true, detail: 'Deletes the download and every file it stored', onSelect: () => { close(); setPending({ download, scope: 'torrent' }) } },
+  ]} />;
+ })();
+ return <section class="tv-list tv-download-list" onFocusCapture={followFocus}>
+  <TVAllocationUse api={api} storedBytes={storedBytes} />
+  {actionMessage && <p role="status" class="focus-hint">{actionMessage}</p>}
+  <div class="tv-filters tv-download-tools">{DOWNLOAD_FILTERS.map(([value, label], col) => <button data-focus-region="content" data-focus-row="1" data-focus-col={col} data-focus-key={`downloads-filter-${value}`} class={filter === value ? 'active' : ''} aria-pressed={filter === value ? 'true' : 'false'} onClick={() => chooseFilter(value)}>{label}<em class="tv-chip-count">{counts[value]}</em></button>)}<button class="tv-download-sort" data-focus-region="content" data-focus-row="1" data-focus-col={DOWNLOAD_FILTERS.length} data-focus-key="downloads-sort" onClick={cycleSort}>Sort: {sortLabel}</button><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col={DOWNLOAD_FILTERS.length + 1} data-focus-key="downloads-search" value={query} onInput={event => { setQuery(event.currentTarget.value); art.reset() }} placeholder="Find a download" aria-label="Find a download; press OK to type" /></div>
+  {query.trim() !== '' && items.length > 0 && <p class="tv-download-count" aria-live="polite">{`${groups.length} of ${items.length} downloads match “${query.trim()}”`}</p>}
+  {groups.length === 0 ? (items.length === 0 ? <EmptyState title="No downloads yet">Open a title, choose a version and press Play and download; it shows here while it transfers.</EmptyState> : <EmptyState title="No downloads match">{`Choose All or clear the search to see all ${items.length} downloads.`}</EmptyState>) : shownGroups.map((group, groupIndex) => <TVDownloadRow key={group.representative.id} group={group} index={groupIndex} thumb={artReady && inReach(art.reach, groupIndex) ? downloadThumb(api, group.representative) : ''} busy={busyAction.startsWith(group.representative.id + ':') ? busyAction : ''} detailsShown={detailsOpen.has(group.representative.id)} expanded={expandedGroups.has(group.representative.engineId)} onPlay={playRow} onAction={actRow} onMore={setMore} onRemoveFile={removeFile} />)}
+  {moreSheet}
+ </section>
 }
 // Category families (both Categories pages). Tiles first; opening a family lists its titles (Tracker) or managed items (My Library)
 // with a chip per raw tracker category. Lists are cached in Catalog so Back from a title page lands on already-rendered cards.
@@ -975,179 +1146,67 @@ function TVFamilies({ api, mode, familyKey, chip, sort, setFamilyKey, setChip, s
   api.titles({ family: familyKey, category: chip, sort, pageSize: FAMILY_PAGE, cursor: list.nextCursor }).then(page => { void api.ensureMetadata(page.items.map(item => item.id)).catch(() => { }); const entry = { titles: [...(list.titles || []), ...page.items], nextCursor: page.nextCursor }; cache.current[listKey] = entry; setList(entry) }).catch(error => setMessage((error as Error).message)).then(() => setLoadingMore(false));
  };
  if (!familyKey) {
-  if (families && families.length === 0) return <EmptyState title={mode === 'library' ? 'No library categories yet' : 'No categories yet'}>{mode === 'library' ? 'Download or watch a title and its category appears here.' : 'Categories appear after the first catalog sync. Open Settings and choose Fetch latest.'}</EmptyState>;
+  if (families && families.length === 0) return <EmptyState title={mode === 'library' ? 'No library categories yet' : 'No categories yet'}>{mode === 'library' ? 'Download or watch a title and its category appears here.' : 'Choose Fetch latest in Settings to run the first catalog sync.'}</EmptyState>;
   return <section class="tv-family-page">{message && <p class="tv-muted" aria-live="polite">{message}</p>}{!families && !message && <p class="tv-muted" aria-live="polite">Loading categories…</p>}{families && <FamilyTiles api={api} families={families} unit={unit} onOpen={open} />}</section>;
  }
  const name = family?.name || familyKey;
  const titles = list?.titles || [];
  const items = list?.items || [];
  const empty = list !== null && titles.length === 0 && items.length === 0;
- const heading = <div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="family-back" onClick={() => { const closing = familyKey; setFamilyKey(''); setChip(''); window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closing}"]`); if (tile) focusElement(tile); else requestLanding() }, 0) }}>← All categories</button></div>;
+ const heading = <div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="family-back" onClick={() => { const closing = familyKey; setFamilyKey(''); setChip(''); window.setTimeout(() => { const tile = document.querySelector<HTMLElement>(`[data-focus-key="family-${closing}"]`); if (tile) focusElement(tile); else requestLanding() }, 0) }}><Icon name="chevron-left" />All categories</button></div>;
  return <section class="tv-family-page">
   {heading}
   <FamilyChips name={name} categories={family?.categories || []} active={chip} row={FAMILY_CHIP_ROW} onPick={pickChip} />
-  {mode === 'catalog' && <div class="tv-filters" role="group" aria-label="Sort titles">{([['newest', 'Newest'], ['seeders', 'Most seeded'], ['rating', 'Rating'], ['title', 'A–Z']] as const).map(([value, label], index) => <button class={sort === value ? 'active' : ''} aria-pressed={sort === value ? 'true' : 'false'} data-focus-region="content" data-focus-row={FAMILY_SORT_ROW} data-focus-col={index} data-focus-key={`family-sort-${value}`} onClick={() => setSort(value)}>{label}</button>)}</div>}
+  {mode === 'catalog' && <div class="tv-filters tv-chip-line" role="group" aria-label="Sort titles"><span class="tv-chip-label">Sort</span>{([['newest', 'Newest'], ['seeders', 'Most seeded'], ['rating', 'Rating'], ['title', 'A–Z']] as const).map(([value, label], index) => <button class={sort === value ? 'active' : ''} aria-pressed={sort === value ? 'true' : 'false'} data-focus-region="content" data-focus-row={FAMILY_SORT_ROW} data-focus-col={index} data-focus-key={`family-sort-${value}`} onClick={() => setSort(value)}>{label}</button>)}</div>}
   {message && <p class="tv-muted" aria-live="polite">{message}</p>}
   {list === null && !message && <p class="tv-muted" aria-live="polite">Loading…</p>}
-  {mode === 'catalog' && titles.length > 0 && <TitleRail api={api} heading={name} items={titles} row={FAMILY_LIST_ROW} from={-Infinity} until={Infinity} keyPrefix="family-title" onOpen={onOpenTitle} />}
-  {mode === 'library' && items.length > 0 && <><div class="row-heading"><h2>{name}</h2></div><div class="tv-library-grid">{items.map((item, index) => { const row = FAMILY_LIST_ROW + Math.floor(index / 5); return <LibraryCard api={api} item={item} row={row} col={index % 5} focusKey={`library-item-${item.titleId || item.catalog?.id || item.release.id}`} loadArt={inRowReach(reach, row)} onOpen={onOpenLibraryItem} /> })}</div></>}
-  {mode === 'catalog' && list?.nextCursor && <div class="tv-filters"><button data-focus-region="content" data-focus-row={FAMILY_LIST_ROW + 1} data-focus-col="0" data-focus-key="family-more" aria-disabled={loadingMore ? 'true' : undefined} onClick={more}>{loadingMore ? 'Loading…' : 'Show more titles'}</button></div>}
+  {mode === 'catalog' && titles.length > 0 && <><div class="row-heading"><h2>{name}</h2></div><TitleGrid api={api} items={titles} firstRow={FAMILY_LIST_ROW} keyPrefix="family-title" onOpen={onOpenTitle} /></>}
+  {mode === 'library' && items.length > 0 && <><div class="row-heading"><h2>{name}</h2></div><div class="tv-poster-grid">{items.map((item, index) => { const row = FAMILY_LIST_ROW + Math.floor(index / GRID_COLUMNS); return <LibraryCard api={api} item={item} row={row} col={index % GRID_COLUMNS} focusKey={`library-item-${item.titleId || item.catalog?.id || item.release.id}`} loadArt={inRowReach(reach, row)} onOpen={onOpenLibraryItem} /> })}</div></>}
+  {mode === 'catalog' && list?.nextCursor && <div class="tv-filters"><button data-focus-region="content" data-focus-row={FAMILY_LIST_ROW + gridLines(titles.length)} data-focus-col="0" data-focus-key="family-more" aria-disabled={loadingMore ? 'true' : undefined} onClick={more}>{loadingMore ? 'Loading…' : 'Show more titles'}</button></div>}
   {empty && !message && <p class="tv-muted">{mode === 'library' ? 'Nothing is left in this category. Press All categories to go back.' : 'No titles in this category yet. Choose All or another category.'}</p>}
  </section>;
 }
 function TVJobs({ api, items: initial }: { api: API; items: Job[] }) {
  const [items, setItems] = useState(initial); const [query, setQuery] = useState(''); const [state, setState] = useState(''); const [kind, setKind] = useState(''); const [retryable, setRetryable] = useState(''); const [updatedHours, setUpdatedHours] = useState(''); const [next, setNext] = useState<string | null>(null); const [message, setMessage] = useState(''); const [detail, setDetail] = useState<{ job: Job; logs: JobLog[]; next: string | null } | null>(null);
- async function load(target = '', append = false) { try { const page = await api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: target }); setItems(value => append ? [...value, ...page.items] : page.items); setNext(page.nextCursor) } catch (error) { setMessage((error as Error).message) } }
- async function open(job: Job) { try { const [result, logs] = await Promise.all([api.job(job.id), api.jobLogs(job.id)]); setDetail({ job: result.job, logs: logs.items, next: logs.nextCursor }) } catch (error) { setMessage((error as Error).message) } }
- async function older() { if (!detail?.next) return; try { const page = await api.jobLogs(detail.job.id, detail.next); setDetail({ ...detail, logs: [...detail.logs, ...page.items], next: page.nextCursor }) } catch (error) { setMessage((error as Error).message) } }
+ async function load(target = '', append = false) { try { const page = await api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: target }); setItems(value => append ? [...value, ...page.items] : page.items); setNext(page.nextCursor) } catch (error) { setMessage('Background jobs could not be loaded. Try again in a minute.') } }
+ // The job row a detail was opened from: closing the detail puts the cursor back on it (D-pad map job-detail).
+ const opened = useRef('');
+ async function open(job: Job) { opened.current = job.id; try { const [result, logs] = await Promise.all([api.job(job.id), api.jobLogs(job.id)]); setDetail({ job: result.job, logs: logs.items, next: logs.nextCursor }) } catch (error) { setMessage('Background jobs could not be loaded. Try again in a minute.') } }
+ async function older() { if (!detail?.next) return; try { const page = await api.jobLogs(detail.job.id, detail.next); setDetail({ ...detail, logs: [...detail.logs, ...page.items], next: page.nextCursor }) } catch (error) { setMessage('Background jobs could not be loaded. Try again in a minute.') } }
  useEffect(() => { const timer = window.setTimeout(() => { void load('') }, 400); return () => clearTimeout(timer) }, [query, state, kind, retryable, updatedHours]);
  useEffect(() => {
   // Catalog signals a jobs keypress near the list end; appends are guarded
   // so rapid keypresses cannot double-fetch the same page.
   let busy = false;
-  const onNear = () => { if (busy || !next) return; busy = true; api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: next }).then(page => { setItems(value => [...value, ...page.items]); setNext(page.nextCursor) }).catch(error => setMessage((error as Error).message)).then(() => { busy = false }) };
+  const onNear = () => { if (busy || !next) return; busy = true; api.jobs({ search: query, state, kind, retryable, updatedHours, pageSize: 12, cursor: next }).then(page => { setItems(value => [...value, ...page.items]); setNext(page.nextCursor) }).catch(error => setMessage('Background jobs could not be loaded. Try again in a minute.')).then(() => { busy = false }) };
   window.addEventListener('tv-jobs-near-end', onNear);
   return () => window.removeEventListener('tv-jobs-near-end', onNear);
  });
- if (detail) return <TVJobDetail detail={detail} onBack={() => setDetail(null)} onOlder={older} />;
+ const closeDetail = () => { setDetail(null); window.setTimeout(() => { const row = document.querySelector<HTMLElement>(`[data-focus-key="job-${CSS.escape(opened.current)}"]`); if (row) focusElement(row); else requestLanding() }, 0) };
+ if (detail) return <TVJobDetail detail={detail} onBack={closeDetail} onOlder={older} />;
  const cycle = (value: string, values: string[], set: (value: string) => void) => set(values[(values.indexOf(value) + 1) % values.length]);
- return <section class="tv-list"><div class="tv-filters"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="jobs-search" value={query} onInput={event => setQuery(event.currentTarget.value)} placeholder="Search; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="jobs-state" onClick={() => cycle(state, ['', 'failed', 'completed', 'running', 'queued'], setState)}>State: {state || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="jobs-kind" onClick={() => cycle(kind, ['', 'metadata', 'catalog-title-refresh', 'catalog-sync'], setKind)}>Kind: {kind ? jobKindLabel(kind) : 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="3" data-focus-key="jobs-retry" onClick={() => cycle(retryable, ['', 'true', 'false'], setRetryable)}>Retry: {retryable === 'true' ? 'can retry' : retryable === 'false' ? 'cannot retry' : 'any'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="4" data-focus-key="jobs-time" onClick={() => cycle(updatedHours, ['', '24', '168', '720'], setUpdatedHours)}>Updated: {updatedHours === '24' ? 'last day' : updatedHours === '168' ? 'last week' : updatedHours === '720' ? 'last month' : 'any time'}</button></div>{message && <p>{message}</p>}{items.length === 0 ? <EmptyState title="No jobs match">Set State to all, or choose a longer Updated range.</EmptyState> : items.map((job, index) => <article><div><strong>{job.label || jobKindLabel(job.kind)}</strong><span>{jobStatusLine(job)}</span></div><div><button data-landing="card" data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-${job.id}`} onClick={() => void open(job)}>Details</button><button disabled={job.state === 'queued' || job.state === 'running' || job.state === 'retry_wait'} data-focus-region="content" data-focus-row={2 + index} data-focus-col="1" data-focus-key={`job-${job.id}-retry`} onClick={() => void api.retryJob(job.id).then(() => api.job(job.id)).then(({ job: fresh }) => { setMessage('Job queued again.'); setItems(value => value.map(item => item.id === fresh.id ? fresh : item)) }).catch(error => setMessage(error.message))}>Retry</button></div></article>)}</section>
+ return <section class="tv-list tv-jobs"><div class="tv-filters"><input readOnly data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="jobs-search" value={query} onInput={event => setQuery(event.currentTarget.value)} placeholder="Search; press OK to type" /><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="jobs-state" onClick={() => cycle(state, ['', 'failed', 'completed', 'running', 'queued'], setState)}>State: {state || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="jobs-kind" onClick={() => cycle(kind, ['', 'metadata', 'catalog-title-refresh', 'catalog-sync'], setKind)}>Kind: {kind ? jobKindLabel(kind) : 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="3" data-focus-key="jobs-retry" onClick={() => cycle(retryable, ['', 'true', 'false'], setRetryable)}>Retry: {retryable === 'true' ? 'can retry' : retryable === 'false' ? 'cannot retry' : 'any'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="4" data-focus-key="jobs-time" onClick={() => cycle(updatedHours, ['', '24', '168', '720'], setUpdatedHours)}>Updated: {updatedHours === '24' ? 'last day' : updatedHours === '168' ? 'last week' : updatedHours === '720' ? 'last month' : 'any time'}</button></div>{message && <p class="tv-job-message" role="status">{message}</p>}{items.length === 0 ? <EmptyState title="No jobs match">Set State to all, or choose a longer Updated range.</EmptyState> : items.map((job, index) => { const shown = jobState(job); return <article class={`tv-job ${shown.tone}`}><span class="tv-job-state"><Icon name={shown.icon} /><b>{shown.word}</b></span><div class="tv-job-main"><strong>{jobWhatRan(job)}</strong><span>{[relativeTime(job.updatedAt), job.state === 'running' ? `${Math.round((job.progress || 0) * 100)}%` : '', job.error || ''].filter(Boolean).join(' · ')}</span></div><div class="tv-job-actions"><button data-landing="card" data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-${job.id}`} onClick={() => void open(job)}>Details</button><button disabled={job.state === 'queued' || job.state === 'running' || job.state === 'retry_wait'} data-focus-region="content" data-focus-row={2 + index} data-focus-col="1" data-focus-key={`job-${job.id}-retry`} onClick={() => void api.retryJob(job.id).then(() => api.job(job.id)).then(({ job: fresh }) => { setMessage('Job queued again.'); setItems(value => value.map(item => item.id === fresh.id ? fresh : item)) }).catch(() => setMessage('The job could not be queued again. Try again in a minute.'))}>Retry</button></div></article> })}</section>
 }
 
 function TVJobDetail({ detail, onBack, onOlder }: { detail: { job: Job; logs: JobLog[]; next: string | null }; onBack: () => void; onOlder: () => void }) {
  const [level, setLevel] = useState(''); const [attempt, setAttempt] = useState(''); const [expanded, setExpanded] = useState<number | null>(null);
  const logs = detail.logs.filter(log => (!level || log.level === level) && (!attempt || String(log.attempt) === attempt));
- return <section class="tv-list job-detail"><button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="job-detail-back" onClick={onBack}>← Jobs</button><h2>{detail.job.label}</h2><p class="tv-muted">{jobStatusLine(detail.job)} · attempt {detail.job.attempt}</p><div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="log-level" onClick={() => setLevel(value => value === '' ? 'error' : value === 'error' ? 'warn' : '')}>Level: {level || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="log-attempt" onClick={() => setAttempt(value => value === '' ? String(detail.job.attempt) : '')}>Attempt: {attempt || 'all'}</button></div>{logs.length === 0 ? <p class="tv-muted">No logs match. Set Level and Attempt to all to see every entry.</p> : logs.map((log, index) => { const open = expanded === log.id; return <button type="button" aria-expanded={open} data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-log-${log.id}`} class={`job-log ${log.level} ${open ? 'expanded' : ''}`} onClick={() => setExpanded(value => value === log.id ? null : log.id)}><span class="job-log-heading"><strong>{log.phase} · {log.level}</strong><i>{open ? 'Hide details' : 'Show details'}</i></span><span>{new Date(log.createdAt).toLocaleString()} · attempt {log.attempt}</span><small>{log.message}</small>{open && <div class="job-log-expanded"><dl><dt>Job</dt><dd>{log.jobId}</dd><dt>Log entry</dt><dd>{log.id}</dd><dt>Attempt</dt><dd>{log.attempt}</dd></dl>{log.context && Object.keys(log.context).length > 0 ? <pre>{JSON.stringify(log.context, null, 2)}</pre> : <p>No structured context was recorded.</p>}</div>}</button> })}{detail.next && <button data-focus-region="content" data-focus-row={3 + logs.length} data-focus-col="0" data-focus-key="job-logs-older" onClick={() => void onOlder()}>Load older logs</button>}</section>
-}
-
-
-const TEST_NAMES: Record<string, string> = {
- filelist: 'FileList',
- qbittorrent: 'qBittorrent',
- storage: 'storage',
- ffmpeg: 'FFmpeg',
- ffprobe: 'FFprobe',
- tmdb: 'TMDB',
- subdl: 'SubDL',
- piratebay: 'Pirate Bay',
-};
-
-// Display label for engine values ('native' | 'qbittorrent') in saved-vs-running feedback.
-const engineName = (v: unknown) => (v === 'native' ? 'Native' : 'qBittorrent');
-// The TV never edits the engine selection, so the feedback is read-only: the
-// ownership explanation always renders, and the running notice appears only
-// when this process started with a different engine than the saved one. Old
-// servers without engineRunning render the static copy only.
-const engineFeedback = (value: Record<string, unknown>) => {
- const running = typeof value.engineRunning === 'string' ? value.engineRunning : '';
- const saved = String(value.downloadEngine ?? '');
- if (running === '' || running === saved) return '';
- return ` Running now: ${engineName(running)} — the saved selection (${engineName(saved)}) applies to new downloads after restart.`;
-};
-
-export function TVSettings({ api, onChangeServer, onForgetServer, updateStatus, onUpdateStatus, confirmOpen, onConfirmOpen, onConfirmClose, rebuildConfirmOpen, onRebuildConfirmOpen, onRebuildConfirmClose }: { api: API; onChangeServer: () => void; onForgetServer: () => void; updateStatus: UpdateStatus | null; onUpdateStatus: (status: UpdateStatus) => void; confirmOpen: boolean; onConfirmOpen: () => void; onConfirmClose: () => void; rebuildConfirmOpen: boolean; onRebuildConfirmOpen: () => void; onRebuildConfirmClose: () => void }) {
- const [value, setValue] = useState<Record<string, unknown> | null>(null); const [managed, setManaged] = useState<Set<string>>(new Set()); const [message, setMessage] = useState('Loading settings…');
- const [trackers, setTrackers] = useState<TrackerStatus[] | null>(null);
- const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
- const [coverage, setCoverage] = useState<{ observed: number; seeded: number } | null>(null);
- const [fetchMessage, setFetchMessage] = useState(''); const [rebuildMessage, setRebuildMessage] = useState(''); const [rebuilding, setRebuilding] = useState(false);
- const [checking, setChecking] = useState(false); const [applying, setApplying] = useState(false); const [updateMessage, setUpdateMessage] = useState('');
- const settingsMounted = useRef(true);
- useEffect(() => () => { settingsMounted.current = false; }, []);
- const openReleaseLink = async (url: string) => { const launched = await openExternalURL(url); if (!settingsMounted.current) return; if (!launched) setUpdateMessage('Open this address on another device: ' + url); };
- const refreshTrackers = () => {
-  const promise = typeof api.trackers === 'function' ? api.trackers() : api.call<TrackerStatus[]>('/trackers');
-  return promise.then(list => { if (settingsMounted.current) setTrackers(Array.isArray(list) ? list : null); }).catch(() => { if (settingsMounted.current) setTrackers(null); });
- };
+ // The detail replaces the job list, so the job row that had focus is gone: start on the back-to-Jobs button.
+ // Back closes the detail first (before the shell would open the rail); consumed on keydown so the
+ // shell's Back-on-keyup never starts.
+ const backButton = useRef<HTMLButtonElement | null>(null);
+ const latestBack = useRef(onBack); latestBack.current = onBack;
  useEffect(() => {
-  Promise.all([api.call<Record<string, unknown>>('/settings'), api.call<{ items: SettingsField[] }>('/settings/schema')]).then(([settings, schema]) => {
-   setValue(settings);
-   setManaged(new Set(schema.items.filter(field => field.readOnly).map(field => field.key)));
-   setMessage('');
-  }).catch(error => setMessage(error.message));
-  void refreshTrackers();
+  focusElement(backButton.current);
+  // With the rail open over the detail, Back closes the rail first (the shell's own Back).
+  const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back' || document.querySelector('.tv-app.menu-open')) return; event.preventDefault(); event.stopImmediatePropagation(); if (!event.repeat) latestBack.current() };
+  document.addEventListener('keydown', key, true);
+  return () => document.removeEventListener('keydown', key, true);
  }, []);
- // Read-only catalog coverage; a failed or malformed answer just leaves it out.
- useEffect(() => { api.call<Record<string, unknown>>('/catalog/status').then(status => { const observed = Number(status?.observedReleases); const seeded = Number(status?.discoverableReleases); if (settingsMounted.current && Number.isFinite(observed) && Number.isFinite(seeded)) setCoverage({ observed, seeded }) }).catch(() => { }) }, []);
- useEffect(() => {
-  if (!updateStatus?.applying) return;
-  const timer = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="update-check"]')), 0);
-  return () => window.clearTimeout(timer);
- }, [updateStatus?.applying]);
- async function save() {
-  if (!value) return;
-  const out = { ...value };
-  Object.keys(out).filter(key => key.endsWith('Configured') || key === 'settingsPath' || key === 'engineRunning').forEach(key => delete out[key]);
-  try {
-   await api.call('/settings', { method: 'PUT', body: JSON.stringify(out) });
-   setMessage('Settings saved. Restart the server to apply worker-limit changes.');
-   void refreshTrackers();
-  } catch (error) {
-   setMessage((error as Error).message);
-  }
- }
- async function test(name: string) { setMessage(`Testing ${TEST_NAMES[name] || name}…`); try { const result = await api.call<{ message: string }>(`/dependencies/${name}/test`, { method: 'POST' }); setMessage(result.message) } catch (error) { setMessage((error as Error).message) } }
- async function fetchLatest() { setFetchMessage('Queuing…'); try { const job = await api.syncCatalog('latest'); if (settingsMounted.current) setFetchMessage(`${job.label} queued. Follow it on Jobs.`) } catch (error) { if (settingsMounted.current) setFetchMessage((error as Error).message) } }
- async function rebuildCatalog() { if (rebuilding) return; setRebuilding(true); try { const job = await api.syncCatalog('rebuild'); if (settingsMounted.current) setRebuildMessage(`${job.label} queued. Follow it on Jobs.`) } catch (error) { if (settingsMounted.current) setRebuildMessage((error as Error).message) } finally { if (settingsMounted.current) setRebuilding(false); onRebuildConfirmClose() } }
- async function checkUpdate() {
-  if (checking) return;
-  setChecking(true); setUpdateMessage('Checking for updates…');
-  try { const next = await api.call<UpdateStatus>('/updates/check', { method: 'POST' }); onUpdateStatus(next); setUpdateMessage(next.available ? `Version ${next.latest} is available.` : 'The server is up to date.') } catch (error) { setUpdateMessage(`Update check failed: ${(error as Error).message}`) } finally { setChecking(false) }
- }
- async function applyUpdate() {
-  if (applying) return;
-  setApplying(true);
-  try {
-   const next = await api.call<UpdateStatus>('/updates/apply', { method: 'POST' });
-   onUpdateStatus(next);
-   setUpdateMessage(next.applying ? 'Update accepted. The server restarts; playback resumes when it is back.' : 'The server is already up to date.');
-  } catch (error) {
-   const outcome = updateApplyOutcome((error as Error & { status?: number }).status);
-   setUpdateMessage(outcome === 'conflict' ? `Update refused: ${(error as Error).message}` : `Update failed: ${(error as Error).message}`);
-  } finally { setApplying(false); onConfirmClose() }
- }
- const allDisabled = Boolean(trackers && trackers.length > 0 && trackers.every(item => !item.enabled));
-const host = (() => { try { return new URL(api.base).host } catch { return '' } })();
- const lockedNote = (key: string) => managed.has(key) && <small>Environment managed</small>;
- return <section class="tv-settings tv-settings-page"><h2>Playback</h2><p class="tv-muted">Language and watched settings for this household. API keys and file paths stay in browser Settings.</p>{value && <>
-  <div class="tv-safe-fields">
-   <label>Preferred audio language{lockedNote('preferredAudioLanguage')}<input disabled={managed.has('preferredAudioLanguage')} data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="setting-audio-primary" value={String(value.preferredAudioLanguage || 'en')} onInput={event => setValue({ ...value, preferredAudioLanguage: event.currentTarget.value })} /></label>
-   <label>Preferred subtitle language{lockedNote('preferredSubtitleLanguage')}<input disabled={managed.has('preferredSubtitleLanguage')} data-focus-region="content" data-focus-row="2" data-focus-col="0" data-focus-key="setting-subtitle-primary" value={String(value.preferredSubtitleLanguage || '')} onInput={event => setValue({ ...value, preferredSubtitleLanguage: event.currentTarget.value })} /></label>
-   <label>Fallback subtitle language{lockedNote('fallbackSubtitleLanguage')}<input disabled={managed.has('fallbackSubtitleLanguage')} data-focus-region="content" data-focus-row="3" data-focus-col="0" data-focus-key="setting-subtitle-fallback" value={String(value.fallbackSubtitleLanguage || '')} onInput={event => setValue({ ...value, fallbackSubtitleLanguage: event.currentTarget.value })} /></label>
-   <label>Mark as watched at (percent){lockedNote('watchedThresholdPercent')}<input disabled={managed.has('watchedThresholdPercent')} type="number" data-focus-region="content" data-focus-row="4" data-focus-col="0" data-focus-key="setting-watched" value={String(value.watchedThresholdPercent || 90)} onInput={event => setValue({ ...value, watchedThresholdPercent: Number(event.currentTarget.value) })} /></label>
-  </div>
-  <h3>Background work</h3>
-  <div class="tv-safe-fields">
-   <label>Concurrent background jobs{lockedNote('maxConcurrentJobs')}<input disabled={managed.has('maxConcurrentJobs')} type="number" min="1" max="20" data-focus-region="content" data-focus-row="5" data-focus-col="0" data-focus-key="setting-workers" value={String(value.maxConcurrentJobs || 10)} onInput={event => setValue({ ...value, maxConcurrentJobs: Number(event.currentTarget.value) })} /></label>
-   <label>Title refresh timeout (minutes){lockedNote('titleRefreshTimeoutMinutes')}<input disabled={managed.has('titleRefreshTimeoutMinutes')} type="number" min="5" max="120" data-focus-region="content" data-focus-row="6" data-focus-col="0" data-focus-key="setting-title-timeout" value={String(value.titleRefreshTimeoutMinutes || 30)} onInput={event => setValue({ ...value, titleRefreshTimeoutMinutes: Number(event.currentTarget.value) })} /></label>
-  </div>
-  <div class="tv-tracker-controls">
-   <h3>Trackers</h3>
-   <p class="tv-muted">Turning a tracker off hides its discovery. Existing downloads stay listed and playable.</p>
-   <button class={`tv-tracker-toggle ${value.fileListEnabled ? 'active' : ''}`} disabled={managed.has('fileListEnabled')} data-focus-region="content" data-focus-row="7" data-focus-col="0" data-focus-key="setting-filelist-enabled" aria-pressed={Boolean(value.fileListEnabled)} onClick={() => setValue({ ...value, fileListEnabled: !value.fileListEnabled })}>FileList: {value.fileListEnabled ? 'On' : 'Off'}{managed.has('fileListEnabled') && <small> · Environment managed</small>}</button>
-   <button class={`tv-tracker-toggle ${value.pirateBayEnabled ? 'active' : ''}`} disabled={managed.has('pirateBayEnabled')} data-focus-region="content" data-focus-row="8" data-focus-col="0" data-focus-key="setting-piratebay-enabled" aria-pressed={Boolean(value.pirateBayEnabled)} onClick={() => setValue({ ...value, pirateBayEnabled: !value.pirateBayEnabled })}>The Pirate Bay: {value.pirateBayEnabled ? 'On' : 'Off'}{managed.has('pirateBayEnabled') && <small> · Environment managed</small>}</button>
-   <div class="tv-tracker-readiness">{trackers === null ? <span class="tv-tracker-chip disabled">Trackers unavailable</span> : trackers.map(t => <span key={t.id} class={`tv-tracker-chip ${!t.enabled ? 'disabled' : t.configured ? 'ready' : 'setup'}`}>{t.name} · {!t.enabled ? 'disabled' : t.configured ? 'ready' : 'needs setup'}</span>)}{allDisabled && <span class="tv-tracker-zero-note">Zero trackers enabled; Downloads remain reachable.</span>}</div>
-   <div class="tv-safe-fields">
-    <label>The Pirate Bay website URL{lockedNote('pirateBayWebsiteUrl')}<input disabled={managed.has('pirateBayWebsiteUrl')} data-focus-region="content" data-focus-row="9" data-focus-col="0" data-focus-key="setting-piratebay-website" value={String(value.pirateBayWebsiteUrl || '')} onInput={event => setValue({ ...value, pirateBayWebsiteUrl: event.currentTarget.value })} /></label>
-    <label>The Pirate Bay API URL{lockedNote('pirateBayApiUrl')}<input disabled={managed.has('pirateBayApiUrl')} data-focus-region="content" data-focus-row="10" data-focus-col="0" data-focus-key="setting-piratebay-api" value={String(value.pirateBayApiUrl || '')} onInput={event => setValue({ ...value, pirateBayApiUrl: event.currentTarget.value })} /></label>
-   </div>
-  </div>
-  <p class="tv-muted">Selection controls new acquisitions. Existing downloads keep the engine that owns them.{engineFeedback(value)}</p>
-  <button class="primary" data-focus-region="content" data-focus-row={SETTINGS_SAVE_ROW} data-focus-col="0" data-focus-key="settings-save" onClick={() => void save()}>Save preferences</button>
- </>}<p class="tv-settings-message" role="status">{message}</p>
-  {updateStatus && <div class="tv-update-panel"><h3>Updates</h3><p>Version {updateStatus.currentVersion}{updateStatus.applying ? ' · installing an update' : updateStatus.available ? ' · update available' : updateStatus.selfUpdate ? ' · up to date' : ''}</p>{updateNoticeVisible(updateStatus) && <div class="tv-update-notice"><strong>{updateStatus.available ? `Version ${updateStatus.latest} is available.` : 'This server updates only by hand.'}</strong><p>Updates install on the server machine and interrupt playback on every connected player; this TV installs nothing itself.</p><button class="tv-release-link" data-focus-region="content" data-focus-row={UPDATE_RELEASE_LINK_ROW} data-focus-col="0" data-focus-key="update-release-link" onClick={() => void openReleaseLink(updateStatus.releasesUrl)}>{updateStatus.releasesUrl}</button></div>}</div>}
-  <div class="tv-diagnostics"><button class="tv-diagnostics-toggle" data-focus-region="content" data-focus-row={SETTINGS_DIAGNOSTICS_ROW} data-focus-col="0" data-focus-key="settings-diagnostics" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen(open => !open)}>{diagnosticsOpen ? 'Hide connection tests' : 'Connection tests'}</button>
-  {diagnosticsOpen && <><p class="tv-muted">Checks that the server can reach each service. The result appears under the Save button.</p><div class="tv-test-buttons">{['filelist', 'qbittorrent', 'storage', 'ffmpeg', 'ffprobe', 'tmdb', 'subdl', 'piratebay'].map((name, index) => <button data-focus-region="content" data-focus-row={SETTINGS_TEST_FIRST_ROW + Math.floor(index / 4)} data-focus-col={index % 4} data-focus-key={`test-${name}`} onClick={() => void test(name)}>Test {TEST_NAMES[name] || name}</button>)}</div></>}</div>
-  <div class="tv-catalog"><h2>Catalog</h2>{coverage && <p class="tv-muted"><strong>{coverage.observed.toLocaleString()}</strong> releases kept · <strong>{coverage.seeded.toLocaleString()}</strong> currently seeded</p>}<p class="tv-muted">Fetch latest pulls the newest releases from your trackers now instead of waiting for the hourly run. It runs in the background; follow it on Jobs.</p><button class="primary" data-focus-region="content" data-focus-row={SETTINGS_CATALOG_FETCH_ROW} data-focus-col="0" data-focus-key="catalog-fetch-latest" onClick={() => void fetchLatest()}>Fetch latest</button><p class="tv-muted" role="status">{fetchMessage}</p></div>
-  <div class="tv-server"><h2>Server</h2>{host && <p class="tv-server-line"><strong>{host}</strong></p>}
-  <div class="tv-server-actions"><button data-focus-region="content" data-focus-row={SETTINGS_CHANGE_SERVER_ROW} data-focus-col="0" data-focus-key="change-server" onClick={onChangeServer}>Change server address</button><button data-focus-region="content" data-focus-row={SETTINGS_FORGET_SERVER_ROW} data-focus-col="0" data-focus-key="forget-server" onClick={onForgetServer}>Forget this server</button>
-  <button data-focus-region="content" data-focus-row={UPDATE_APPLY_ROW} data-focus-col="0" data-focus-key="update-apply" disabled={updateApplyDisabled(updateStatus, applying)} onClick={onConfirmOpen}>{updateStatus?.applying || applying ? 'Installing…' : 'Install server update'}</button></div>
-  <p aria-live="polite">{updateMessage}</p></div>
-  <div class="tv-danger-zone"><h2>Danger zone</h2><p>Troubleshooting only. Rebuild catalog refreshes every enabled category's window and rebuilds the local projections. It is slow and heavy on your trackers and the server; use it only when something is broken.</p><button class="danger-button" data-focus-region="content" data-focus-row={SETTINGS_REBUILD_ROW} data-focus-col="0" data-focus-key="catalog-rebuild" onClick={onRebuildConfirmOpen}>Rebuild catalog</button><p class="tv-muted" role="status">{rebuildMessage}</p></div>
-  {confirmOpen && updateStatus && <section role="dialog" aria-modal="true" aria-labelledby="tv-update-confirm-heading" class="tv-settings tv-update-confirm"><h2 id="tv-update-confirm-heading">Install version {updateStatus.latest}?</h2><p>The server downloads the release, installs it, and restarts. Playback is interrupted on every connected device, including this TV.</p><div><button data-focus-region={UPDATE_DIALOG_REGION} data-focus-row="0" data-focus-col="0" data-focus-key="update-confirm-cancel" onClick={onConfirmClose}>Cancel</button><button class="danger-button" data-focus-region={UPDATE_DIALOG_REGION} data-focus-row="0" data-focus-col="1" data-focus-key="update-confirm-apply" disabled={applying} onClick={() => void applyUpdate()}>{applying ? 'Starting…' : 'Install and restart'}</button></div></section>}
-  {rebuildConfirmOpen && <section role="dialog" aria-modal="true" aria-labelledby="tv-rebuild-confirm-heading" class="tv-settings tv-rebuild-confirm"><h2 id="tv-rebuild-confirm-heading">Rebuild the catalog?</h2><p>This refreshes every enabled category's latest window and rebuilds the local projections over everything ever observed. It is slow and puts heavy load on your trackers and the server, so run it only when something is broken. Nothing is removed; follow the job on Jobs.</p><div><button data-focus-region={REBUILD_DIALOG_REGION} data-focus-row="0" data-focus-col="0" data-focus-key="rebuild-confirm-cancel" onClick={onRebuildConfirmClose}>Cancel</button><button class="danger-button" data-focus-region={REBUILD_DIALOG_REGION} data-focus-row="0" data-focus-col="1" data-focus-key="rebuild-confirm-apply" disabled={rebuilding} onClick={() => void rebuildCatalog()}>{rebuilding ? 'Starting…' : 'Rebuild now'}</button></div></section>}
- </section>;
+ // Row 0.5: below the header Refresh (row 0), above the log filters, so Up and Down both reach it.
+ return <section class="tv-list job-detail"><button ref={backButton} data-focus-region="content" data-focus-row="0.5" data-focus-col="0" data-focus-key="job-detail-back" onClick={onBack}><Icon name="chevron-left" />Jobs</button><h2>{jobWhatRan(detail.job)}</h2><p class="tv-muted">{jobStatusLine(detail.job)} · attempt {detail.job.attempt}</p><div class="tv-filters"><button data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="log-level" onClick={() => setLevel(value => value === '' ? 'error' : value === 'error' ? 'warn' : '')}>Level: {level || 'all'}</button><button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="log-attempt" onClick={() => setAttempt(value => value === '' ? String(detail.job.attempt) : '')}>Attempt: {attempt || 'all'}</button></div>{logs.length === 0 ? <p class="tv-muted">No logs match. Set Level and Attempt to all to see every entry.</p> : logs.map((log, index) => { const open = expanded === log.id; return <button type="button" aria-expanded={open} data-focus-region="content" data-focus-row={2 + index} data-focus-col="0" data-focus-key={`job-log-${log.id}`} class={`job-log ${log.level} ${open ? 'expanded' : ''}`} onClick={() => setExpanded(value => value === log.id ? null : log.id)}><span class="job-log-heading"><strong>{log.phase} · {log.level}</strong><i>{open ? 'Hide details' : 'Show details'}</i></span><span>{new Date(log.createdAt).toLocaleString()} · attempt {log.attempt}</span><small>{log.message}</small>{open && <div class="job-log-expanded"><dl><dt>Job</dt><dd>{log.jobId}</dd><dt>Log entry</dt><dd>{log.id}</dd><dt>Attempt</dt><dd>{log.attempt}</dd></dl>{log.context && Object.keys(log.context).length > 0 ? <pre>{JSON.stringify(log.context, null, 2)}</pre> : <p>No structured context was recorded.</p>}</div>}</button> })}{detail.next && <button data-focus-region="content" data-focus-row={3 + logs.length} data-focus-col="0" data-focus-key="job-logs-older" onClick={() => void onOlder()}>Load older logs</button>}</section>
 }
+
 
 // Promotion slot on the home route. It is one focus stop: OK hands the
 // creative's click URL to the platform browser (the server resolves
@@ -1185,17 +1244,20 @@ export function TVPromotions({ api }: { api: API }) {
  return <button class="tv-promo" data-focus-region="content" data-focus-row="95" data-focus-col="0" data-focus-key="promo" onClick={() => { void openExternalURL(url) }}><small>Advertisement</small>{/^https?:\/\//.test(promotion.image) && <img src={promotion.image} alt="" />}{promotion.title && <strong>{promotion.title}</strong>}{promotion.text && <p>{promotion.text}</p>}{promotion.link ? <code>{promotion.link}</code> : null}</button>;
 }
 
+// Poster card: the poster with its library-state badge, then the title (up to two lines) and one short fact.
 const TitleCard = memo(function TitleCard({ api, title, row, col, focusKey, seeders, focusRef, loadArt, onOpen }: { api: API; title: CatalogTitle; row: number; col: number; focusKey?: string; seeders?: boolean; focusRef?: { current: HTMLButtonElement | null }; loadArt: boolean; onOpen: (title: CatalogTitle) => void }) {
- return <button ref={focusRef} class="poster-card" data-landing="card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey || `title-${title.id}`} data-art={followArtURL(api, title)} onClick={() => onOpen(title)}>{title.posterUrl ? <PosterArt src={api.streamURL(title.posterUrl)} load={loadArt} /> : <div class="poster-fallback">{title.title.slice(0, 1)}</div>}<TVStateBadges state={title.libraryState} /><div class="poster-copy"><strong>{title.title}</strong><span>{cardMeta(title, { seeders })}</span></div></button>;
+ return <button ref={focusRef} class="poster-card" data-landing="card" data-focus-region="content" data-focus-row={row} data-focus-col={col} data-focus-key={focusKey || `title-${title.id}`} data-art={followArtURL(api, title)} onClick={() => onOpen(title)}><span class="card-art">{title.posterUrl ? <PosterArt src={api.streamURL(title.posterUrl)} load={loadArt} /> : <span class="poster-fallback">{title.title.slice(0, 1)}</span>}<TVStateBadges state={title.libraryState} compact /></span><span class="poster-copy"><strong>{title.title}</strong><span>{cardMeta(title, { seeders })}</span></span></button>;
 });
 function sourceActionLabel(source: CatalogSource) { return source.libraryState?.downloadState && source.libraryState.downloadState !== 'none' ? 'Play' : 'Play and download' }
+// The versions row, shared by the movie list and an episode's Versions view: one line of aligned columns (resolution, the
+// Best match slot, quality and codec, size and seeders in tabular figures, tracker and audio, library state and the action),
+// then the release and file name, which is evidence: its line is reserved and shows while the row has focus.
 function SourceButton({ source, row, onPlay, focusKey, region = 'content', best }: { source: CatalogSource; row: number; onPlay: (release: Release, fileIndex?: number) => void; focusKey?: string; region?: string; best?: boolean }) {
  const name = source.filePath || source.release.name;
- const secondary = [source.release.trackerName, source.parsed.audio].filter(Boolean).join(' · ');
- // The decision point: resolution, chips, size and seeders lead. Tracker and audio are secondary; the release and file name is evidence and shows only while the row has focus.
+ const tracker = [source.release.trackerName, source.parsed.audio].filter(Boolean).join(' · ');
  return <button class={`source-button ${best ? 'best' : ''}`} data-focus-region={region} data-focus-row={row} data-focus-col="0" data-focus-key={focusKey || `source-${source.release.id}-${source.fileIndex ?? -1}`} onClick={() => onPlay(source.release, source.fileIndex)}>
-  <span class="source-main"><b class="source-resolution">{sourceHeadline(source.parsed)}</b>{best ? <span class="source-best">Best match</span> : best === false && <span class="source-best-slot" aria-hidden="true" />}{sourceChips(source.parsed, source.release.category).map(chip => <span class="source-chip">{chip}</span>)}<span class="source-facts">{formatBytes(source.fileSizeBytes || source.release.sizeBytes)} · {source.release.seeders} seeders</span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b></span></span>
-  <span class="source-detail">{secondary && <span class="source-secondary">{secondary}</span>}<span class="source-filename" title={name}>{name}</span></span>
+  <span class="source-main"><b class="source-resolution">{sourceHeadline(source.parsed)}</b>{best ? <span class="source-best">Best match</span> : <span class="source-best-slot" aria-hidden="true" />}<span class="source-quality">{sourceChips(source.parsed, source.release.category).join(' · ')}</span><span class="source-size">{formatBytes(source.fileSizeBytes || source.release.sizeBytes)}</span><span class="source-seeders">{source.release.seeders} seeders</span><span class="source-tracker">{tracker}</span><span class="source-action"><TVStateBadges state={source.libraryState} /><b class="source-action-label">{sourceActionLabel(source)}</b></span></span>
+  <span class="source-detail"><span class="source-filename" title={name}>{name}</span></span>
  </button>;
 }
 
@@ -1227,6 +1289,12 @@ function defaultEpisodeOf(season: CatalogSeason | undefined, target: DetailTarge
  const saved = resume?.seasonNumber === season.number && resume.episodeNumber ? season.episodes.find(item => item.number === resume.episodeNumber) : undefined;
  return targeted || saved || season.episodes.find(item => item.libraryState?.watchState !== 'watched') || season.episodes[0];
 }
+// The version a saved resume points at, so the line under the actions can name it; undefined when the list no longer has it.
+function findSource(detail: CatalogDetail, item: HouseholdItem): CatalogSource | undefined {
+ const same = (source: CatalogSource) => source.release.id === item.release.id && (source.fileIndex ?? -1) === (item.fileIndex ?? -1);
+ const pool = detail.sources.concat(...detail.seasons.map(season => ([] as CatalogSource[]).concat(...season.episodes.map(episode => episode.sources))));
+ return pool.find(same) || pool.find(source => source.release.id === item.release.id);
+}
 const paneFocusable = (selector: string) => document.querySelector<HTMLElement>(selector);
 
 function TitleDetail({ api, detail, target, message, resume, initialVersions = '', restoreKey = '', onVersions, favorite, onClose, onFavorite, onResume, onPlay, onPackAction }: { api: API; detail: CatalogDetail; target: DetailTarget; message: string; resume?: HouseholdItem; initialVersions?: string; restoreKey?: string; onVersions?: (key: string) => void; favorite: boolean; onClose: () => void; onFavorite: (title: CatalogTitle, value: boolean) => void; onResume: (item: HouseholdItem) => void; onPlay: (release: Release, fileIndex?: number) => void; onPackAction: (source: CatalogSource, season: number, action: SeasonPackAction) => Promise<void | boolean> }) {
@@ -1241,6 +1309,15 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
  const [refreshing, setRefreshing] = useState(false);
  const [refreshNote, setRefreshNote] = useState('');
  const [infoOpen, setInfoOpen] = useState(false);
+ const [moreOpen, setMoreOpen] = useState(false);
+ // The provider's description (a movie's runtime, the certification) is asked once, a moment after the page shows; the facts line
+ // never waits on it, and the Info panel opens on the same answer instead of asking again.
+ const [titleInfo, setTitleInfo] = useState<TitleInfo | undefined>(undefined);
+ useEffect(() => {
+  let live = true;
+  const timer = window.setTimeout(() => { try { Promise.resolve(api.titleInfo(detail.title.id)).then(answer => { if (live && answer && answer.available) setTitleInfo(answer) }, () => { }) } catch { /* no Info support: the facts stay as they are */ } }, 400);
+  return () => { live = false; window.clearTimeout(timer) };
+ }, [detail.title.id]);
  const selected = detail.seasons.find(item => item.number === season);
  // Season info (stills, runtime, rating, synopsis) is asked once per season, a moment after the season shows, and kept for the page.
  // The page never waits on it: without an answer every row and block falls back to what the title detail holds.
@@ -1261,7 +1338,15 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
  const art = useListArtReach();
  useEffect(() => { art.reset() }, [season, opened]);
  useEffect(() => {
-  const focused = (event: FocusEvent) => { const row = (event.target as HTMLElement | null)?.closest?.('[data-art-index]') as HTMLElement | null; if (row) art.focus(Number(row.dataset.artIndex)) };
+  // The episode list keeps the focused row in its middle (the board's E03 above, E04 focused, E05 below), so a row
+  // never sits cut off at the list's top edge; one scroll write, the row and list sizes come from the layout already done.
+  const focused = (event: FocusEvent) => {
+   const target = event.target as HTMLElement | null;
+   const row = target?.closest?.('[data-art-index]') as HTMLElement | null;
+   if (row) art.focus(Number(row.dataset.artIndex));
+   const pane = target && target.dataset && target.dataset.focusRegion === 'episodes' ? target.closest('.episode-pane') as HTMLElement | null : null;
+   if (pane) pane.scrollTop = centredScrollTop({ top: target!.offsetTop, height: target!.offsetHeight }, { height: pane.clientHeight, scrollHeight: pane.scrollHeight });
+  };
   document.addEventListener('focusin', focused);
   return () => document.removeEventListener('focusin', focused);
  }, []);
@@ -1285,21 +1370,32 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
  const timer = useRef(0);
  const focusIntent = useRef<'' | 'versions' | 'list'>('');
  const returnKey = useRef('');
- const focusVersions = () => { const first = paneFocusable('[data-focus-region="versions"]') || paneFocusable(`[data-focus-key="season-${season}"]`); if (first) focusElement(first) };
+ // The page scroll a view change sets: the Versions view opens with the season pills at the safe edge (the header steps away),
+ // and the list state, which fits the screen, returns the page to its top so the header shows again.
+ const scrollPage = (view: HTMLElement | null) => { const screen = document.querySelector<HTMLElement>('.detail-screen'); if (screen) screen.scrollTop = view ? Math.max(0, view.offsetTop - (parseFloat(getComputedStyle(screen).paddingTop) || 0)) : 0 };
+ const focusVersions = () => { scrollPage(paneFocusable('.season-browser')); const first = paneFocusable('[data-focus-region="versions"]') || paneFocusable(`[data-focus-key="season-${season}"]`); if (first) focusElement(first) };
  // Open the Versions view for an episode; focus follows its render, on the Best match.
  const openVersions = (key: string) => { window.clearTimeout(timer.current); focusIntent.current = 'versions'; setPicked(key); setOpened(key) };
  // Back to the episode list, focused on the episode the view was opened from.
  const closeVersions = () => { if (!openedValid) return; window.clearTimeout(timer.current); returnKey.current = opened; focusIntent.current = 'list'; setOpened('') };
  useEffect(() => {
   if (focusIntent.current === 'versions' && openedValid) { focusIntent.current = ''; focusVersions() }
-  else if (focusIntent.current === 'list' && !openedValid) { focusIntent.current = ''; focusElement(paneFocusable(`[data-episode-key="${returnKey.current}"]`) || paneFocusable('[data-focus-region="episodes"]')) }
+  else if (focusIntent.current === 'list' && !openedValid) { focusIntent.current = ''; scrollPage(null); focusElement(paneFocusable(`[data-episode-key="${returnKey.current}"]`) || paneFocusable('[data-focus-region="episodes"]')) }
  });
+ // A list that appears (the page opens, another season, back from Versions) shows its selected episode in the middle,
+ // as the board does, even before the cursor goes there; once the cursor is in the list, focus keeps it centred.
+ useEffect(() => {
+  if (versionsShown) return;
+  const row = paneFocusable('.episode-pane .episode-tile.selected');
+  const pane = row ? row.closest('.episode-pane') as HTMLElement | null : null;
+  if (row && pane && !pane.contains(document.activeElement)) pane.scrollTop = centredScrollTop({ top: row.offsetTop, height: row.offsetHeight }, { height: pane.clientHeight, scrollHeight: pane.scrollHeight });
+ }, [season, versionsShown]);
  useEffect(() => { onVersions?.(openedValid ? opened : '') }, [opened, openedValid]);
  useEffect(() => () => { window.clearTimeout(timer.current); onVersions?.('') }, []);
  const scheduleSelect = (key: string) => { window.clearTimeout(timer.current); if (key === selectedKey) return; timer.current = window.setTimeout(() => setPicked(key), 150) };
  const chooseVersion = () => { if (detail.seasons.length === 0) { focusElement(document.querySelector<HTMLElement>('.source-button')); return } const key = playEpisode ? episodeKeyOf(playEpisode) : selectedKey; if (key) openVersions(key); else focusVersions() };
  // A page restored into its Versions view lands on the version the viewer left from, else the Best match, instead of the hero.
- useEffect(() => { const t = window.setTimeout(() => { const back = initialVersions && restoreKey ? paneFocusable(`[data-focus-region="versions"][data-focus-key="${CSS.escape(restoreKey)}"]`) : null; focusElement(back || (initialVersions ? paneFocusable('[data-focus-region="versions"]') : null) || document.querySelector<HTMLElement>('[data-detail-initial]')) }, 0); return () => window.clearTimeout(t); }, []);
+ useEffect(() => { const t = window.setTimeout(() => { const back = initialVersions && restoreKey ? paneFocusable(`[data-focus-region="versions"][data-focus-key="${CSS.escape(restoreKey)}"]`) : null; if (initialVersions) scrollPage(paneFocusable('.season-browser')); focusElement(back || (initialVersions ? paneFocusable('[data-focus-region="versions"]') : null) || document.querySelector<HTMLElement>('[data-detail-initial]')) }, 0); return () => window.clearTimeout(t); }, []);
  useEffect(() => { if (!pendingPack) return; const t = window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="season-pack-delete-cancel"]')), 0); return () => window.clearTimeout(t) }, [pendingPack]);
  const closePackDialog = () => { const pack = pendingPack; setPendingPack(null); if (pack) window.setTimeout(() => focusElement(document.querySelector<HTMLElement>(`[data-focus-key="season-pack-${pack.release.id}-delete"]`)), 0) };
  useEffect(() => { if (!pendingPack) return; const key = (event: KeyboardEvent) => { if (remoteAction(event.key, event.keyCode) !== 'back') return; event.preventDefault(); event.stopImmediatePropagation(); if (!deleting) closePackDialog() }; document.addEventListener('keydown', key, true); return () => document.removeEventListener('keydown', key, true) }, [pendingPack, deleting]);
@@ -1340,35 +1436,42 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
   try { await api.refreshTitle(detail.title.id, detail.title.title, true) } catch (e) { setRefreshNote((e as Error).message) } finally { setRefreshing(false) }
  };
  const packs = selected?.packSources || [];
+ const resumeSource = resume ? findSource(detail, resume) : undefined;
+ const plays = playsLine({ source: resume ? resumeSource : firstSource, resume, kind: detail.title.kind });
+ const playLabel = firstSource ? { action: sourceActionLabel(firstSource), version: [firstSource.parsed?.resolution, firstSource.parsed?.quality].filter(Boolean).join(' ') } : { action: '', version: '' };
+ const rating = cardRating(detail.title);
+ const facts: Array<string | JSX.Element> = [releaseLine(detail.title), detail.title.kind === 'series' ? '' : formatRuntime(titleInfo?.runtimeMinutes), (detail.title.genres || []).slice(0, 3).join(', ')].filter(Boolean);
+ if (rating) facts.push(<b class="tv-rating" aria-label={`Rated ${rating}`}><Icon name="star" />{rating}</b>);
+ if (titleInfo?.certification) facts.push(<span class="detail-certification">{titleInfo.certification}</span>);
  const paneSources = openedEpisode ? rankSources(openedEpisode.sources, { season: openedEpisode.season, episode: openedEpisode.number }) : [];
  const unknownSources: CatalogSource[] = [];
  if (unknownKey && openedValid && opened === unknownKey && selected?.unknown) selected.unknown.forEach(episode => episode.sources.forEach(source => unknownSources.push(source)));
  const code = (value: number) => (value < 10 ? '0' : '') + value;
  const paneTitle = openedEpisode ? `S${code(openedEpisode.season)} · E${code(openedEpisode.number)} · ${openedEpisode.title}` : openedValid && selected ? `S${code(selected.number)} · Unknown episodes` : selected ? `Season ${selected.number}` : '';
  const packBase = Math.max(paneSources.length, unknownSources.length);
- return <main class="detail-screen">
+ return <main class={`detail-screen${detail.seasons.length > 0 ? ' series-page' : ''}`}>
   <Backdrop initial={artURL(api, detail.title)} follow={false} sharp posterOnly={!detail.title.backdropUrl && !!detail.title.posterUrl} />
-  <button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}>Back</button>
+  <button data-focus-region="content" data-focus-row="0" data-focus-col="0" data-focus-key="detail-back" onClick={onClose}><Icon name="chevron-left" />Back</button>
   <div class="detail-copy">
-   <span class="eyebrow">{heroFacts(detail.title).join(' · ')}</span>
+   <span class="detail-kind">{titleKind(detail.title)}</span>
    <h1>{detail.title.title}</h1>
-   {detail.title.genres && detail.title.genres.length > 0 && <p class="detail-genres">{detail.title.genres.join(' · ')}</p>}
+   {facts.length > 0 && <p class="detail-facts">{facts.map((fact, index) => <Fragment key={index}>{index > 0 && <i class="detail-dot" aria-hidden="true">·</i>}{fact}</Fragment>)}</p>}
    <TVStateBadges state={detail.title.libraryState} />
-   <p class="detail-overview">{detail.title.overview || 'No description yet. Pick a version to play.'}</p>
+   {/* A series page leaves the overview to Info (the "Series page" board), so its seasons and episodes sit on the first screen. */}
+   {detail.seasons.length === 0 && <p class="detail-overview">{detail.title.overview || 'No description yet. Pick a version to play.'}</p>}
    <div class="detail-actions">
-    {resume ? <button class="primary" data-detail-initial data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onResume(resume)} aria-label={`${resumeActionLabel(resume, detail.title.kind)} at saved position`}>{resumeActionLabel(resume, detail.title.kind)}</button> : firstSource && <button class="primary" data-detail-initial data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onPlay(firstSource.release, firstSource.fileIndex)}>{playActionLabel(firstSource)}</button>}
+    {resume ? <button class="primary" data-detail-initial data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onResume(resume)} aria-label={`${resumeActionLabel(resume, detail.title.kind)} from ${formatTime(resume.positionMs)}`}><Icon name="play" />{resumeActionLabel(resume, detail.title.kind)}<span class="detail-primary-note"> from {formatTime(resume.positionMs)}</span></button> : firstSource && <button class="primary" data-detail-initial data-focus-region="content" data-focus-row="1" data-focus-col="0" data-focus-key="detail-playback" onClick={() => onPlay(firstSource.release, firstSource.fileIndex)}><Icon name="play" />{playLabel.action}{playLabel.version && <span class="detail-primary-note">{` · ${playLabel.version}`}</span>}</button>}
     {firstSource && <button data-focus-region="content" data-focus-row="1" data-focus-col="1" data-focus-key="detail-versions" onClick={chooseVersion}>Choose version</button>}
-    <button data-detail-initial={resume || firstSource ? undefined : true} data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="detail-favorite" aria-pressed={favorite} onClick={() => onFavorite(detail.title, !favorite)}>{favorite ? 'In My List' : 'Add to My List'}</button>
-    <button data-focus-region="content" data-focus-row="1" data-focus-col="3" data-focus-key="detail-refresh" aria-disabled={refreshing ? 'true' : undefined} aria-label="Refresh data: fetches fresh series information from the metadata providers and searches all trackers again, then rebuilds the episode list." onClick={() => void refresh()}>{refreshing ? 'Refreshing…' : 'Refresh data'}</button>
-    <button data-focus-region="content" data-focus-row="1" data-focus-col="4" data-focus-key="detail-info" aria-haspopup="dialog" onClick={() => setInfoOpen(true)}>Info</button>
+    <button class="detail-icon" data-detail-initial={resume || firstSource ? undefined : true} data-focus-region="content" data-focus-row="1" data-focus-col="2" data-focus-key="detail-favorite" aria-pressed={favorite} aria-label={favorite ? 'In My List' : 'Add to My List'} onClick={() => onFavorite(detail.title, !favorite)}><Icon name={favorite ? 'check' : 'plus'} /></button>
+    <button class="detail-icon" data-focus-region="content" data-focus-row="1" data-focus-col="4" data-focus-key="detail-info" aria-haspopup="dialog" aria-label="Info" onClick={() => setInfoOpen(true)}><Icon name="info" /></button>
+    <button class="detail-icon" data-focus-region="content" data-focus-row="1" data-focus-col="5" data-focus-key="detail-more" aria-haspopup="dialog" aria-label="More: Refresh data" onClick={() => setMoreOpen(true)}><Icon name="more" /></button>
    </div>
-   {resume && <small class="resume-file">{resumeLine(resume, detail.title.kind)}</small>}
+   {plays && <p class="detail-plays">{plays}</p>}
   </div>
   {message && <p class="detail-message" aria-live="polite">{message}</p>}
-  {refreshNote && <p class="detail-message" role="alert">{refreshNote}</p>}
+  {refreshNote && !moreOpen && <p class="detail-message" role="alert">{refreshNote}</p>}
   {detail.seasons.length > 0 && <section class="season-browser">
-   <h2>Seasons</h2>
-   <div class="season-tabs">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { window.clearTimeout(timer.current); setSeason(item.number); setPicked(''); setOpened('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
+   <div class="season-tabs" role="group" aria-label="Seasons">{detail.seasons.map((item, index) => <button key={item.number} data-focus-region="content" data-focus-row="2" data-focus-col={index} data-focus-key={`season-${item.number}`} class={season === item.number ? 'active' : ''} onClick={() => { window.clearTimeout(timer.current); setSeason(item.number); setPicked(''); setOpened('') }}><span>Season {item.number}</span><TVStateBadges state={item.libraryState} /></button>)}</div>
    {versionsShown ? <section class="versions-view" aria-label="Versions">
     <header class="versions-head"><h3 class="versions-title"><span class="versions-label">Versions</span> · {paneTitle}</h3></header>
     {openedValid && <p class="info-crumbs" aria-label="You are here">{(openedEpisode ? infoCrumbs(detail.title.title, [{ kind: 'episode', season: openedEpisode.season, episode: openedEpisode.number }]) : [detail.title.title, `Season ${selected!.number}`, 'Unknown episodes']).join(' › ')}</p>}
@@ -1392,38 +1495,40 @@ function TitleDetail({ api, detail, target, message, resume, initialVersions = '
     </div>
    </section> : <div class="season-panes">
     <div class="episode-column">
-    <h3 class="episode-heading"><span class="episode-heading-label">Episodes</span> · Season {season}</h3>
     <div class="episode-pane" role="list" aria-label={`Season ${season} episodes`}>
      {selected && selected.episodes.length === 0 && !unknownKey ? <p class="episode-loading" role="status">Preparing the individual episode list. This page updates by itself when it is ready.</p> : selected?.episodes.map((episode, index) => {
       const key = episodeKeyOf(episode);
       const chosen = selectedKey === key;
-      const episodeState = episode.libraryState;
-      const progress = episodeState && episodeState.watchState !== 'watched' && episodeState.positionMs ? watchProgress({ positionMs: episodeState.positionMs, durationMs: episodeState.durationMs || 0 }) : 0;
+      const libraryState = episode.libraryState;
+      const progress = libraryState && libraryState.watchState !== 'watched' && libraryState.positionMs ? watchProgress({ positionMs: libraryState.positionMs, durationMs: libraryState.durationMs || 0 }) : 0;
       const page = episodePageView(episode.season, episode, infoOf(episode));
       const still = page.stillUrl || titleArt;
-      // One row in the Info panel's episode style: still, code and name, facts, and the chevron that says "opens".
+      const state = episodeState(libraryState, progress);
+      // One row of the "Series page" board: the still (with the progress bar on it while the episode is under way), the code
+      // and name, the facts line, a two-line synopsis, the one library-state word and the chevron that says "opens".
       return <article key={key} role="listitem" class="episode-row">
        <button class={`info-stop info-row episode-tile ${chosen ? 'selected' : ''}`} aria-current={chosen ? 'true' : undefined} data-episode-key={key} data-art-index={index} data-focus-region="episodes" data-focus-row={index} data-focus-col="0" data-focus-key={`episode-${key}`} onFocus={() => scheduleSelect(key)} onClick={() => openVersions(key)}>
-        <span class="info-still-small" aria-hidden="true">{still && inReach(art.reach, index) && <img src={api.streamURL(still)} alt="" onError={hideImage} />}</span>
-        <span class="info-row-copy"><b>{episode.number ? `E${episode.number < 10 ? '0' : ''}${episode.number} · ` : ''}{episode.title}</b><small>{episodeMeta(episode, page, progress)}</small>{page.overview && <span class="episode-synopsis">{page.overview}</span>}{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
-        <TVStateBadges state={episode.libraryState} />
-        <span class="info-chevron" aria-hidden="true">›</span>
+        <span class="info-still-small" aria-hidden="true">{still && inReach(art.reach, index) && <img src={api.streamURL(still)} alt="" onError={hideImage} />}{progress > 0 && <span class="episode-progress"><b style={{ width: `${progress}%` }} /></span>}</span>
+        <span class="info-row-copy"><b>{episode.number ? <><span class="episode-code">{`E${episode.number < 10 ? '0' : ''}${episode.number}`}</span>{' '}</> : ''}{episode.title}</b><small>{episodeMeta(episode, page)}</small>{page.overview && <span class="episode-synopsis">{page.overview}</span>}</span>
+        {state && <span class={`episode-state ${state.tone}`}>{state.text}</span>}
+        <Icon name="chevron-right" class="info-chevron" />
        </button>
       </article>;
      })}
      {selected && unknownKey && <article key={unknownKey} role="listitem" class="episode-row unknown-group">
       <button class={`info-stop info-row episode-tile ${selectedKey === unknownKey ? 'selected' : ''}`} aria-current={selectedKey === unknownKey ? 'true' : undefined} data-episode-key={unknownKey} data-focus-region="episodes" data-focus-row={selected.episodes.length} data-focus-col="0" data-focus-key={unknownKey} onFocus={() => scheduleSelect(unknownKey)} onClick={() => openVersions(unknownKey)}>
        <span class="info-row-copy"><b>Unknown episodes ({selected.unknown!.length})</b><small>Files without episode information</small></span>
-       <span class="info-chevron" aria-hidden="true">›</span>
+       <Icon name="chevron-right" class="info-chevron" />
       </button>
      </article>}
     </div>
     </div>
    </div>}
   </section>}
-  {detail.seasons.length === 0 && detail.sources.length === 0 && <section class="source-list"><EmptyState title="No versions yet">The trackers have no release for this title right now. Press Refresh data to search them again.</EmptyState></section>}
-  {detail.seasons.length === 0 && detail.sources.length > 0 && <section class="source-list"><h2>Versions</h2>{detail.sources.map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={2 + index} onPlay={onPlay} />)}</section>}
-  {infoOpen && <TitleInfoPanel api={api} title={detail.title} onClose={() => { setInfoOpen(false); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="detail-info"]')), 0) }} />}
+  {detail.seasons.length === 0 && detail.sources.length === 0 && <section class="source-list"><EmptyState title="No versions yet">The trackers have none for this title now; choose More, then Refresh data, to search them again.</EmptyState></section>}
+  {detail.seasons.length === 0 && detail.sources.length > 0 && <section class="source-list" aria-label="Versions"><header class="source-list-head"><h2>Versions</h2><span>{`${detail.sources.length} available · best first`}</span></header>{rankSources(detail.sources).map((source, index) => <SourceButton key={`${source.release.id}:${source.fileIndex ?? -1}`} source={source} row={2 + index} best={index === 0} onPlay={onPlay} />)}</section>}
+  {moreOpen && <MoreMenu title={detail.title.title} returnKey="detail-more" message={refreshNote} onClose={() => setMoreOpen(false)} items={[{ key: 'refresh', label: 'Refresh data', busy: refreshing, busyLabel: 'Refreshing…', detail: detail.title.kind === 'series' ? 'Fetch fresh series information and search every tracker again, then rebuild the episode list.' : 'Fetch fresh information and search every tracker again for new versions.', onSelect: () => void refresh() }]} />}
+  {infoOpen && <TitleInfoPanel api={api} title={detail.title} initialInfo={titleInfo} onClose={() => { setInfoOpen(false); window.setTimeout(() => focusElement(document.querySelector<HTMLElement>('[data-focus-key="detail-info"]')), 0) }} />}
   {pendingPack && <section role="dialog" aria-modal="true" aria-labelledby="tv-season-pack-delete-heading" class="tv-settings tv-removal-confirm tv-season-pack-confirm"><h2 id="tv-season-pack-delete-heading">Delete season download?</h2><strong>Season {selected?.number}</strong><p>{pendingPack.release.name} · {pendingPack.release.trackerName}</p><p>This permanently deletes the season download and every episode file in it. You can download the season again later.</p><button aria-disabled={deleting ? 'true' : undefined} data-focus-region="season-pack-dialog" data-focus-row="0" data-focus-col="0" data-focus-key="season-pack-delete-cancel" onClick={() => { if (!deleting) closePackDialog() }}>Cancel</button><button aria-disabled={deleting ? 'true' : undefined} class="danger-button" data-focus-region="season-pack-dialog" data-focus-row="1" data-focus-col="0" data-focus-key="season-pack-delete-confirm" onClick={() => void confirmDelete()}>{deleting ? 'Deleting…' : 'Delete download'}</button></section>}
  </main>;
 }
@@ -1443,6 +1548,8 @@ export function App() {
  const statusStore = useRef<StatusStore | null>(null);
  if (!statusStore.current) statusStore.current = createStatusStore();
  const setStatus = statusStore.current.set;
+ const connectionStore = useRef<StatusStore | null>(null);
+ if (!connectionStore.current) connectionStore.current = createStatusStore();
  const [portal, setPortal] = useState<PortalState | null>(null);
  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
  type PrepareAttempt =
@@ -1601,6 +1708,7 @@ export function App() {
    stream.onopen = () => {
     failures = 0;
     setStatus('Server connected');
+    connectionStore.current?.set(CONNECTED);
     // Reconnect recovery: refetch both snapshots and drop replayed
     // portal/update events until the fresh state has landed, so a stale
     // replay can never override what the server reports now.
@@ -1615,7 +1723,7 @@ export function App() {
    stream.addEventListener('portal.state', portalStateEvent as EventListener);
    stream.addEventListener('updates.status', updateStatusEvent as EventListener);
    stream.addEventListener('updates.failed', updateFailedEvent as EventListener);
-   stream.onerror = () => { stream?.close(); if (stopped || suspended) return; failures++; const delay = Math.min(30_000, 1000 * Math.pow(2, Math.min(5, failures - 1))); setStatus(`Server connection lost. Reconnecting in ${Math.ceil(delay / 1000)}s…`); void api.diagnostic('warn', 'TV event stream disconnected', { attempt: failures }).catch(() => { }); window.clearTimeout(timer); timer = window.setTimeout(open, delay); };
+   stream.onerror = () => { stream?.close(); if (stopped || suspended) return; failures++; const delay = Math.min(30_000, 1000 * Math.pow(2, Math.min(5, failures - 1))); const lost = `Server connection lost. Reconnecting in ${Math.ceil(delay / 1000)}s…`; setStatus(lost); connectionStore.current?.set(lost); void api.diagnostic('warn', 'TV event stream disconnected', { attempt: failures }).catch(() => { }); window.clearTimeout(timer); timer = window.setTimeout(open, delay); };
   };
   const disposeVisibility = onAppVisibilityChange(visible => {
    window.clearTimeout(timer);
@@ -1647,7 +1755,7 @@ export function App() {
  }, [api]);
  if (player && api) return <Player key={player.download.id} api={api} download={player.download} resumeMs={player.resumeMs} preferences={player.preferences} onStateChanged={() => loadState()} onComplete={advanceEpisode} onEpisode={switchEpisode} onClose={() => setPlayer(null)} />;
  if (!api) return <SetupWithStatus store={statusStore.current} draft={draft} server={server} onDraft={setDraft} onConnect={url => void connect(url)} onForget={() => { localStorage.removeItem(STORAGE); setServer(''); setDraft(''); setStatus('Saved server forgotten.') }} />;
- return <Catalog api={api} statusStore={statusStore.current} titles={titles} facets={facets} household={household} downloads={downloads} jobs={jobs} restoreFocus={navSnapshot.current ? navSnapshot.current.focusKey : catalogFocus.current} initialNav={navSnapshot.current || undefined} onNav={snapshot => { navLive.current = snapshot }} portal={portal} updateStatus={updateStatus} onUpdateStatus={setUpdateStatus} onFocus={key => { catalogFocus.current = key; }} onRetry={() => void connect(server)} onChangeServer={() => { cancelPrepare(); navSnapshot.current = null; setAPI(null); }} onForgetServer={() => { cancelPrepare(); navSnapshot.current = null; localStorage.removeItem(STORAGE); setAPI(null); setServer(''); setDraft(''); }} onPlay={play} onPlayDownload={download => { rememberNav(catalogFocus.current); void api.playback(download.id).then(value => setPlayer({ download, resumeMs: value.watched ? 0 : value.positionMs })).catch(() => setPlayer({ download, resumeMs: 0 })) }} onManageDownload={manageDownload} onManageSeasonPack={manageSeasonPack} onRefreshDownloads={refreshDownloads} onFavorite={favorite} preparing={preparing} onCancelPrepare={cancelPrepare} onRetryPrepare={retryPrepare} />;
+ return <Catalog api={api} statusStore={statusStore.current} connectionStore={connectionStore.current} titles={titles} facets={facets} household={household} downloads={downloads} jobs={jobs} restoreFocus={navSnapshot.current ? navSnapshot.current.focusKey : catalogFocus.current} initialNav={navSnapshot.current || undefined} onNav={snapshot => { navLive.current = snapshot }} portal={portal} updateStatus={updateStatus} onUpdateStatus={setUpdateStatus} onFocus={key => { catalogFocus.current = key; }} onRetry={() => void connect(server)} onChangeServer={() => { cancelPrepare(); navSnapshot.current = null; setAPI(null); }} onForgetServer={() => { cancelPrepare(); navSnapshot.current = null; localStorage.removeItem(STORAGE); setAPI(null); setServer(''); setDraft(''); }} onPlay={play} onPlayDownload={download => { rememberNav(catalogFocus.current); void api.playback(download.id).then(value => setPlayer({ download, resumeMs: value.watched ? 0 : value.positionMs })).catch(() => setPlayer({ download, resumeMs: 0 })) }} onManageDownload={manageDownload} onManageSeasonPack={manageSeasonPack} onRefreshDownloads={refreshDownloads} onFavorite={favorite} preparing={preparing} onCancelPrepare={cancelPrepare} onRetryPrepare={retryPrepare} />;
 }
 
 try {

@@ -2,6 +2,7 @@
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 
 // The Categories pages show Category families as wide image tiles. Opening one lists its titles with
 // a chip per raw tracker category; Back returns to the tile that opened it.
@@ -74,16 +75,16 @@ describe('Categories pages show Category families', () => {
     vi.restoreAllMocks();
   });
 
-  const openRoute = async (menuKey: string) => {
+  const openScreen = async (menuKey: string) => {
     render(h(App, null), container);
     await wait(120);
-    container.querySelector<HTMLButtonElement>(`[data-focus-key="menu-${menuKey}"]`)!.click();
+    await openRoute(container, menuKey, 0);
     await wait();
   };
   const tile = (key: string) => container.querySelector<HTMLButtonElement>(`[data-focus-key="family-${key}"]`)!;
 
   it('draws one wide tile per family with the name, count and newest title', async () => {
-    await openRoute('categories');
+    await openScreen('categories');
     const tiles = Array.from(container.querySelectorAll<HTMLButtonElement>('.family-tile'));
     expect(tiles.map(t => t.querySelector('strong')!.textContent)).toEqual(['Movies', 'Series', '4K & UHD', 'Anime']);
     expect(tiles[0].textContent).toContain('12 titles');
@@ -93,7 +94,7 @@ describe('Categories pages show Category families', () => {
   });
 
   it('lays the tiles out for the D-pad and tags them as landing cards', async () => {
-    await openRoute('categories');
+    await openScreen('categories');
     const tiles = Array.from(container.querySelectorAll<HTMLButtonElement>('.family-tile'));
     expect(tiles.every(t => t.classList.contains('poster-card') && t.dataset.focusRegion === 'content')).toBe(true);
     expect(tiles.map(t => [t.dataset.focusRow, t.dataset.focusCol])).toEqual([['1', '0'], ['1', '1'], ['1', '2'], ['2', '0']]);
@@ -101,7 +102,7 @@ describe('Categories pages show Category families', () => {
   });
 
   it('loads tile art through the server and keeps the tile when a family has only bundled art', async () => {
-    await openRoute('categories');
+    await openScreen('categories');
     const images = Array.from(container.querySelectorAll<HTMLImageElement>('.family-tile img'));
     expect(images.length).toBeGreaterThan(0);
     expect(images[0].getAttribute('src')).toBe('http://server.lan:8097/api/v1/artwork/t-movies/backdrop');
@@ -110,7 +111,7 @@ describe('Categories pages show Category families', () => {
   });
 
   it('opens a family with its titles and one chip per raw category, and Back returns to the tile', async () => {
-    await openRoute('categories');
+    await openScreen('categories');
     tile('series').click();
     await wait();
     expect(requests.some(url => url.includes('/catalog/titles') && url.includes('family=series'))).toBe(true);
@@ -126,7 +127,7 @@ describe('Categories pages show Category families', () => {
   });
 
   it('narrows to one raw category with a chip', async () => {
-    await openRoute('categories');
+    await openScreen('categories');
     tile('movies').click();
     await wait();
     container.querySelector<HTMLButtonElement>('[data-focus-key="family-chip-Movies Blu-Ray"]')!.click();
@@ -136,7 +137,7 @@ describe('Categories pages show Category families', () => {
   });
 
   it('shows the library families on My Library > Categories and opens one', async () => {
-    await openRoute('library-categories');
+    await openScreen('library-categories');
     expect(container.querySelectorAll('.family-tile').length).toBe(1);
     expect(container.querySelector('.family-tile')!.textContent).toContain('1 item');
     tile('movies').click();
@@ -148,8 +149,35 @@ describe('Categories pages show Category families', () => {
     expect((document.activeElement as HTMLElement | null)?.dataset.focusKey).toBe('family-movies');
   });
 
+  it('lays the titles of a family out as a grid seven to a line, with Show more titles on the line under it', async () => {
+    const nine = Array.from({ length: 9 }, (_, index) => title(`t${index}`, `Title ${index}`));
+    const base = (globalThis.fetch as ReturnType<typeof vi.fn>).getMockImplementation() as (input: RequestInfo | URL) => Promise<unknown>;
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => String(input).includes('/catalog/titles?') && String(input).includes('family=movies') ? respond({ items: nine, nextCursor: 'more', total: 20 }) : base(input));
+    await openScreen('categories');
+    tile('movies').click();
+    await wait();
+    const cards = Array.from(container.querySelectorAll<HTMLElement>('[data-focus-key^="family-title-"]'));
+    expect(cards.map(card => `${card.dataset.focusRow}:${card.dataset.focusCol}`)).toEqual(['10:0', '10:1', '10:2', '10:3', '10:4', '10:5', '10:6', '11:0', '11:1']);
+    const more = container.querySelector<HTMLElement>('[data-focus-key="family-more"]')!;
+    expect(more.dataset.focusRow).toBe('12');
+  });
+
+  it('marks the selected category chip with a check as well as the fill', async () => {
+    await openScreen('categories');
+    tile('movies').click();
+    await wait();
+    const chip = (category: string) => container.querySelector<HTMLButtonElement>(`[data-focus-key="family-chip-${category}"]`)!;
+    expect(chip('all').querySelector('svg')).not.toBeNull();
+    expect(chip('Movies HD').querySelector('svg')).toBeNull();
+    chip('Movies HD').click();
+    await wait();
+    expect(chip('Movies HD').querySelector('svg')).not.toBeNull();
+    expect(chip('all').querySelector('svg')).toBeNull();
+    expect(chip('Movies HD').textContent).toBe('Movies HD');
+  });
+
   it('keeps the family open across a title page and marks its first card as the landing card', async () => {
-    await openRoute('categories');
+    await openScreen('categories');
     tile('movies').click();
     await wait();
     const cards = Array.from(container.querySelectorAll<HTMLButtonElement>('.poster-card'));

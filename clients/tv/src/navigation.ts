@@ -159,6 +159,28 @@ export function revealElement(element: HTMLElement | null): void {
   }
 }
 
+// A row whose buttons are separate focus stops (a Downloads row) looks active while one of them holds focus. The old
+// engines have no :focus-within, so the navigation layer sets the class: the element marked data-active-row that
+// contains focus gets "active-row", and only one row has it at a time. Two class changes per move, no layout read.
+let activeRow: Element | null = null;
+export function markActiveRow(element: Element | null): void {
+  const row = element && element.closest ? element.closest('[data-active-row]') : null;
+  if (row === activeRow) return;
+  if (activeRow) activeRow.classList.remove('active-row');
+  if (row) row.classList.add('active-row');
+  activeRow = row;
+}
+
+/**
+ * The scroll position that puts a row's middle at the middle of its scrolling list, clamped to the list's ends: a
+ * list that keeps the focused row centred (the series episode list) always shows a piece of the row above and below.
+ * `row.top` is the row's offset inside the list's content.
+ */
+export function centredScrollTop(row: { top: number; height: number }, list: { height: number; scrollHeight: number }): number {
+  const end = Math.max(0, list.scrollHeight - list.height);
+  return Math.max(0, Math.min(Math.round(row.top + row.height / 2 - list.height / 2), end));
+}
+
 export function focusElement(element: HTMLElement | null): void {
   if (!element) return;
   if (isTextInput(element) && element.dataset.tvEditing !== 'true') element.readOnly = true;
@@ -187,6 +209,7 @@ export function useTVNavigation(options: {
       const element = event.target as HTMLElement | null;
       if (!element) return;
       revealElement(element);
+      markActiveRow(element);
       const key = element.dataset.focusKey;
       if (key) { lastFocusKey = key; latest.current.onFocusKey?.(key); }
     };

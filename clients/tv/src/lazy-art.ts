@@ -12,7 +12,7 @@ import { useEffect, useState } from 'preact/hooks';
 // more than one rail away from the focused one drops all its art. A hook only sets state when its range changes.
 // Nothing here touches focus or the DOM.
 
-/** Cards loaded either side of the focused column; a 1920px screen shows about six. */
+/** Cards loaded either side of the focused column; a 1920px screen shows about seven posters (#55) or four landscape cards. */
 export const ART_COLUMN_REACH = 8;
 /** Loaded cards further than this from the focused column are dropped. */
 export const ART_COLUMN_KEEP = 14;
@@ -120,7 +120,8 @@ export const ART_ROW_KEEP = 4;
 export type RowReach = [number, number];
 
 function rowReachFor(firstRow: number, current: FocusPoint, previous: RowReach | null): RowReach {
-  return slideReach(previous, current.row < 0 ? firstRow : current.row, ART_ROW_REACH, ART_ROW_KEEP, -Infinity) as RowReach;
+  // Focus above the grid (its chips, the search field) counts as its first line, so the lines on screen stay loaded.
+  return slideReach(previous, current.row < firstRow ? firstRow : current.row, ART_ROW_REACH, ART_ROW_KEEP, -Infinity) as RowReach;
 }
 
 /** The inclusive row range of a grid whose artwork should be loaded. Starts around `firstRow`, slides with focus, and sets state only when it changes. */

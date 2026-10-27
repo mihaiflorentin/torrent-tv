@@ -46,7 +46,7 @@
     var element = messageElement();
     if (!element) return;
     element.textContent = message;
-    if (failed) element.style.color = 'var(--tt-danger, #ff7b86)';
+    if (failed) element.style.color = 'var(--tt-danger,#ff8a8a)';
   }
 
   window.FileListBoot = {
@@ -61,7 +61,7 @@
     },
     fail: function(error) {
       ready = true;
-      show('Application startup failed\n\n' + describe(error), true);
+      show('Application startup failed\n\n' + describe(error) + '\n\nRestart the app; if it fails again, tell the household admin.', true);
     }
   };
 
@@ -75,6 +75,6 @@
   });
 
   window.setTimeout(function() {
-    if (!ready) show(stage + ' is taking longer than expected.', false);
+    if (!ready) show(stage + ' is taking longer than expected. If nothing changes, restart the app.', false);
   }, 8000);
 }());

@@ -173,6 +173,24 @@ describe('TV Info season drill-down', () => {
     expect(focused()).toBe('info-seasons');
   });
 
+  it('leaves the cursor on Back or Close once the viewer moved there, whatever re-renders next', async () => {
+    await open({ seasonInfo: async () => season(60) });
+    key('info-seasons')!.focus();
+    key('info-seasons')!.click();
+    await wait();
+    key('info-season-1')!.focus();
+    key('info-season-1')!.click();
+    await wait();
+    // The artwork window follows a row and settles a moment later, after the viewer went up to Back.
+    key('info-episode-40')!.focus();
+    key('info-back')!.focus();
+    await wait(400);
+    expect(focused()).toBe('info-back');
+    key('info-close')!.focus();
+    await wait(400);
+    expect(focused()).toBe('info-close');
+  });
+
   it('says so calmly when no provider knows the seasons, the season or the episode', async () => {
     await open({ titleSeasons: async () => ({ titleId: 'a', available: false, seasons: [] }) });
     key('info-seasons')!.focus();

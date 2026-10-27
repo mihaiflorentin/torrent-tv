@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, Download } from '@torrent-tv/shared';
 import { withETag } from './test-api';
 // Static import cannot work here: main.tsx bootstraps and asserts the presence
@@ -94,7 +95,7 @@ describe('calm action errors', () => {
   it('shows a rejected download action in the downloads list instead of escaping', async () => {
     const onManageDownload = vi.fn(async () => { throw new Error('Pause failed: 409 conflict'); });
     mount(container, {}, { downloads: [download], onManageDownload });
-    container.querySelector<HTMLButtonElement>('[data-menu-route="downloads"]')?.click();
+    await openRoute(container, 'downloads', 0);
     await wait();
 
     key('download-dl-1-pause')?.click();
@@ -109,10 +110,13 @@ describe('calm action errors', () => {
   it('keeps the removal dialog open and shows the message when a delete is rejected', async () => {
     const onManageDownload = vi.fn(async () => { throw new Error('Delete failed: 409 conflict'); });
     mount(container, {}, { downloads: [download], onManageDownload });
-    container.querySelector<HTMLButtonElement>('[data-menu-route="downloads"]')?.click();
+    await openRoute(container, 'downloads', 0);
     await wait();
 
-    key('download-dl-1-delete')?.click();
+    // Delete download lives in the row's More sheet (drawn on its own layer on <body>).
+    key('download-dl-1-more')?.click();
+    await wait();
+    document.querySelector<HTMLButtonElement>('[data-focus-key="more-delete"]')?.click();
     await wait();
     key('download-confirm')?.click();
     await wait();
@@ -186,7 +190,7 @@ describe('stable catalog lists', () => {
   it('patches a metadata update into the matching card and keeps the list and sort', async () => {
     const api = catalogApi();
     mount(container, api as unknown as Partial<API>, { titles: [title('a', 'Alpha'), title('b', 'Bravo')] });
-    container.querySelector<HTMLButtonElement>('[data-menu-route="browse"]')?.click();
+    await openRoute(container, 'browse', 0);
     await wait();
     container.querySelector<HTMLButtonElement>('[data-focus-key="sort-seeders"]')?.click();
     await wait();
@@ -218,7 +222,7 @@ describe('stable catalog lists', () => {
   it('reapplies the current sort when an explicit refresh replaces the snapshot', async () => {
     const api = catalogApi();
     const view = mount(container, api as unknown as Partial<API>, { titles: [title('a', 'Alpha'), title('b', 'Bravo')] });
-    container.querySelector<HTMLButtonElement>('[data-menu-route="browse"]')?.click();
+    await openRoute(container, 'browse', 0);
     await wait();
     container.querySelector<HTMLButtonElement>('[data-focus-key="sort-seeders"]')?.click();
     await wait();

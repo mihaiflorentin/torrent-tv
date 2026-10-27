@@ -4,6 +4,7 @@ import { sharedApi } from '@torrent-tv/web/shared-api';
 import { openExternal, pushUpdateStatus, sessionStore, setPortalIdentity, sharedOrigin, usePortal, useServerState } from './lib/state';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { ProjectsPage } from '@torrent-tv/web/projects';
+import { AppMark } from '@torrent-tv/web/icons';
 import { JobsPage } from './pages/JobsPage';
 import { ServerPage } from './pages/ServerPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -37,7 +38,7 @@ export function App() {
     <div class="shell">
       <a class="skip-link" href="#content">Skip to content</a>
       <nav class="shell-nav" aria-label="Sections">
-        <div class="shell-brand"><span class="brand-mark" aria-hidden="true">TT</span><strong>Torrent <span>TV</span></strong></div>
+        <div class="shell-brand"><AppMark /><strong>Torrent TV</strong></div>
         {sections.map(s => (
           <button key={s.id} type="button" class={view === s.id ? 'active' : ''} aria-current={view === s.id ? 'page' : undefined} onClick={() => setView(s.id)}>
             <span class={`dot dot-${server.state}`} aria-hidden="true" />

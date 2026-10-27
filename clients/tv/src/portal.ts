@@ -5,38 +5,9 @@
 // functions and identity constants the tests assert against.
 import type { PortalState, UpdateStatus } from '@torrent-tv/shared';
 
-// Sidebar focus row of the Other projects entry, which opens the projects
-// route page. Appended after the fixed menu rows (the last menu row is 32),
-// so portal links appearing or disappearing never renumbers an existing
-// control.
-export const PROJECTS_MENU_ROW = 33;
-
 // Focus region of the update confirmation dialog; directional movement
 // never leaves the region of the focused element, which is the trap.
 export const UPDATE_DIALOG_REGION = 'update-dialog';
-
-// TVSettings focus rows. Rows 1-6 stay the safe playback fields; the two
-// tracker toggles follow (7-8), then the two Pirate Bay URL inputs (9-10),
-// the save control (11), the release link of the update notice (12), six
-// connection tests (13-18), and change/forget server (19-20). The update
-// controls append after them so inserting a row renumbers only these
-// constants.
-export const SETTINGS_SAVE_ROW = 11;
-export const UPDATE_RELEASE_LINK_ROW = 12;
-// The Diagnostics disclosure sits between the update notice (12) and the
-// connection tests (13): a half row, so no pinned row renumbers. The tests
-// it reveals stay out of the DOM, and out of the D-pad graph, until it opens.
-export const SETTINGS_DIAGNOSTICS_ROW = UPDATE_RELEASE_LINK_ROW + 0.5;
-export const SETTINGS_TEST_FIRST_ROW = 13;
-export const SETTINGS_CHANGE_SERVER_ROW = 19;
-export const SETTINGS_FORGET_SERVER_ROW = 20;
-export const UPDATE_CHECK_ROW = 21;
-export const UPDATE_APPLY_ROW = 22;
-// Catalog maintenance: Fetch latest follows the connection tests (13-14, with
-// 15-18 spare) and precedes the server actions; the Rebuild catalog button of
-// the Danger zone is the last control on the page, below the update install.
-export const SETTINGS_CATALOG_FETCH_ROW = 15;
-export const SETTINGS_REBUILD_ROW = 23;
 
 // Focus region of the rebuild confirmation dialog, a trap like the update one.
 export const REBUILD_DIALOG_REGION = 'rebuild-dialog';

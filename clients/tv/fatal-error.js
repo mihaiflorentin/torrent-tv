@@ -83,20 +83,22 @@
   var panel = document.createElement('div');
   panel.id = 'fatal-error';
   panel.setAttribute('role', 'alert');
-  // Boot-screen palette from the shared tokens (the fallbacks matter when app.css never loaded), sized for a 1080p TV (mirrors #startup in index.html).
+  // Night Screen on the boot layer (ticket #62): the ground, a left-aligned column at the screen's content edge
+  // (168 px), the status word in the danger colour, a white heading, the cause, then one next action. The var()
+  // fallbacks repeat the token values because app.css may never have loaded; sizes follow the TV type scale.
   panel.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;'
-   + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
-   + 'padding:100px;box-sizing:border-box;background:var(--tt-ink,#0e0a15);color:var(--tt-text,#f8f2ea);'
-   + 'font-family:var(--tt-font-sans,Arial,sans-serif);text-align:center';
+   + 'display:flex;flex-direction:column;align-items:flex-start;justify-content:center;'
+   + 'padding:96px 168px;box-sizing:border-box;background:var(--tt-ink,#0a0b0f);color:var(--tt-text,#f5f6f8);'
+   + 'font-family:var(--tt-font-sans,Arial,sans-serif);text-align:left';
+  appendText(panel, 'p', 'Error',
+   'font-size:26px;font-weight:700;line-height:1.2;margin:0 0 16px;color:var(--tt-danger,#ff8a8a)');
   appendText(panel, 'h1', 'Something went wrong',
-   'font-size:64px;margin:0 0 26px;color:var(--tt-danger,#ff7b86)');
+   'font-size:56px;font-weight:800;line-height:1.15;letter-spacing:-0.02em;margin:0 0 24px;color:var(--tt-text,#f5f6f8)');
   appendText(panel, 'p', message,
-   'font-size:28px;line-height:1.5;white-space:pre-wrap;max-width:1500px;'
-   + 'margin:0 0 40px;word-break:break-word');
-  appendText(panel, 'p', 'Please tell the household admin about this message.',
-   'font-size:28px;line-height:1.6;margin:8px 0');
-  appendText(panel, 'p', 'Press Back to exit.',
-   'font-size:28px;line-height:1.6;margin:8px 0;color:var(--tt-text-muted,#bdb3cc)');
+   'font-size:30px;line-height:1.45;white-space:pre-wrap;max-width:1400px;'
+   + 'margin:0 0 32px;word-break:break-word;color:var(--tt-text-muted,#c9cdd6)');
+  appendText(panel, 'p', 'Tell the household admin what this message says, then press Back to exit.',
+   'font-size:30px;line-height:1.45;max-width:1400px;margin:0;color:var(--tt-text,#f5f6f8)');
   document.body.appendChild(panel);
  }
 

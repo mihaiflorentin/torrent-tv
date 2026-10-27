@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 import type { API, CatalogDetail, CatalogFacets, CatalogSource, CatalogTitle, Download, HouseholdItem, HouseholdState, Job } from '@torrent-tv/shared';
 import { withETag } from './test-api';
 
@@ -67,7 +68,7 @@ function mount(container: HTMLElement, api: Partial<API> = {}, props: Props = {}
 describe('TV screens show what helps the next decision', () => {
   let container: HTMLDivElement;
   const text = (selector: string) => container.querySelector(selector)?.textContent ?? '';
-  const route = async (name: string) => { container.querySelector<HTMLButtonElement>(`[data-menu-route="${name}"]`)!.click(); await wait(); };
+  const route = async (name: string) => { await openRoute(container, name, 0); await wait(); };
   const key = (focusKey: string) => container.querySelector<HTMLButtonElement>(`[data-focus-key="${focusKey}"]`);
 
   beforeEach(() => {
@@ -83,17 +84,27 @@ describe('TV screens show what helps the next decision', () => {
     mount(container, {}, { titles: [title()] });
     await wait();
     expect(text('.tv-hero')).toContain('Alpha');
-    expect(text('.tv-hero')).toContain('Movie · 2019');
+    expect(text('.tv-hero-kind')).toBe('Movie');
+    expect(text('.tv-hero-facts')).toBe('20192160p');
     expect(text('.tv-hero')).not.toMatch(/seeders|FileList|\d+ versions?/i);
-    expect(text('.poster-card')).toContain('2019 · 2160p');
+    expect(text('.poster-card .poster-copy span')).toBe('2019');
     expect(text('.poster-card')).not.toMatch(/seeders|FileList|source/i);
+  });
+
+  it('badges a poster with its library state in a word short enough for the card, the full state in its label', async () => {
+    mount(container, {}, { titles: [title({ libraryState: { downloadState: 'downloaded', transferState: 'idle', watchState: 'watched' } }), title({ id: 'b', title: 'Beta', libraryState: { downloadState: 'downloading', transferState: 'active', watchState: 'partial', progress: 0.41 } })] });
+    await wait();
+    const badges = (focusKey: string) => Array.from(key(focusKey)!.querySelectorAll('.tv-state-badge')).map(node => [node.textContent, node.getAttribute('aria-label')]);
+    expect(badges('title-a')).toEqual([['Downloaded', 'Downloaded'], ['Watched', 'Watched']]);
+    expect(badges('title-b')).toEqual([['41% done', 'Downloading 41%'], ['Started', 'Some watched']]);
   });
 
   it('gives a title without a year no placeholder', async () => {
     mount(container, {}, { titles: [title({ year: undefined })] });
     await wait();
     expect(container.textContent).not.toMatch(/Year unknown|—/);
-    expect(text('.tv-hero .eyebrow')).toBe('Movie');
+    expect(text('.tv-hero-kind')).toBe('Movie');
+    expect(container.querySelector('.tv-hero-facts .detail-dot')).toBeNull();
   });
 
   it('shows seeders only on the row defined by them', async () => {
@@ -105,12 +116,12 @@ describe('TV screens show what helps the next decision', () => {
     expect(named('Strong swarms')).toContain('77 seeders');
   });
 
-  it('prints episode code and progress on a continue-watching card, never the release, tracker or path', async () => {
+  it('prints episode code and time left on a continue-watching card, never the release, tracker or path', async () => {
     mount(container, {}, { titles: [title()], household: { ...empty, continueWatching: [libraryItem()] } });
     await wait();
     const card = text('.library-poster-card');
     expect(card).toContain('Alpha');
-    expect(card).toContain('S01E02 · 41% watched');
+    expect(card).toContain('S01E02 · 1 min left');
     expect(card).not.toMatch(/FileList|WEB-DL|\.mkv|GRP/);
     expect(container.querySelector('.tv-card-progress')?.getAttribute('aria-label')).toBe('41% watched');
   });
@@ -127,7 +138,8 @@ describe('TV screens show what helps the next decision', () => {
     mount(container, {}, { titles: [] });
     await wait();
     expect(text('.tv-empty h2')).toBe('No titles to show yet');
-    expect(text('.tv-empty p')).toMatch(/Refresh/);
+    expect(text('.tv-empty p')).toMatch(/Reload library/);
+    expect(text('.tv-empty button')).toBe('Reload library');
     await route('search');
     expect(text('.tv-empty h2')).toBe('Search the catalog');
   });
@@ -137,31 +149,35 @@ describe('TV screens show what helps the next decision', () => {
     await route('downloads');
     const row = () => container.querySelector('.tv-download-row')!.textContent ?? '';
     expect(row()).toContain('Alpha · S01E02 · Pilot');
-    expect(row()).toContain('Downloading 41% · 4.2 MB/s · 12 min left');
-    expect(row()).toContain('1080p · WEB-DL · H264 · 3.1 GB · FileList · Playable while downloading');
+    expect(row()).toContain('41%');
+    expect(row()).toContain('4.2 MB/s · 12 min left · Playable now');
+    expect(row()).toContain('3.1 GB');
     expect(row()).not.toMatch(/Alpha\.S01E02\.1080p|\.mkv|peers|connected seeds|file 3/);
-    key('download-d1-details')!.click();
+    key('download-d1-more')!.click();
+    await wait();
+    document.querySelector<HTMLButtonElement>('[data-focus-key="more-details"]')!.click();
     await wait();
     expect(row()).toContain('Alpha.S01E02.1080p.WEB-DL-GRP');
     expect(row()).toContain('Alpha.S01/Alpha.S01E02.1080p.mkv (file 3)');
     expect(row()).toContain('9 connected seeds · 14 peers');
-    expect(key('download-d1-details')!.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('draws a long download list in steps after a route change, so the screen opens without a long task', async () => {
     const many = Array.from({ length: 20 }, (_, index) => download({ id: `d${index}`, engineId: `e${index}`, displayTitle: `Title ${index}` }));
     mount(container, {}, { titles: [title()], downloads: many });
+    // The first screenful draws with the route change; the rest once the screen has opened.
     await route('downloads');
-    await wait(120);
+    expect(container.querySelectorAll('.tv-download-row')).toHaveLength(6);
+    await wait(520);
     expect(container.querySelectorAll('.tv-download-row')).toHaveLength(20);
-    expect(container.querySelector('.tv-download-count')!.textContent).toBe('20 downloads');
+    expect(key('downloads-filter-all')!.textContent).toBe('All20');
   });
 
   it('tells an empty Downloads screen how to fill it', async () => {
     mount(container, {}, { titles: [title()], downloads: [] });
     await route('downloads');
     expect(text('.tv-empty h2')).toBe('No downloads yet');
-    expect(text('.tv-download-count')).toBe('');
+    expect(key('downloads-filter-all')!.textContent).toBe('All0');
   });
 
   it('names a job by what ran and how it ended, with no job id', async () => {
@@ -169,8 +185,10 @@ describe('TV screens show what helps the next decision', () => {
     await route('jobs');
     await wait(60);
     const row = text('.tv-list article');
-    expect(row).toContain('Fetch latest');
-    expect(row).toContain('Failed · tracker timed out');
+    expect(text('.tv-job-state')).toBe('Failed');
+    expect(text('.tv-job-main strong')).toBe('Fetch latest');
+    expect(text('.tv-job-main span')).toMatch(/ ago · tracker timed out$/);
+    expect(container.querySelector('.tv-job-state svg')).not.toBeNull();
     expect(row).not.toContain('job-8f31a2');
   });
 
@@ -178,6 +196,8 @@ describe('TV screens show what helps the next decision', () => {
     const call = vi.fn(async (path: string) => path === '/settings' ? { preferredAudioLanguage: 'en', preferredSubtitleLanguage: 'ro', fallbackSubtitleLanguage: 'en', watchedThresholdPercent: 90, fileListEnabled: true, pirateBayEnabled: false, downloadEngine: 'native' } : path === '/settings/schema' ? { items: [] } : []);
     mount(container, { call, trackers: async () => [] } as unknown as Partial<API>, { titles: [title()] });
     await route('settings');
+    await wait(60);
+    key('settings-group-server')!.click();
     await wait(60);
     expect(container.querySelector('[data-focus-key^="test-"]')).toBeNull();
     const toggle = key('settings-diagnostics')!;
@@ -196,28 +216,31 @@ describe('TV screens show what helps the next decision', () => {
       await wait();
     };
 
-    it('leads the version row with resolution, chips, size and seeders; the file name is evidence on the row but not a headline', async () => {
+    it('draws the version row as aligned columns: resolution, Best match slot, quality and codec, size, seeders, tracker, action; the file name is evidence, not a headline', async () => {
       await open(detail());
       const row = container.querySelector('.source-button')!;
+      const columns = Array.from(row.querySelector('.source-main')!.children).map(cell => cell.className.split(' ')[0]);
+      expect(columns).toEqual(['source-resolution', 'source-best', 'source-quality', 'source-size', 'source-seeders', 'source-tracker', 'source-action']);
       expect(row.querySelector('.source-resolution')?.textContent).toBe('1080p');
-      expect(Array.from(row.querySelectorAll('.source-chip')).map(chip => chip.textContent)).toEqual(['WEB-DL', 'H264']);
-      expect(row.querySelector('.source-facts')?.textContent).toBe('4.2 GB · 77 seeders');
+      expect(row.querySelector('.source-quality')?.textContent).toBe('WEB-DL · H264');
+      expect(row.querySelector('.source-size')?.textContent).toBe('4.2 GB');
+      expect(row.querySelector('.source-seeders')?.textContent).toBe('77 seeders');
       expect(row.querySelector('.source-action-label')?.textContent).toBe('Play and download');
-      expect(row.querySelector('.source-secondary')?.textContent).toBe('FileList · DDP 5.1');
+      expect(row.querySelector('.source-tracker')?.textContent).toBe('FileList · DDP 5.1');
       expect(row.querySelector('.source-filename')?.textContent).toBe('Alpha.2019.1080p.WEB-DL.mkv');
     });
 
     it('omits an unknown codec instead of printing a placeholder', async () => {
       await open(detail({}, [source({ videoCodec: undefined })]));
       expect(container.textContent).not.toMatch(/codec unknown/i);
-      expect(Array.from(container.querySelectorAll('.source-chip')).map(chip => chip.textContent)).toEqual(['WEB-DL']);
+      expect(container.querySelector('.source-quality')?.textContent).toBe('WEB-DL');
     });
 
     it('moves tracker names off the header and summarises a series by its seasons', async () => {
       await open(detail({ kind: 'series', seasonCount: 3, genres: ['Drama', 'Mystery'] }));
       const header = text('.detail-copy');
-      expect(header).toContain('3 seasons · Since 2019');
-      expect(header).toContain('Drama · Mystery');
+      expect(text('.detail-kind')).toBe('3 seasons');
+      expect(text('.detail-facts')).toBe('Since 2019·Drama, Mystery');
       expect(header).not.toMatch(/FileList|seeders/);
     });
 
@@ -245,11 +268,12 @@ describe('Player heading', () => {
     delete (window as unknown as { webapis?: unknown }).webapis;
   });
 
-  it('shows the title with its episode code and the current Audio and Subtitles choice, not the file path', async () => {
+  it('shows the show and episode code over the episode name, the current Audio and Subtitles choice, not the file path', async () => {
     const api = { streamURL: (p: string) => p, playbackPreferences: async () => ({ audioLanguage: 'en', audioTrackIndex: 1, subtitleLanguage: 'ro', subtitleMode: 'selected' }), downloads: async () => ({ items: [], nextCursor: null, total: 0 }), updatePlayback: async () => ({}) } as unknown as API;
     render(<Player api={api} download={download()} resumeMs={0} onClose={() => { }} onStateChanged={() => { }} onComplete={() => { }} />, container);
     await wait();
-    expect(container.querySelector('.player-title')?.textContent).toBe('Alpha · S01E02 · Pilot');
+    expect(container.querySelector('.player-kicker')?.textContent).toBe('Alpha · S01E02');
+    expect(container.querySelector('.player-title')?.textContent).toBe('Pilot');
     expect(container.querySelector('.player-choice')?.textContent).toBe('Audio English · Subtitles Romanian');
     expect(container.querySelector('.player-heading')?.textContent).not.toMatch(/\.mkv|FileList/);
   });

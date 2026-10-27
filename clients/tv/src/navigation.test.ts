@@ -2,9 +2,28 @@
 import { h, render } from 'preact';
 import { useRef } from 'preact/hooks';
 import { describe, expect, it, vi } from 'vitest';
-import { chooseDirectionalTarget, chooseStructuredTarget, RectLike, remoteAction, useTVNavigation } from './navigation';
+import { centredScrollTop, chooseDirectionalTarget, chooseStructuredTarget, RectLike, remoteAction, useTVNavigation } from './navigation';
+
+// A scrolling list that keeps the focused row in its middle (the series episode list): the row above and the row
+// below both peek, so the viewer sees there is more either way, and the ends never scroll past the list.
+describe('centredScrollTop', () => {
+  it('puts the row\'s middle at the list\'s middle', () => {
+    // A 466 px list of 176 px rows 10 px apart: the third row (top 372) centres at 372 + 88 - 233.
+    expect(centredScrollTop({ top: 372, height: 176 }, { height: 466, scrollHeight: 1100 })).toBe(227);
+  });
+  it('stays at the top for the first row', () => {
+    expect(centredScrollTop({ top: 0, height: 176 }, { height: 466, scrollHeight: 1100 })).toBe(0);
+    expect(centredScrollTop({ top: 186, height: 176 }, { height: 466, scrollHeight: 1100 })).toBe(41);
+  });
+  it('stops at the end of the list', () => {
+    expect(centredScrollTop({ top: 924, height: 176 }, { height: 466, scrollHeight: 1100 })).toBe(634);
+  });
+  it('never scrolls a list that fits', () => {
+    expect(centredScrollTop({ top: 186, height: 176 }, { height: 466, scrollHeight: 362 })).toBe(0);
+  });
+});
 import type { TVPlatformHooks } from './platform';
-import { PROJECTS_MENU_ROW, REBUILD_DIALOG_REGION, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_REBUILD_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION } from './portal';
+import { REBUILD_DIALOG_REGION, UPDATE_DIALOG_REGION } from './portal';
 
 const rect = (left: number, top: number, width = 100, height = 100): RectLike => ({ left, top, right: left + width, bottom: top + height, width, height });
 
@@ -88,42 +107,6 @@ describe('remoteAction', () => {
   });
 });
 
-describe('TVSettings update rows', () => {
-  const control = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
-  const change = control(SETTINGS_CHANGE_SERVER_ROW);
-  const forget = control(SETTINGS_FORGET_SERVER_ROW);
-  const check = control(UPDATE_CHECK_ROW);
-  const apply = control(UPDATE_APPLY_ROW);
-  const elements = [change, forget, check, apply];
-  it('walks from the existing rows onto the appended check and apply rows', () => {
-    expect(chooseStructuredTarget(forget, elements, 'down')).toBe(check);
-    expect(chooseStructuredTarget(check, elements, 'down')).toBe(apply);
-  });
-  it('walks back up without losing the appended rows', () => {
-    expect(chooseStructuredTarget(apply, elements, 'up')).toBe(check);
-    expect(chooseStructuredTarget(check, elements, 'up')).toBe(forget);
-  });
-  it('maintains continuous vertical order from save through tests and server actions', () => {
-    const save = control(SETTINGS_SAVE_ROW);
-    const firstTest = control(SETTINGS_TEST_FIRST_ROW);
-    const lastTest = control(SETTINGS_TEST_FIRST_ROW + 5);
-    const full = [save, firstTest, lastTest, change, forget, check, apply];
-    expect(chooseStructuredTarget(save, full, 'down')).toBe(firstTest);
-    expect(chooseStructuredTarget(lastTest, full, 'down')).toBe(change);
-    expect(chooseStructuredTarget(change, full, 'down')).toBe(forget);
-  });
-});
-
-describe('Other projects sidebar entry', () => {
-  const menuItem = (row: number) => ({ dataset: { focusRegion: 'sidebar', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
-  const settings = menuItem(32);
-  const projects = menuItem(PROJECTS_MENU_ROW);
-  it('sits below the last fixed menu row and never renumbers it', () => {
-    expect(chooseStructuredTarget(settings, [settings, projects], 'down')).toBe(projects);
-    expect(chooseStructuredTarget(projects, [settings, projects], 'up')).toBe(settings);
-  });
-});
-
 describe('modal dialog focus traps', () => {
   const dialogItem = (region: string, row: number, col: number) => ({ dataset: { focusRegion: region, focusRow: String(row), focusCol: String(col) } } as unknown as HTMLElement);
   const contentItem = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
@@ -153,27 +136,14 @@ describe('modal dialog focus traps', () => {
   });
 });
 
-describe('Catalog rows and the rebuild dialog', () => {
+describe('Settings rows and the rebuild dialog', () => {
   const dialogItem = (row: number, col: number) => ({ dataset: { focusRegion: REBUILD_DIALOG_REGION, focusRow: String(row), focusCol: String(col) } } as unknown as HTMLElement);
   const contentItem = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
-  it('walks down from the connection tests through Fetch latest and the server actions to Rebuild catalog', () => {
-    const lastTest = contentItem(SETTINGS_TEST_FIRST_ROW + 1);
-    const fetchLatest = contentItem(SETTINGS_CATALOG_FETCH_ROW);
-    const change = contentItem(SETTINGS_CHANGE_SERVER_ROW);
-    const apply = contentItem(UPDATE_APPLY_ROW);
-    const rebuild = contentItem(SETTINGS_REBUILD_ROW);
-    const all = [lastTest, fetchLatest, change, apply, rebuild];
-    expect(chooseStructuredTarget(lastTest, all, 'down')).toBe(fetchLatest);
-    expect(chooseStructuredTarget(fetchLatest, all, 'down')).toBe(change);
-    expect(chooseStructuredTarget(apply, all, 'down')).toBe(rebuild);
-    expect(chooseStructuredTarget(rebuild, all, 'up')).toBe(apply);
-    expect(chooseStructuredTarget(rebuild, all, 'down')).toBeNull();
-  });
   it('keeps focus inside the rebuild dialog between Cancel and Rebuild', () => {
     const cancel = dialogItem(0, 0);
     const confirm = dialogItem(0, 1);
-    const rebuild = contentItem(SETTINGS_REBUILD_ROW);
-    const elements = [cancel, confirm, rebuild, contentItem(UPDATE_APPLY_ROW)];
+    const rebuild = contentItem(20);
+    const elements = [cancel, confirm, rebuild, contentItem(21)];
     expect(chooseStructuredTarget(cancel, elements, 'right')).toBe(confirm);
     expect(chooseStructuredTarget(confirm, elements, 'left')).toBe(cancel);
     for (const direction of ['up', 'down'] as const) {

@@ -92,7 +92,7 @@ describe('web/style.css', () => {
   it('keeps selection, progress and focus visible in forced-colors mode', () => {
     const block = /@media\s*\(\s*forced-colors\s*:\s*active\s*\)\s*\{([\s\S]*)\n\}\s*(?:\/\*|@media|$)/.exec(css)?.[1] ?? '';
     expect(block, 'a forced-colors block exists').not.toBe('');
-    expect(block).toMatch(/\.nav-group button\.selected::before/);
+    expect(block).toMatch(/\.nav-items button\.selected::before/);
     expect(block).toMatch(/progress[^{]*\{[^}]*forced-color-adjust\s*:\s*none/);
     expect(block).toMatch(/\.switch-field input:checked ~ \.switch-track/);
     expect(block).toMatch(/Highlight/);

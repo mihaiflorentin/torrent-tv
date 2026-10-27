@@ -1,4 +1,4 @@
-/* Torrent TV television stylesheet: the Velvet Booth direction (DESIGN.md) on a fixed 1920x1080 canvas read at 3 m.
+/* Torrent TV television stylesheet: the Night Screen direction (DESIGN.md) on a fixed 1920x1080 canvas read at 3 m.
    Every colour, size and radius comes from the shared tokens in @torrent-tv/shared/design/tokens.css; this file holds layout only.
    Support floor is Chromium 53 (webOS 4) and 63 (Tizen 5): no grid (Chromium 57), flex gap is off-limits (ADR-0006) so siblings
    take margins, and focus uses the :focus pseudo-class because TV focus is never pointer-driven. */
@@ -37,7 +37,11 @@ h3 {
  line-height: var(--tt-leading-tight)
 }
 
-/* Controls ------------------------------------------------------------ */
+/* Controls ------------------------------------------------------------
+   The shared vocabulary (#53): buttons and chips are fully rounded translucent pills with no hairline; the border
+   stays as a transparent 2 px edge so a focused control keeps its geometry and the white inner edge has a place.
+   Focus is two signals: a fill change (white with ground-coloured text on compact controls, a lighter fill on rows
+   and posters) plus the solid white outline outside an offset, beside the halo. */
 button,
 input {
  position: relative;
@@ -45,9 +49,7 @@ input {
  font-size: var(--tt-tv-text-body);
  line-height: var(--tt-leading-tight);
  color: var(--tt-text);
- background: var(--tt-raised);
- border: 2px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
+ border-radius: var(--tt-radius-pill);
  padding: 0 var(--tt-space-6);
  min-height: var(--tt-tv-target)
 }
@@ -56,14 +58,19 @@ button {
  display: inline-flex;
  align-items: center;
  justify-content: center;
- font-weight: var(--tt-weight-medium);
+ font-weight: var(--tt-weight-semibold);
  text-align: center;
- cursor: pointer
+ cursor: pointer;
+ background: var(--tt-fill);
+ border: 2px solid;
+ border-color: transparent
 }
 
+/* A text field keeps the 3:1 edge an input needs; it is a field, not a pill to press. */
 input {
  height: var(--tt-tv-target);
- border-color: var(--tt-line-strong)
+ background: var(--tt-raised);
+ border: 2px solid var(--tt-line-strong)
 }
 
 input::-webkit-input-placeholder {
@@ -86,51 +93,85 @@ select:focus {
  z-index: 30
 }
 
+/* The focused button, chip, tab or rail item turns solid white with ground-coloured text. */
+button:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
 /* Busy controls stay focusable (aria-disabled) so the remote keeps its place. */
 button[aria-disabled="true"] {
  opacity: .55
 }
 
+/* The primary action is the brighter pill and the bolder word; saffron is no longer a button fill. */
 button.primary {
- background: var(--tt-accent);
- border-color: var(--tt-accent-deep);
- color: var(--tt-on-accent);
+ background: var(--tt-fill-strong);
  font-weight: var(--tt-weight-bold)
 }
 
 button.primary:focus {
- background: var(--tt-accent-hover)
+ background: var(--tt-fill-focus)
 }
 
-/* Selected tabs, filters and toggles keep a tinted fill and a bar, so selection never rests on colour alone. */
+/* Selected tabs, filters and toggles: the selected fill, the bold word and a short saffron marker under the label,
+   so selection never rests on colour alone. Focused, the pill turns white and keeps the marker. */
 button.active,
 button.open,
 button[aria-pressed="true"] {
- background: linear-gradient(var(--tt-accent), var(--tt-accent)) no-repeat left bottom / 100% 6px, var(--tt-accent-soft);
- border-color: var(--tt-accent-line);
+ background: linear-gradient(var(--tt-accent), var(--tt-accent)) no-repeat 50% 88% / 40px 4px, var(--tt-fill-selected);
  font-weight: var(--tt-weight-bold)
 }
 
-button.primary.active {
- background: var(--tt-accent)
+button.active:focus,
+button.open:focus,
+button[aria-pressed="true"]:focus {
+ background: linear-gradient(var(--tt-accent-deep), var(--tt-accent-deep)) no-repeat 50% 88% / 40px 4px, var(--tt-fill-focus)
 }
 
+/* Destructive actions: distinct but calm. The word is in the danger colour on the ordinary pill (no red box);
+   focused, the pill fills with the danger colour and the word turns ground-coloured, so it never looks like the
+   white focus of a safe action. */
 .danger-button {
- color: var(--tt-danger);
- border-color: var(--tt-danger)
+ color: var(--tt-danger)
 }
 
 .danger-button:focus {
  background: var(--tt-danger);
- color: var(--tt-ink)
+ color: var(--tt-on-fill-focus)
 }
 
+/* Line icons (icons.tsx) take the control's text colour through currentColor. */
 .tv-icon {
  display: block;
  width: 40px;
  height: 40px;
- flex: 0 0 40px;
- fill: currentColor
+ flex: 0 0 40px
+}
+
+button>.tv-icon:first-child {
+ width: 32px;
+ height: 32px;
+ flex: 0 0 32px;
+ margin: 0 var(--tt-space-3) 0 -6px
+}
+
+/* The app mark: a rounded saffron square with a play shape (the rail's brand and the Setup screen). */
+.tv-mark {
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ width: 56px;
+ height: 56px;
+ border-radius: var(--tt-radius-lg);
+ background: var(--tt-accent);
+ color: var(--tt-on-accent)
+}
+
+.tv-mark svg {
+ display: block;
+ width: 26px;
+ height: 26px
 }
 
 .tv-muted,
@@ -206,7 +247,8 @@ button.primary.active {
 
 /* Title page art (backdrop.tsx `sharp`): the picture the viewer opened, shown as it is. One full-resolution layer,
    no blur and no scale, so there is nothing for an old GPU to filter; a change is still only an opacity fade. The
-   scrim darkens from the left (under the title block) and the bottom (under the rows) and leaves the rest clear. */
+   scrim darkens from the left (under the title block, which has no panel of its own) and the bottom (under the
+   versions) and leaves the upper right of the picture clear. */
 .tv-backdrop.sharp .tv-backdrop-art {
  width: 1920px;
  height: 1080px;
@@ -220,7 +262,7 @@ button.primary.active {
 }
 
 .tv-backdrop.sharp .tv-backdrop-scrim {
- background: linear-gradient(0deg, var(--tt-scrim-bottom) 0, transparent 38%), linear-gradient(90deg, var(--tt-scrim-text) 0, var(--tt-scrim-top) 46%, transparent 86%)
+ background: linear-gradient(0deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-text) 32%, transparent 58%), linear-gradient(90deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-text) 38%, transparent 72%)
 }
 
 /* A poster with no backdrop: full height at the right edge, never cropped into a stretched slice. The scrim holds
@@ -247,31 +289,29 @@ button.primary.active {
  left: 0;
  top: 0;
  z-index: 20;
- width: 400px;
+ width: 520px;
  height: 1080px;
- padding: 24px 24px 24px;
- overflow-x: hidden;
- overflow-y: auto;
+ padding: var(--tt-tv-safe-y) var(--tt-space-5);
+ overflow: hidden;
  contain: layout paint
 }
 
-/* The rail's panel is a 400 px layer behind the buttons. Compact, it is slid left so only the 120 px icon strip shows;
-   open, it slides home. The slide is a transform on its own layer and the labels fade by opacity, so the compositor
-   does the work and the main thread only flips a class (animating clip or width would repaint or re-lay out every
-   frame, and held each route change open for the length of the transition). Lean engines snap: see the
-   .lean-graphics rules below. The panel's outer shadow is gone because contain: paint clipped it anyway. */
+/* The rail's panel is a 520 px layer behind the buttons: the ground colour, fading out over its last fifth.
+   Compact, it is slid left so only its last 120 px show, which is the fade itself: a soft strip behind the icons,
+   no edge. Open, it slides home. The slide is a transform on its own layer and the labels fade by opacity, so the
+   compositor does the work and the main thread only flips a class (animating clip or width would repaint or re-lay
+   out every frame, and held each route change open for the length of the transition). Lean engines snap: see the
+   .lean-graphics rules below. */
 .tv-sidebar::before {
  content: '';
  position: absolute;
  left: 0;
  top: 0;
  z-index: -1;
- box-sizing: border-box;
- width: 400px;
+ width: 520px;
  height: 1080px;
- background: var(--tt-surface);
- border-right: 1px solid var(--tt-line);
- transform: translateX(-280px);
+ background: linear-gradient(90deg, var(--tt-surface) 78%, transparent);
+ transform: translateX(-400px);
  transition: transform var(--tt-dur-base) var(--tt-ease-out)
 }
 
@@ -279,114 +319,214 @@ button.primary.active {
  transform: none
 }
 
-.tv-sidebar::-webkit-scrollbar {
- display: none
+/* The open rail dims the screen behind it (one full-screen layer, faded by opacity, never a blur). */
+.tv-veil {
+ position: fixed;
+ left: 0;
+ top: 0;
+ z-index: 15;
+ width: 1920px;
+ height: 1080px;
+ background: var(--tt-veil);
+ opacity: 0;
+ pointer-events: none;
+ transition: opacity var(--tt-dur-base)
+}
+
+.tv-app.menu-open .tv-veil {
+ opacity: 1
 }
 
 .tv-brand {
  display: flex;
  align-items: center;
  height: 64px;
- margin-bottom: var(--tt-space-2);
  white-space: nowrap
 }
 
-.tv-brand>span {
- display: flex;
- align-items: center;
- justify-content: center;
- flex: 0 0 72px;
- width: 72px;
- height: 56px;
- border-radius: var(--tt-radius-md);
- background: var(--tt-accent);
- color: var(--tt-on-accent);
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-black)
+.tv-brand>.tv-mark {
+ flex: 0 0 56px;
+ margin-left: 8px
 }
 
 .tv-brand>b {
  margin-left: var(--tt-space-4);
  font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-black)
+ font-weight: var(--tt-weight-black);
+ letter-spacing: var(--tt-tracking-snug)
 }
 
-.tv-menu-group {
- margin: 0 0 var(--tt-space-3)
-}
-
-.tv-menu-group>small {
+/* Six hubs, each at least the TV target height, at the same place compact and open, so opening the rail moves no
+   icon. The focused hub grows to show its one-line hint (the rail is the only thing that moves, inside its own
+   layout containment). */
+.tv-rail {
  display: block;
- margin: var(--tt-space-3) 0 var(--tt-space-1) var(--tt-space-4);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-bold);
- letter-spacing: .1em;
- line-height: 1.2;
- text-transform: uppercase;
- white-space: nowrap
+ margin-top: 136px
 }
 
 .tv-sidebar button {
  display: flex;
  justify-content: flex-start;
- width: 352px;
- height: 56px;
- min-height: 56px;
- margin: 1px 0;
- padding: 0 var(--tt-space-4) 0 0;
+ align-items: center;
+ width: 448px;
+ min-height: 76px;
+ margin: 0 0 var(--tt-space-2);
+ padding: var(--tt-space-2) var(--tt-space-5) var(--tt-space-2) 4px;
+ border-radius: 22px;
  background: transparent;
- border-color: transparent;
- border-left: 6px solid transparent;
+ color: var(--tt-text-muted);
  white-space: nowrap;
  text-align: left
 }
 
+/* The icon cell: a 64 px square centred on the 120 px compact strip. Compact, the current hub's icon sits on a
+   rounded selected fill (the strip shows no labels); open, the whole item takes the fill instead. */
 .tv-sidebar button i {
  display: flex;
  align-items: center;
  justify-content: center;
  flex: 0 0 64px;
  width: 64px;
- color: var(--tt-text-muted);
+ height: 64px;
+ border-radius: var(--tt-radius-xl);
+ font-style: normal
+}
+
+.tv-sidebar button i .tv-icon {
+ width: 32px;
+ height: 32px;
+ flex: 0 0 32px
+}
+
+.tv-sidebar button span {
+ display: block;
+ margin-left: var(--tt-space-3);
+ min-width: 0;
+ white-space: normal
+}
+
+.tv-sidebar button b {
+ display: block;
+ font-size: 32px;
+ font-weight: var(--tt-weight-semibold);
+ line-height: var(--tt-leading-tight);
+ white-space: nowrap
+}
+
+/* The hint under the focused hub only: what it holds ("Continue · My List · Watched · Categories"). */
+.tv-rail-hint {
+ display: none;
+ margin-top: 2px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium);
+ line-height: 1.2
+}
+
+.tv-app.menu-open .tv-sidebar button:focus .tv-rail-hint {
+ display: block;
+ color: var(--tt-text-faint)
+}
+
+/* Active transfers on Downloads: a count in the accent, which marks counts. */
+.tv-rail-count {
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ min-width: 40px;
+ height: 40px;
+ margin-left: auto;
+ padding: 0 var(--tt-space-3);
+ border-radius: var(--tt-radius-pill);
+ background: var(--tt-accent);
+ color: var(--tt-on-accent);
+ font-size: var(--tt-tv-text-meta);
  font-style: normal;
- font-size: 32px
+ font-weight: var(--tt-weight-bold);
+ font-variant-numeric: var(--tt-figures)
+}
+
+/* The server connection at the foot of the open rail: a dot (its shape does not change, the word does) and a line.
+   The line names host and port, so a long address ends in an ellipsis inside the open rail (520 px, 46 px in from each side). */
+.tv-rail-connection {
+ position: absolute;
+ left: 46px;
+ bottom: var(--tt-tv-safe-y);
+ display: flex;
+ align-items: center;
+ max-width: 428px;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap
+}
+
+.tv-rail-connection>span {
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-rail-connection>i {
+ display: block;
+ width: 12px;
+ height: 12px;
+ margin-right: var(--tt-space-3);
+ border-radius: 6px;
+ background: var(--tt-text-faint)
+}
+
+.tv-rail-connection.ok>i {
+ background: var(--tt-ok)
+}
+
+.tv-rail-connection.lost>i {
+ background: var(--tt-warn)
 }
 
 .tv-sidebar button span,
+.tv-rail-count,
 .tv-brand>b,
-.tv-menu-group>small {
+.tv-rail-connection {
  opacity: 0;
  transition: opacity var(--tt-dur-base)
 }
 
-.tv-sidebar button span {
- font-size: var(--tt-tv-text-body)
-}
-
 .tv-app.menu-open .tv-sidebar button span,
+.tv-app.menu-open .tv-rail-count,
 .tv-app.menu-open .tv-brand>b,
-.tv-app.menu-open .tv-menu-group>small {
+.tv-app.menu-open .tv-rail-connection {
  opacity: 1
 }
 
 .tv-sidebar button.active {
  background: transparent;
- border-left-color: var(--tt-accent);
  color: var(--tt-text);
  font-weight: var(--tt-weight-bold)
 }
 
-.tv-app.menu-open .tv-sidebar button.active {
- background: var(--tt-accent-soft)
+.tv-sidebar button.active b {
+ font-weight: var(--tt-weight-bold)
 }
 
 .tv-sidebar button.active i {
- color: var(--tt-accent)
+ background: var(--tt-fill-selected)
 }
 
-.tv-sidebar button:focus {
- border-color: var(--tt-focus-edge)
+.tv-app.menu-open .tv-sidebar button.active {
+ background: var(--tt-fill-selected)
+}
+
+.tv-app.menu-open .tv-sidebar button.active i {
+ background: transparent
+}
+
+/* A focused rail item is a white pill like any control (the rail is always open while it holds focus). */
+.tv-sidebar button:focus,
+.tv-app.menu-open .tv-sidebar button:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-sidebar button:focus i {
+ background: transparent
 }
 
 .tv-content {
@@ -404,62 +544,164 @@ button.primary.active {
  display: none
 }
 
+/* A screen's head: its one heading (none on Home and Search) and, on Library and Discover, the hub's tabs. */
 .tv-top {
  display: flex;
  align-items: center;
- height: 96px
-}
-
-.tv-top>*+* {
- margin-left: var(--tt-space-5)
+ min-height: 96px;
+ margin-bottom: var(--tt-space-4)
 }
 
 .tv-top h1 {
- margin-right: auto;
+ margin-right: var(--tt-space-7);
  font-size: var(--tt-tv-text-heading);
- font-weight: var(--tt-weight-black)
+ font-weight: var(--tt-weight-black);
+ letter-spacing: var(--tt-tracking-heading);
+ white-space: nowrap
 }
 
-.tv-status {
- max-width: 620px;
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis
+/* The tab strip: pills like the chips; the selected one carries the selected fill, bold word and saffron bar. */
+.tv-tabs {
+ display: flex;
+ flex-wrap: nowrap
 }
 
-.tv-notice {
+.tv-tabs>button {
+ flex: 0 0 auto;
+ margin-right: var(--tt-space-4);
+ white-space: nowrap
+}
+
+/* Shown only while something is wrong (the server is unreachable, a tracker needs setting up). */
+.tv-banner {
+ max-width: 1500px;
  margin: 0 0 var(--tt-space-5);
  padding: var(--tt-space-4) var(--tt-space-5);
- background: var(--tt-raised);
- border-left: 6px solid var(--tt-info);
+ background: var(--tt-fill);
+ border-left: 6px solid var(--tt-warn);
  border-radius: var(--tt-radius-md);
+ color: var(--tt-text);
  font-size: var(--tt-tv-text-body)
 }
 
+/* A screen notice (an action that failed, a title that would not open): a quiet rounded banner, no hairline edge. */
+.tv-notice {
+ max-width: 1400px;
+ margin: 0 0 var(--tt-space-5);
+ padding: var(--tt-space-4) var(--tt-space-6);
+ background: var(--tt-fill);
+ border-radius: var(--tt-radius-xl);
+ font-size: var(--tt-tv-text-body)
+}
+
+/* Search (#58, the "Search" board): a large rounded field with the search icon and, once there is a query, the
+   result count inside it; Search and Clear follow it. The field is the input itself (the icon and the count sit on
+   it), so the focus ring goes round the whole pill. */
 .tv-search {
  display: flex;
  align-items: center;
- margin: var(--tt-space-3) 0 var(--tt-space-4)
+ margin: 10px 0 0
 }
 
 .tv-search>*+* {
  margin-left: var(--tt-space-4)
 }
 
-.tv-search input {
- width: 860px
+.tv-search-field {
+ position: relative;
+ display: block;
+ flex: 0 0 1100px;
+ width: 1100px
 }
 
-.tv-recent {
- display: flex;
- flex-wrap: wrap;
- margin: 0 0 var(--tt-space-3)
+.tv-search-field input {
+ display: block;
+ width: 1100px;
+ height: 92px;
+ padding: 0 220px 0 90px;
+ background: var(--tt-fill);
+ border-color: transparent;
+ font-size: 36px;
+ font-weight: var(--tt-weight-semibold)
 }
 
-.tv-recent>* {
- margin: 0 var(--tt-space-4) var(--tt-space-3) 0
+.tv-search-field .tv-icon,
+.tv-search-count {
+ position: absolute;
+ z-index: 31;
+ pointer-events: none
+}
+
+.tv-search-field .tv-icon {
+ left: 36px;
+ top: 29px;
+ width: 34px;
+ height: 34px;
+ color: var(--tt-text-muted)
+}
+
+.tv-search-field input:focus~.tv-search-count {
+ color: var(--tt-text)
+}
+
+.tv-search-count {
+ right: 36px;
+ top: 0;
+ line-height: 92px;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap
+}
+
+/* The chip line of Search, Browse and the family sort row: a muted label ("Sort", "Recent") before each set of
+   chips, the chips at the meta size, all on one line. Recent searches are outlined and quieter than the sort chips
+   (the board), and a long term ends in an ellipsis. */
+.tv-chip-line {
+ flex-wrap: nowrap;
+ align-items: center
+}
+
+.tv-filters.tv-chip-line>* {
+ flex: 0 0 auto;
+ margin: 0 var(--tt-space-3) var(--tt-space-3) 0
+}
+
+.tv-chip-line>button {
+ padding: 0 var(--tt-space-5);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap
+}
+
+.tv-chip-line>.tv-chip-label {
+ margin-right: 20px;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta)
+}
+
+.tv-chip-line>.tv-chip-label-next {
+ margin-left: var(--tt-space-6)
+}
+
+.tv-chip-line>.tv-recent-chip {
+ display: block;
+ max-width: 260px;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ line-height: 60px;
+ background: transparent;
+ border-color: var(--tt-fill-strong);
+ color: var(--tt-text-muted);
+ font-weight: var(--tt-weight-medium)
+}
+
+.tv-chip-line>.tv-recent-chip:focus {
+ background: var(--tt-fill-focus);
+ border-color: var(--tt-focus-edge);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-app[data-route="search"] .tv-chip-line {
+ margin-top: 28px
 }
 
 .tv-filters {
@@ -472,86 +714,205 @@ button.primary.active {
  margin: 0 var(--tt-space-4) var(--tt-space-3) 0
 }
 
-/* Home hero: text over the focus-following backdrop, on a scrim that guarantees contrast. */
-.tv-hero {
- margin: var(--tt-space-3) 0 var(--tt-space-4)
+/* Home hero (#55, the "Home" board): no panel and no page title. The copy sits straight on the focus-following
+   backdrop, whose Home scrims (below) darken the left under the copy and the bottom under the rows. The kind line,
+   the title with its subtitle line, facts and the resolution chip, a two-line overview, then the primary, Info and
+   My List in one row. The top margin puts the kind line where the board has it (170 px down). */
+.tv-app[data-route="home"] .tv-backdrop-scrim {
+ background: linear-gradient(90deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-text) 30%, transparent 64%), linear-gradient(0deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-bottom) 18%, transparent 56%), var(--tt-scrim-top)
 }
 
-.tv-hero-copy {
- width: 1040px;
- padding: var(--tt-space-5) var(--tt-space-6) var(--tt-space-6);
- background: var(--tt-scrim-text);
- border-radius: var(--tt-radius-lg)
+.tv-hero {
+ width: 1000px;
+ margin: 116px 0 60px
+}
+
+.tv-hero-kind {
+ display: flex;
+ align-items: center;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ line-height: var(--tt-leading-tight)
+}
+
+/* The saffron marker of a title in progress, beside its word. */
+.tv-hero-dot {
+ flex: 0 0 10px;
+ width: 10px;
+ height: 10px;
+ margin-right: 14px;
+ border-radius: 5px;
+ background: var(--tt-accent)
 }
 
 .tv-hero h2 {
- margin: var(--tt-space-2) 0 var(--tt-space-3);
- font-size: var(--tt-tv-text-title);
+ margin: 18px 0 0;
+ font-size: var(--tt-tv-text-display);
  font-weight: var(--tt-weight-black);
- line-height: 1.08;
- max-height: 140px;
+ line-height: var(--tt-leading-display);
+ letter-spacing: var(--tt-tracking-display)
+}
+
+/* Two lines at most; old engines without the line clamp stop at the same height. */
+.tv-hero-title {
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2;
+ max-height: 2.04em;
  overflow: hidden
 }
 
-.tv-hero-overview,
-.detail-overview {
+.tv-hero-subtitle {
+ display: block;
+ margin-top: 6px;
+ color: var(--tt-text-muted);
+ font-size: 40px;
+ font-weight: var(--tt-weight-semibold);
+ line-height: 1.2;
+ letter-spacing: var(--tt-tracking-snug);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-hero-facts {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ margin-top: 26px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ line-height: var(--tt-leading-tight)
+}
+
+.tv-hero-chip {
+ margin-left: var(--tt-space-5);
+ padding: var(--tt-space-1) var(--tt-space-3);
+ border: 2px solid var(--tt-line-strong);
+ border-radius: var(--tt-radius-sm);
+ color: var(--tt-text);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold)
+}
+
+.tv-hero-facts>.tv-hero-chip:first-child {
+ margin-left: 0
+}
+
+.tv-hero-overview {
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2;
+ width: 860px;
+ max-height: 2.9em;
+ margin-top: 26px;
+ overflow: hidden;
+ color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-body);
  line-height: var(--tt-leading-body)
 }
 
-.tv-hero-overview {
- max-height: 132px;
- overflow: hidden;
- display: -webkit-box;
- -webkit-line-clamp: 3;
- -webkit-box-orient: vertical
+.tv-hero-actions {
+ display: flex;
+ flex-wrap: nowrap;
+ align-items: center;
+ margin-top: 40px
 }
 
-.tv-hero-genres,
-.detail-genres {
- margin-top: var(--tt-space-2);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta)
+.tv-hero-actions>*+* {
+ margin-left: 20px
 }
 
-.tv-hero button {
- margin-top: var(--tt-space-5)
+.tv-hero-actions button {
+ flex: 0 0 auto;
+ height: 80px;
+ white-space: nowrap
+}
+
+.tv-hero-actions button.primary {
+ padding: 0 40px 0 32px;
+ font-size: 32px
+}
+
+.tv-hero-actions button.primary>.tv-icon:first-child {
+ width: 30px;
+ height: 30px;
+ flex: 0 0 30px;
+ margin: 0 14px 0 0
+}
+
+.tv-hero-actions button.tv-hero-icon {
+ width: 80px;
+ padding: 0
+}
+
+.tv-hero-actions button.tv-hero-icon>.tv-icon:first-child {
+ margin: 0
 }
 
 /* Rows ----------------------------------------------------------------- */
+/* Rows sit 48 px apart: 28 px of the rail's own room under the cards plus this margin. */
 .row-heading {
  display: flex;
  align-items: baseline;
- margin: var(--tt-space-5) 0 0
+ margin: 20px 0 0
 }
 
 .row-heading h2 {
  font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ letter-spacing: var(--tt-tracking-snug)
 }
 
 .poster-rail {
  display: flex;
+ align-items: flex-start;
  overflow-x: auto;
  padding: 28px 24px 36px;
  margin: -4px -96px -8px -24px
 }
 
+/* About seven posters (210 px) or four landscape cards (400 px) across, 28 px apart. */
 .poster-rail>* {
- flex: 0 0 304px;
- margin-right: var(--tt-space-4)
+ flex: 0 0 210px;
+ margin-right: 28px
 }
 
+.landscape-rail>* {
+ flex: 0 0 400px
+}
+
+/* A card: the art, then the title (two lines at most) and one short fact under it, on no surface of its own.
+   Focused, the whole card lifts and its copy sits on a lighter fill, inside the white ring. */
 .poster-card {
  display: block;
- width: 304px;
- height: 548px;
+ width: 210px;
+ min-height: 0;
  padding: 0;
  overflow: hidden;
  text-align: left;
- background: var(--tt-raised);
+ background: transparent;
+ border-radius: var(--tt-radius-lg);
  contain: layout paint style;
  transition: transform var(--tt-dur-fast) var(--tt-ease-out)
+}
+
+.landscape-card {
+ width: 400px
+}
+
+.card-art {
+ position: relative;
+ display: block;
+ height: 315px;
+ overflow: hidden;
+ background: var(--tt-raised);
+ border-radius: var(--tt-radius-lg)
+}
+
+.landscape-card .card-art {
+ height: 225px
 }
 
 .poster-card img,
@@ -559,7 +920,7 @@ button.primary.active {
 .poster-fallback {
  display: block;
  width: 100%;
- height: 440px;
+ height: 100%;
  object-fit: cover
 }
 
@@ -574,6 +935,33 @@ button.primary.active {
 }
 
 .poster-card:focus {
+ transform: scale(var(--tt-focus-scale-tv));
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
+}
+
+/* The rating on a card: the drawn star in saffron, then the number. */
+.tv-rating {
+ font-weight: var(--tt-weight-semibold)
+}
+
+.tv-rating .tv-icon {
+ display: inline-block;
+ width: 24px;
+ height: 24px;
+ margin: 0 6px -3px 0;
+ color: var(--tt-accent)
+}
+
+/* The hero's primary action lifts like a poster (a transform, so nothing around it moves); the title page's
+   primary does the same. performance.css pins every other focused control at transform: none. */
+.tv-hero button.primary,
+.detail-actions button.primary {
+ transition: transform var(--tt-dur-fast) var(--tt-ease-out)
+}
+
+.tv-hero button.primary:focus,
+.detail-actions button.primary:focus {
  transform: scale(var(--tt-focus-scale-tv))
 }
 
@@ -583,60 +971,88 @@ button.primary.active {
 .lean-graphics .tv-sidebar::before,
 .lean-graphics .tv-sidebar button span,
 .lean-graphics .tv-brand>b,
-.lean-graphics .tv-menu-group>small,
-.lean-graphics .poster-card {
+.lean-graphics .tv-rail-count,
+.lean-graphics .tv-rail-connection,
+.lean-graphics .tv-veil,
+.lean-graphics .poster-card,
+.lean-graphics .tv-hero button.primary,
+.lean-graphics .detail-actions button.primary {
  transition: none
 }
 
+/* A fixed height (two title lines and the fact) keeps every card in a row the same size: a button centres its
+   content, so a shorter copy would push the art down. */
 .poster-copy {
- height: 104px;
- padding: var(--tt-space-3) 14px;
- display: flex;
- flex-direction: column
+ display: block;
+ height: 128px;
+ padding: var(--tt-space-3) var(--tt-space-2) 14px
 }
 
-.poster-copy>*+* {
- margin-top: var(--tt-space-1)
+.landscape-card .poster-copy {
+ height: 132px
 }
 
+/* The title wraps to a second line instead of being cut; old engines without the line clamp stop at the same height. */
 .poster-copy strong {
- font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-bold);
- line-height: var(--tt-leading-tight);
- white-space: nowrap;
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2;
+ max-height: 2.4em;
  overflow: hidden;
- text-overflow: ellipsis
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ line-height: 1.2
 }
 
+.landscape-card .poster-copy strong {
+ font-size: 28px;
+ font-weight: var(--tt-weight-bold)
+}
+
+/* One short fact, chosen to fit (display.ts); the ellipsis is only a guard. */
 .poster-copy span {
+ display: block;
+ margin-top: var(--tt-space-1);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta);
  font-weight: var(--tt-weight-medium);
- line-height: 1.25;
+ line-height: 1.3;
  white-space: nowrap;
  overflow: hidden;
  text-overflow: ellipsis
 }
 
-.tv-library-grid {
+/* The poster grid of Search, Browse and the family pages: seven cards to a line, as main.tsx numbers its focus
+   rows, 28 px apart (the right margin takes the last card's 28 px). The padding leaves room for the focus lift. */
+.tv-poster-grid {
  display: flex;
  flex-wrap: wrap;
+ align-items: flex-start;
  padding: 28px 24px 0;
- margin: 0 -24px
+ margin: 0 -52px 0 -24px
 }
 
-.tv-library-grid .poster-card {
- margin: 0 var(--tt-space-4) var(--tt-space-5) 0
+.tv-poster-grid>* {
+ flex: 0 0 210px;
+ margin: 0 28px var(--tt-space-5) 0
 }
 
+/* Watch progress on the art: a slim saffron bar on a translucent track. */
 .tv-card-progress {
  position: absolute;
- left: 0;
- right: 0;
- top: 430px;
- height: 10px;
- background: var(--tt-scrim-text);
+ left: 20px;
+ right: 20px;
+ bottom: 18px;
+ height: 6px;
+ border-radius: 3px;
+ background: var(--tt-fill-strong);
  overflow: hidden
+}
+
+.poster-card:not(.landscape-card) .tv-card-progress {
+ left: 12px;
+ right: 12px;
+ bottom: 12px
 }
 
 .tv-card-progress b {
@@ -659,7 +1075,7 @@ button.primary.active {
  margin-bottom: 8px
 }
 
-.poster-card>.tv-state-badges {
+.card-art>.tv-state-badges {
  position: absolute;
  top: 12px;
  left: 12px;
@@ -729,25 +1145,29 @@ button.primary.active {
  background: currentColor
 }
 
-/* Empty and error states: what happened, then what to do. */
+/* Empty and error states (#62): what happened, then what to do, one sentence each, straight on the screen like the
+   boards' section text. No panel, no edge: an empty state never draws a box inside a box. */
 .tv-empty {
  max-width: 1100px;
  margin: var(--tt-space-7) 0;
- padding: var(--tt-space-6) var(--tt-space-7);
- background: var(--tt-surface);
- border: 1px solid var(--tt-line);
- border-left: 6px solid var(--tt-accent-line);
- border-radius: var(--tt-radius-lg)
+ padding: 0
 }
 
 .tv-empty h2 {
  font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ letter-spacing: var(--tt-tracking-snug)
 }
 
 .tv-empty p {
  margin-top: var(--tt-space-3);
+ font-size: var(--tt-tv-text-body);
  color: var(--tt-text-muted)
+}
+
+/* The next action of an empty state (Reload library), where the header Refresh used to be. */
+.tv-empty>button {
+ margin-top: var(--tt-space-5)
 }
 
 /* Panels and dialogs ---------------------------------------------------- */
@@ -782,68 +1202,351 @@ button.primary.active {
 }
 
 .tv-settings-page {
+ display: flex;
+ align-items: flex-start;
+ margin-top: 14px
+}
+
+/* Settings in two panes (#60, the "Settings" board). The group list: 460 px of 72 px rows, the name at 30 px and
+   its status at 26 px muted on the right. The selected group has the selected fill and the bold name; the focused
+   one is the white pill like every control (a vertical tab list). */
+.tv-settings-groups {
+ flex: 0 0 460px;
+ width: 460px;
+ margin-right: 72px
+}
+
+.tv-settings-groups button {
+ display: flex;
+ justify-content: space-between;
+ width: 100%;
+ height: var(--tt-tv-target);
+ margin: 0 0 6px;
+ padding: 0 var(--tt-space-5);
+ border-radius: var(--tt-radius-xl);
  background: transparent;
- border: 0;
- padding: 0;
- margin: 0;
- max-width: 1180px
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold);
+ text-align: left;
+ white-space: nowrap
 }
 
-.tv-settings-page>h2,
-.tv-server>h2,
-.tv-catalog>h2,
-.tv-danger-zone>h2 {
- margin-top: var(--tt-space-3)
+.tv-settings-groups button.selected {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold)
 }
 
-.tv-settings-page>button,
-.tv-settings-page .tv-server button,
-.tv-settings-page .tv-catalog button,
-.tv-settings-page .tv-danger-zone button,
-.tv-diagnostics-toggle {
+.tv-settings-groups button:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-settings-groups small {
+ margin-left: var(--tt-space-4);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium);
+ font-variant-numeric: var(--tt-figures);
+ color: var(--tt-text-subtle);
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-settings-groups small.attention {
+ color: var(--tt-danger)
+}
+
+.tv-settings-groups button:focus small {
+ color: var(--tt-on-fill-focus)
+}
+
+/* The selected group's rows: 1124 px wide under a 26 px label; the pane scrolls on its own so the group list
+   stays put (padding keeps the focus ring inside the scrollport). */
+.tv-settings-pane {
+ flex: 0 0 1148px;
+ width: 1148px;
+ max-height: 816px;
+ margin: -12px 0 0 -12px;
+ padding: 12px;
+ overflow-y: auto
+}
+
+.tv-settings-pane::-webkit-scrollbar {
+ display: none
+}
+
+.tv-settings-pane>h2 {
+ padding-left: 28px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ letter-spacing: .02em;
+ color: var(--tt-text-subtle)
+}
+
+.tv-settings-pane>h2+* {
  margin-top: var(--tt-space-4)
 }
 
-.tv-settings-message {
- min-height: 40px
+/* A row: the name on the left at 30 px semibold, the value and a chevron (or the switch and On/Off) on the right.
+   Focused, it keeps its own fill, lighter, inside the white ring, and its help shows under it. */
+.tv-setting-row {
+ position: relative;
+ display: block;
+ width: 100%;
+ min-height: var(--tt-tv-target);
+ margin: 0 0 var(--tt-space-2);
+ padding: 20px 28px;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet);
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-semibold);
+ text-align: left
 }
 
-.tv-safe-fields>label {
- display: block;
- margin-top: var(--tt-space-4);
+.tv-setting-row:focus {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
+}
+
+.tv-setting-line {
+ display: flex;
+ align-items: center;
+ justify-content: space-between
+}
+
+.tv-setting-name {
+ flex: 1 1 auto;
+ min-width: 0;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold)
+}
+
+.tv-setting-name small {
+ color: var(--tt-warn);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium)
+}
+
+.tv-setting-value {
+ display: flex;
+ align-items: center;
+ flex: 0 1 auto;
+ min-width: 0;
+ margin-left: var(--tt-space-5);
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-regular);
+ font-variant-numeric: var(--tt-figures);
+ color: var(--tt-text-muted);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-chevron {
+ width: 28px;
+ height: 28px;
+ flex: 0 0 28px;
+ margin-left: var(--tt-space-3)
+}
+
+.tv-setting-help {
+ display: none;
+ margin-top: 10px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-regular);
+ line-height: 1.4;
+ color: var(--tt-text-subtle)
+}
+
+.tv-setting-row:focus .tv-setting-help {
+ display: block
+}
+
+/* The primary row of a pane (Save, Fetch latest) is the bolder name; the danger row is the danger-coloured word,
+   filled with the danger colour on focus. */
+.tv-setting-row.primary .tv-setting-name {
+ font-weight: var(--tt-weight-bold)
+}
+
+.tv-setting-row.primary {
+ background: var(--tt-fill-quiet)
+}
+
+.tv-setting-row.primary:focus {
+ background: var(--tt-fill-selected)
+}
+
+.tv-setting-row.danger-button {
+ color: var(--tt-danger)
+}
+
+.tv-setting-row.danger-button:focus {
+ background: var(--tt-danger);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-setting-row.danger-button:focus .tv-setting-help {
+ color: var(--tt-on-fill-focus)
+}
+
+/* A readable row (the connected server, the version): no focus stop, the quiet fill without the ring. */
+.tv-setting-info {
+ background: transparent
+}
+
+/* The switch: a 76x42 track, saffron with the dark knob on the right when on, the plain fill when off. */
+.tv-switch {
+ position: relative;
+ display: inline-block;
+ width: 76px;
+ height: 42px;
+ flex: 0 0 76px;
+ margin-right: var(--tt-space-3);
+ border-radius: 21px;
+ background: var(--tt-fill-strong)
+}
+
+.tv-switch::after {
+ content: "";
+ position: absolute;
+ top: 5px;
+ left: 5px;
+ width: 32px;
+ height: 32px;
+ border-radius: 16px;
+ background: var(--tt-text-muted)
+}
+
+.tv-switch.on {
+ background: var(--tt-accent)
+}
+
+.tv-switch.on::after {
+ left: 39px;
+ background: var(--tt-on-accent)
+}
+
+.tv-setting-value b {
+ min-width: 52px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ color: var(--tt-text)
+}
+
+/* A field row: the input carries focus and shows the value on the right; the face behind it draws the row's fill
+   and ring and the help shows under it, by sibling selectors, so focus costs no script or extra layout pass. */
+.tv-setting-field {
+ display: flex;
+ padding: 20px 30px;
+ flex-wrap: wrap;
+ align-items: center;
+ z-index: 0;
+ background: transparent
+}
+
+.tv-setting-face {
+ position: absolute;
+ top: 0;
+ right: 0;
+ bottom: 0;
+ left: 0;
+ z-index: -1;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet)
+}
+
+.tv-setting-field .tv-setting-name {
+ order: 0
+}
+
+.tv-setting-field input,
+.tv-setting-field input:focus {
+ order: 1;
+ flex: 0 1 420px;
+ width: 420px;
+ height: auto;
+ min-height: 0;
+ margin: -8px 0;
+ padding: 4px 8px;
+ border: 2px solid transparent;
+ border-radius: var(--tt-radius-md);
+ background: transparent;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-regular);
+ font-variant-numeric: var(--tt-figures);
+ text-align: right;
+ outline: 0;
+ box-shadow: none
+}
+
+.tv-setting-field.wide input,
+.tv-setting-field.wide input:focus {
+ flex-basis: 640px;
+ width: 640px
+}
+
+.tv-setting-field input:disabled {
+ opacity: .6
+}
+
+.tv-setting-field input:focus ~ .tv-setting-face {
+ background: var(--tt-fill-selected);
+ outline: 4px solid var(--tt-focus-ring);
+ outline-offset: var(--tt-focus-offset)
+}
+
+.tv-setting-field input:focus ~ .tv-setting-help {
+ display: block
+}
+
+/* Typing: the value becomes a field again, on the raised surface with its edge. */
+.tv-setting-field input[data-tv-editing="true"] {
+ background: var(--tt-raised);
+ border-color: var(--tt-line-strong);
+ color: var(--tt-text)
+}
+
+.tv-setting-suffix {
+ order: 2;
+ margin-left: -4px;
+ font-size: var(--tt-tv-text-body);
  color: var(--tt-text-muted)
 }
 
-.tv-safe-fields input {
- display: block;
- width: 100%;
- margin-top: var(--tt-space-2)
+.tv-setting-field .tv-chevron {
+ order: 3;
+ color: var(--tt-text-muted)
 }
 
-.tv-safe-fields small {
- margin-left: var(--tt-space-3);
- color: var(--tt-warn)
+.tv-setting-field .tv-setting-help {
+ order: 4;
+ flex: 0 0 100%
 }
 
-.tv-tracker-controls {
- margin: var(--tt-space-5) 0 0;
- padding: var(--tt-space-4) 0 0;
- border-top: 1px solid var(--tt-line)
+/* Pane text that is not a row (the tracker readiness, the engine note, the Danger zone warning) and the status
+   line under the rows (a save, a test, a queued job). */
+.tv-setting-note {
+ margin: var(--tt-space-2) 0 var(--tt-space-4);
+ padding: 0 28px;
+ font-size: var(--tt-tv-text-meta);
+ color: var(--tt-text-subtle)
 }
 
-.tv-tracker-controls h3 {
- margin-top: 0
-}
-
-.tv-tracker-toggle {
- margin: var(--tt-space-3) var(--tt-space-4) 0 0;
- min-width: 340px
+.tv-setting-status {
+ min-height: 40px;
+ margin-top: var(--tt-space-3);
+ padding: 0 28px;
+ font-size: var(--tt-tv-text-meta);
+ color: var(--tt-text-muted)
 }
 
 .tv-tracker-readiness {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-4) 0 0
+ margin: var(--tt-space-2) 0 var(--tt-space-2);
+ padding: 0 28px
 }
 
 .tv-tracker-chip {
@@ -851,20 +1554,18 @@ button.primary.active {
  margin: 0 var(--tt-space-3) var(--tt-space-3) 0;
  padding: var(--tt-space-1) var(--tt-space-4);
  border-radius: var(--tt-radius-pill);
- border: 1px solid var(--tt-line-strong);
+ border: 0;
  font-size: var(--tt-tv-text-meta);
- background: var(--tt-raised);
+ background: var(--tt-fill);
  color: var(--tt-text)
 }
 
 .tv-tracker-chip.ready {
- color: var(--tt-ok);
- border-color: var(--tt-ok)
+ color: var(--tt-ok)
 }
 
 .tv-tracker-chip.setup {
- color: var(--tt-warn);
- border-color: var(--tt-warn)
+ color: var(--tt-warn)
 }
 
 .tv-tracker-chip.disabled {
@@ -873,71 +1574,21 @@ button.primary.active {
 
 .tv-tracker-zero-note {
  align-self: center;
- margin-left: var(--tt-space-2);
- color: var(--tt-text-muted);
+ margin: 0 0 var(--tt-space-3) var(--tt-space-2);
+ color: var(--tt-text-subtle);
  font-size: var(--tt-tv-text-meta)
 }
 
-.tv-server,
-.tv-catalog,
-.tv-danger-zone,
-.tv-diagnostics,
-.tv-update-panel {
- margin-top: var(--tt-space-6);
- padding-top: var(--tt-space-4);
- border-top: 1px solid var(--tt-line)
-}
-
-.tv-update-panel h3 {
- margin-top: 0
-}
-
-.tv-server-line strong {
- color: var(--tt-text);
- font-size: var(--tt-tv-text-lead)
-}
-
-.tv-server-actions {
- display: flex;
- flex-direction: column;
- align-items: flex-start
-}
-
+/* The connection tests: compact pills four to a line under the disclosure. */
 .tv-test-buttons {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-3) 0 0
+ margin: var(--tt-space-2) 0 0;
+ padding: 0 0 0 var(--tt-space-2)
 }
 
 .tv-test-buttons button {
  margin: 0 var(--tt-space-3) var(--tt-space-3) 0
-}
-
-.tv-update-notice {
- margin: var(--tt-space-3) 0 0;
- padding: var(--tt-space-4) var(--tt-space-5);
- background: var(--tt-raised);
- border-left: 6px solid var(--tt-info);
- border-radius: var(--tt-radius-md)
-}
-
-.tv-update-notice strong {
- display: block;
- font-size: var(--tt-tv-text-body)
-}
-
-.tv-update-notice p {
- margin-top: var(--tt-space-2)
-}
-
-.tv-release-link {
- display: block;
- margin-top: var(--tt-space-3);
- text-align: left;
- color: var(--tt-info);
- white-space: normal;
- overflow-wrap: break-word;
- overflow-wrap: anywhere
 }
 
 /* Modal dialogs: solid overlay surface, a spread shadow as the veil (no blur, no backdrop filter). */
@@ -997,6 +1648,28 @@ button.primary.active {
  text-overflow: ellipsis
 }
 
+/* The preparing dialog (getting ready, #62) is its own solid sheet like the Player panels, not the Settings panel:
+   the overlay surface, rounded, no hairline, a lead heading, muted supporting lines and pill actions. */
+.tv-prepare-confirm {
+ padding: var(--tt-space-7);
+ background: var(--tt-overlay);
+ border-radius: var(--tt-radius-xl)
+}
+
+.tv-prepare-confirm h2 {
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold);
+ letter-spacing: var(--tt-tracking-snug)
+}
+
+.tv-prepare-confirm .supporting {
+ margin-top: var(--tt-space-3)
+}
+
+.tv-prepare-confirm>button {
+ margin-top: var(--tt-space-6)
+}
+
 .tv-prepare-wait {
  margin-top: var(--tt-space-4)
 }
@@ -1041,50 +1714,166 @@ button.primary.active {
  min-width: 320px
 }
 
-/* Title detail ---------------------------------------------------------- */
+/* Title detail ----------------------------------------------------------
+   The movie title page (#56, board "Movie title page"): kind, title, facts, overview and one row of actions straight on
+   the sharp backdrop, under its left and bottom scrims, with no boxed header. Then the versions as aligned rows. */
 .detail-screen {
  height: 1080px;
  overflow-y: auto;
  padding: var(--tt-tv-safe-y) var(--tt-tv-safe-x) var(--tt-space-9)
 }
 
+/* The on-screen Back stays for pointer-free certainty but steps back: no fill at rest, the quiet tone, meta type.
+   Focused it is a white pill like any control. */
+.detail-screen>[data-focus-key="detail-back"] {
+ padding: 0 var(--tt-space-5);
+ background: transparent;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium)
+}
+
+.detail-screen>[data-focus-key="detail-back"]:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
+.detail-screen>[data-focus-key="detail-back"]>.tv-icon:first-child {
+ width: 26px;
+ height: 26px;
+ flex: 0 0 26px;
+ margin: 0 10px 0 -6px
+}
+
 .detail-copy {
- width: 1000px;
- margin: var(--tt-space-6) 0 var(--tt-space-6);
- padding: var(--tt-space-5) var(--tt-space-6) var(--tt-space-6);
- background: var(--tt-scrim-text);
- border-radius: var(--tt-radius-lg)
+ width: 1100px;
+ margin: var(--tt-space-5) 0 var(--tt-space-7)
+}
+
+.detail-kind {
+ display: block;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ letter-spacing: .02em
 }
 
 .detail-copy h1 {
- margin: var(--tt-space-2) 0 var(--tt-space-3);
+ margin: 10px 0 0;
  font-size: var(--tt-tv-text-title);
  font-weight: var(--tt-weight-black);
- line-height: 1.08
+ line-height: var(--tt-leading-display);
+ letter-spacing: var(--tt-tracking-display)
+}
+
+/* Facts in one line: date, runtime, genres, the rated star and the certification, apart by faint dots. */
+.detail-facts {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ margin-top: var(--tt-space-5);
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ line-height: var(--tt-leading-tight)
+}
+
+.detail-dot {
+ margin: 0 var(--tt-space-4);
+ color: var(--tt-text-faint);
+ font-style: normal
+}
+
+.detail-facts .tv-rating {
+ display: flex;
+ align-items: center;
+ color: var(--tt-text)
+}
+
+.detail-facts .tv-rating .tv-icon {
+ width: 26px;
+ height: 26px;
+ flex: 0 0 26px;
+ margin: 0 var(--tt-space-2) 0 0
+}
+
+.detail-certification {
+ padding: var(--tt-space-1) var(--tt-space-3);
+ border: 2px solid var(--tt-line-strong);
+ border-radius: var(--tt-radius-sm);
+ color: var(--tt-text);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold)
 }
 
 .detail-copy .tv-state-badges {
- margin-top: var(--tt-space-3)
-}
-
-.detail-overview {
  margin-top: var(--tt-space-4)
 }
 
+/* Three lines at most; old engines without the line clamp stop at the same height. */
+.detail-overview {
+ display: -webkit-box;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 3;
+ width: 900px;
+ max-height: 4.35em;
+ margin-top: var(--tt-space-5);
+ overflow: hidden;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body);
+ line-height: var(--tt-leading-body)
+}
+
+/* One row that never wraps: the primary, Choose version, then My List, Info and More as round icon buttons. */
 .detail-actions {
  display: flex;
- flex-wrap: wrap;
- margin-top: var(--tt-space-5)
+ flex-wrap: nowrap;
+ align-items: center;
+ margin-top: 36px
 }
 
-.detail-actions>* {
- margin: 0 var(--tt-space-4) var(--tt-space-2) 0
+.detail-actions>*+* {
+ margin-left: 20px
 }
 
-.resume-file {
- display: block;
- margin-top: var(--tt-space-3);
- color: var(--tt-text-muted);
+.detail-actions button {
+ flex: 0 0 auto;
+ height: 80px;
+ padding: 0 34px;
+ white-space: nowrap
+}
+
+.detail-actions button.primary {
+ padding: 0 40px 0 32px;
+ font-size: 32px
+}
+
+.detail-actions button.primary>.tv-icon:first-child {
+ width: 30px;
+ height: 30px;
+ flex: 0 0 30px;
+ margin: 0 14px 0 0
+}
+
+/* The position or the version, in the lighter weight after the action word; it fades with the pill's own text colour. */
+.detail-primary-note {
+ font-weight: var(--tt-weight-medium);
+ opacity: .72;
+ white-space: pre
+}
+
+.detail-actions button.detail-icon {
+ width: 80px;
+ padding: 0
+}
+
+.detail-actions button.detail-icon>.tv-icon:first-child {
+ margin: 0
+}
+
+/* What one press of the primary will play, in the quiet tone under the row. */
+.detail-plays {
+ margin-top: 22px;
+ color: var(--tt-text-subtle);
  font-size: var(--tt-tv-text-meta)
 }
 
@@ -1095,59 +1884,99 @@ button.primary.active {
  color: var(--tt-text-muted)
 }
 
-.season-browser,
+/* The movie versions sit on the art like the copy above them: a heading with the count, then the rows. */
 .source-list {
- width: 1500px;
- box-sizing: border-box;
- padding: var(--tt-space-5) var(--tt-space-6);
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-lg)
+ width: 1728px
 }
 
-.source-list {
- background: var(--tt-surface)
+.source-list-head {
+ display: flex;
+ align-items: baseline;
+ margin-bottom: 18px
 }
 
-/* The series card is translucent (a token, no blur) so the title's sharp backdrop shows through it. Its text carries
-   a dark halo (--tt-text-shade: two static layers, never animated) so it stays readable over a bright picture.
-   A button does not inherit text-shadow, so the transparent episode rows take it directly; text on a saffron fill
-   (--tt-on-accent) and the filled danger focus stay crisp. */
+.source-list-head h2 {
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold)
+}
+
+.source-list-head span {
+ margin-left: 18px;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta)
+}
+
+/* Series page (#57, board "Series page"): the movie page's header without the overview (Info carries it), then the
+   season pills and the episode rows straight on the art, no card. The bottom scrim is deeper than the movie page's:
+   solid ground under the list, fading out above the pills, so the rows need no translucent card and no text halo. */
+.series-page .tv-backdrop.sharp .tv-backdrop-scrim {
+ background: linear-gradient(0deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-bottom) 40%, transparent 72%), linear-gradient(90deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-text) 38%, transparent 72%)
+}
+
+/* The board's compact header: the 80 px title, the row of 76 px actions 28 px under the copy, tighter steps between,
+   so the pills and two and a half rows of episodes share the first screen with it. */
+.series-page .detail-copy {
+ margin: var(--tt-space-3) 0 var(--tt-space-5)
+}
+
+.series-page .detail-copy h1 {
+ font-size: var(--tt-tv-text-title-compact)
+}
+
+.series-page .detail-facts {
+ margin-top: var(--tt-space-4)
+}
+
+.series-page .detail-actions {
+ margin-top: 28px
+}
+
+.series-page .detail-actions button {
+ height: 76px
+}
+
+.series-page .detail-actions button.detail-icon {
+ width: 76px
+}
+
+.series-page .detail-plays {
+ margin-top: var(--tt-space-4)
+}
+
 .season-browser {
- width: 100%;
- background: var(--tt-card-surface);
- text-shadow: var(--tt-text-shade)
+ width: 1728px
 }
 
-.season-browser .info-stop {
- text-shadow: var(--tt-text-shade)
-}
-
-.season-browser button.primary,
-.season-browser .source-best,
-.season-browser .danger-button:focus {
- text-shadow: none
-}
-
-/* Old engines repaint a scrolling episode list on every frame: one tight layer keeps the shade at a fraction of the cost. */
-.lean-graphics .season-browser,
-.lean-graphics .season-browser .info-stop {
- text-shadow: 0 0 4px var(--tt-text-shade-core)
-}
-
-.season-browser h2,
 .source-list h2 {
  font-size: var(--tt-tv-text-lead);
  font-weight: var(--tt-weight-bold)
 }
 
+/* Season pills, 12 px apart (margins, not gap). Rest: the quiet word on the fill; selected: the lighter fill, the bold
+   word in full white and the saffron marker (white is the cursor's); focused: the white pill. */
 .season-tabs {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-4) 0 var(--tt-space-4)
+ margin: 0 0 var(--tt-space-3)
 }
 
 .season-tabs button {
- margin: 0 var(--tt-space-3) var(--tt-space-3) 0
+ height: 64px;
+ min-height: 0;
+ margin: 0 12px 12px 0;
+ padding: 0 28px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-semibold)
+}
+
+.season-tabs button.active {
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold)
+}
+
+.season-tabs button:focus {
+ color: var(--tt-on-fill-focus)
 }
 
 .season-tabs button>*+* {
@@ -1173,13 +2002,20 @@ button.primary.active {
  background: transparent
 }
 
-.episode-row {
- padding: var(--tt-space-2) 0;
- border-top: 1px solid var(--tt-line)
+/* On a focused (white) tab the badge dots take the tab's ground-coloured text; their shape still tells the state. */
+.season-tabs button:focus .tv-state-badge {
+ color: var(--tt-on-fill-focus)
 }
 
-/* One column under the season bar: an "Episodes" heading over the list, left-aligned and as wide as the card, the same
-   edge as the Versions view. The list scrolls on its own; flexbox only (no grid, no gap) for Chromium 53. */
+.episode-row {
+ margin-bottom: 10px
+}
+
+.episode-row:last-child {
+ margin-bottom: 0
+}
+
+/* One column under the pills, as wide as the page's content. Flexbox only (no grid, no gap) for Chromium 53. */
 .season-panes {
  display: block
 }
@@ -1190,33 +2026,27 @@ button.primary.active {
  min-width: 0
 }
 
-.episode-heading {
- margin: var(--tt-space-3) 0 var(--tt-space-3);
- padding: 0 var(--tt-space-2);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-black);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis
-}
-
-.episode-heading-label {
- color: var(--tt-accent)
-}
-
+/* The list scrolls on its own, two and a half rows high, and keeps the focused row in its middle (main.tsx), so a
+   piece of the row above and below always shows. It is the rows' offset parent for that, and its 12 px padding (the
+   negative margin keeps the rows on the page's edge) leaves room for the focus ring. */
 .episode-pane {
+ position: relative;
  box-sizing: border-box;
- max-height: 720px;
- overflow-y: auto;
- padding: var(--tt-space-1) var(--tt-space-4) var(--tt-space-1) var(--tt-space-2)
+ max-height: 456px;
+ margin: 0 -12px;
+ padding: 12px;
+ overflow-y: auto
+}
+
+.episode-pane::-webkit-scrollbar {
+ display: none
 }
 
 /* Versions view: after OK on an episode the list steps aside and that episode's versions take the whole width.
    Flexbox only; the page scrolls, so the view adds no scroll area of its own. */
 .versions-view {
  display: block;
- padding: var(--tt-space-1) var(--tt-space-2) var(--tt-space-3)
+ padding: var(--tt-space-1) 0 var(--tt-space-3)
 }
 
 .versions-head {
@@ -1224,8 +2054,7 @@ button.primary.active {
  display: flex;
  align-items: baseline;
  justify-content: space-between;
- padding-bottom: var(--tt-space-3);
- border-bottom: 1px solid var(--tt-line)
+ padding-bottom: var(--tt-space-1)
 }
 
 .versions-title {
@@ -1243,7 +2072,7 @@ button.primary.active {
 }
 
 .versions-list {
-  padding: var(--tt-space-1) var(--tt-space-3) var(--tt-space-3)
+ padding: var(--tt-space-1) 0 var(--tt-space-3)
 }
 
 /* The episode block is the Info panel's episode level: its still, facts line, title and synopsis, then the versions below.
@@ -1294,93 +2123,136 @@ button.primary.active {
  color: var(--tt-text-muted)
 }
 
-/* The selected episode stays marked in the list: a tint plus a bar, never colour alone. */
+/* An episode row (the board's): transparent at rest; the selected episode keeps a quiet fill and a saffron edge
+   (never colour alone: the edge is a shape); focused, the lighter fill inside the white ring, never the white pill. */
 .episode-tile.selected {
- background: var(--tt-accent-soft);
- border-color: var(--tt-accent-line);
- box-shadow: inset 8px 0 0 var(--tt-accent)
-}
-
-/* The tint lifts the surface under the facts line, so it takes the full text colour, not the muted one. */
-.episode-tile.selected small {
- color: var(--tt-text)
+ background: var(--tt-fill-quiet);
+ box-shadow: inset 6px 0 0 var(--tt-accent)
 }
 
 .episode-tile.selected:focus {
- border-color: var(--tt-focus-edge);
- box-shadow: inset 8px 0 0 var(--tt-accent), var(--tt-focus-shadow-tv)
+ background: var(--tt-fill-selected);
+ box-shadow: inset 6px 0 0 var(--tt-accent), var(--tt-focus-shadow-tv)
 }
 
 .episode-tile {
  display: flex;
+ box-sizing: border-box;
  width: 100%;
+ height: 176px;
  align-items: center;
- justify-content: space-between;
+ justify-content: flex-start;
+ background: transparent;
  text-align: left
 }
 
-/* The full-width row: a 16:9 still, then name, facts and a short synopsis, with the badges and the chevron at the right edge.
-   The still is bigger than the Info panel's 160x90 (the row has the room); the synopsis clamps to two lines, with a
-   max-height fallback for engines without -webkit-line-clamp. */
+.info-stop.episode-tile {
+ margin: 0;
+ padding: 0 26px 0 14px;
+ border-radius: var(--tt-radius-xl)
+}
+
+/* The 16:9 still (the Info panel keeps its 160x90) carries the progress bar of an episode under way. */
 .episode-tile .info-still-small {
  width: 256px;
- height: 144px
+ height: 144px;
+ flex: 0 0 256px;
+ margin-right: 28px;
+ border-radius: 12px
 }
 
-.episode-tile .episode-synopsis {
- display: -webkit-box;
- max-height: 2.8em;
- margin-top: var(--tt-space-2);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
- line-height: 1.4;
- overflow: hidden;
- -webkit-box-orient: vertical;
- -webkit-line-clamp: 2
-}
-
-.episode-tile.selected .episode-synopsis {
- color: var(--tt-text)
-}
-
-/* Episode progress: a static bar whose width is set by state, never animated. */
 .episode-tile .episode-progress {
- display: block;
- width: 360px;
- max-width: 100%;
- margin-top: var(--tt-space-2);
- height: 10px;
- background: var(--tt-scrim-text);
+ position: absolute;
+ left: 12px;
+ right: 12px;
+ bottom: 12px;
+ height: 6px;
+ border-radius: 3px;
+ background: var(--tt-fill-strong);
  overflow: hidden
 }
 
 .episode-tile .episode-progress b {
  display: block;
  height: 100%;
+ border-radius: 3px;
  background: var(--tt-accent)
 }
 
-.episode-tile .tv-state-badges {
+/* Code and name, the facts line, then the synopsis clamped to two lines (max-height backs the clamp on old engines).
+   The lines are set tight so all four fit the 144 px still. */
+.episode-tile .info-row-copy b {
+ line-height: 1.15
+}
+
+.episode-code {
+ color: var(--tt-text-subtle);
+ font-weight: var(--tt-weight-semibold)
+}
+
+.episode-tile .info-row-copy small {
+ margin-top: 4px;
+ color: var(--tt-text-subtle);
+ line-height: 1.15
+}
+
+.episode-tile .episode-synopsis {
+ display: -webkit-box;
+ max-height: 2.7em;
+ margin-top: 6px;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ line-height: 1.35;
+ overflow: hidden;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2
+}
+
+/* The one library-state word, its tone beside the word, never instead of it. */
+.episode-state {
  flex: 0 0 auto;
- flex-wrap: nowrap;
- justify-content: flex-end;
- margin: 0 0 0 var(--tt-space-4)
+ margin-left: var(--tt-space-5);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ white-space: nowrap
 }
 
-.episode-tile .tv-state-badges>* {
- margin: 0 0 0 var(--tt-space-2)
+.episode-state.progress {
+ color: var(--tt-accent)
 }
 
-.episode-loading {
- margin-top: var(--tt-space-3);
- padding: var(--tt-space-5);
- border: 2px dashed var(--tt-line-strong);
- border-radius: var(--tt-radius-md);
+.episode-state.ok {
+ color: var(--tt-ok)
+}
+
+.episode-state.danger {
+ color: var(--tt-danger)
+}
+
+.episode-state.quiet {
  color: var(--tt-text-muted)
 }
 
-/* Version row, the decision point: resolution and chips lead, size and seeders follow, the action closes the line.
-   The release and file name is evidence: its line is always reserved and shows only while the row has focus. */
+.episode-tile .info-chevron {
+ width: 34px;
+ height: 34px;
+ flex: 0 0 34px;
+ margin-left: var(--tt-space-5);
+ color: var(--tt-text-subtle)
+}
+
+/* A season whose episode list is still being prepared: one sentence in the empty states' voice (#62), no box. */
+.episode-loading {
+ max-width: 1100px;
+ margin-top: var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body)
+}
+
+/* Version row, the decision point, shared by the movie list and an episode's Versions view: one line of fixed columns
+   (resolution, the Best match slot, quality and codec, size, seeders, tracker, then state and the action) so rows
+   compare at a glance. The release and file name is evidence: its line is always reserved and shows only while the
+   row has focus. Rest: the quiet fill; focus: the lighter fill inside the white ring, never the white pill. */
 .source-button {
  display: flex;
  flex-direction: column;
@@ -1388,105 +2260,43 @@ button.primary.active {
  justify-content: flex-start;
  width: 100%;
  min-width: 0;
- margin: var(--tt-space-3) 0 0;
- padding: var(--tt-space-3) var(--tt-space-5);
+ margin: 10px 0 0;
+ padding: var(--tt-space-3) 28px var(--tt-space-2);
+ border-radius: 18px;
+ background: var(--tt-fill-quiet);
+ font-weight: var(--tt-weight-regular);
  text-align: left
+}
+
+.source-button:focus {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
 }
 
 .source-main {
  display: flex;
  align-items: center;
  min-width: 0;
+ min-height: 48px;
  overflow: hidden
 }
 
 .source-main>*+* {
- margin-left: var(--tt-space-4)
+ margin-left: var(--tt-space-5)
 }
 
-/* Fixed columns, so resolutions, chips and numbers line up from one row to the next. */
 .source-resolution {
  flex: 0 0 auto;
  min-width: 120px;
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-black)
-}
-
-.source-chip {
- flex: 0 1 auto;
- min-width: 0;
- padding: var(--tt-space-1) var(--tt-space-3);
- border: 1px solid var(--tt-line-strong);
- border-radius: var(--tt-radius-sm);
- font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-bold);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis
-}
-
-.source-facts {
- flex: 0 0 auto;
- min-width: 360px;
- margin-left: auto;
- font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-medium);
- font-variant-numeric: tabular-nums;
- text-align: right;
- white-space: nowrap
-}
-
-.source-action {
- display: flex;
- align-items: center;
- min-width: 270px;
- justify-content: flex-end
-}
-
-.source-action>*+* {
- margin-left: var(--tt-space-3)
-}
-
-.source-action-label {
- color: var(--tt-accent);
  font-size: var(--tt-tv-text-body);
  font-weight: var(--tt-weight-bold)
 }
 
-/* Tracker and audio, then the release name on the same line; the name truncates with an ellipsis. */
-.source-detail {
- display: flex;
- align-items: baseline;
- min-width: 0;
- margin-top: var(--tt-space-1)
-}
-
-.source-secondary {
- flex: 0 0 auto;
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta)
-}
-
-.source-filename {
- display: block;
- flex: 1 1 0;
- min-width: 0;
- min-height: 34px;
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis;
- opacity: 0;
- transition: opacity var(--tt-dur-fast)
-}
-
 .source-best,
 .source-best-slot {
- flex: 0 0 auto;
- box-sizing: border-box;
- width: 150px;
- text-align: center
+ flex: 0 0 170px;
+ width: 170px;
+ box-sizing: border-box
 }
 
 .source-best {
@@ -1495,15 +2305,92 @@ button.primary.active {
  background: var(--tt-accent);
  color: var(--tt-on-accent);
  font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-black)
+ font-weight: var(--tt-weight-bold);
+ text-align: center
+}
+
+.source-quality {
+ flex: 0 0 360px;
+ width: 360px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.source-size,
+.source-seeders {
+ flex: 0 0 auto;
+ font-size: 28px;
+ font-variant-numeric: tabular-nums;
+ text-align: right;
+ white-space: nowrap
+}
+
+.source-size {
+ width: 150px;
+ font-weight: var(--tt-weight-semibold)
+}
+
+.source-seeders {
+ width: 200px;
+ color: var(--tt-text-muted)
+}
+
+.source-tracker {
+ flex: 1 1 0;
+ min-width: 0;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.source-action {
+ display: flex;
+ flex: 0 0 auto;
+ align-items: center;
+ justify-content: flex-end
+}
+
+.source-action>*+* {
+ margin-left: var(--tt-space-3)
+}
+
+/* The action word is quiet at rest and full white on the focused row: what OK will do, where the cursor is. */
+.source-action-label {
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-bold)
+}
+
+.source-button:focus .source-action-label {
+ color: var(--tt-text)
+}
+
+.source-detail {
+ display: flex;
+ min-width: 0
+}
+
+.source-filename {
+ display: block;
+ flex: 1 1 0;
+ min-width: 0;
+ min-height: 34px;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ opacity: 0;
+ transition: opacity var(--tt-dur-fast)
 }
 
 .source-button:focus .source-filename {
  opacity: 1
-}
-
-.source-secondary+.source-filename {
- margin-left: var(--tt-space-4)
 }
 
 /* In the Versions view the name is part of the comparison, so it always shows. */
@@ -1511,14 +2398,13 @@ button.primary.active {
  opacity: 1
 }
 
-/* Season packs: plain cards in the Versions view, controls always visible. */
+/* Season packs: after the versions, rows on the quiet fill like the version rows, controls always visible. */
 .season-pack-downloads {
- margin: var(--tt-space-5) 0 var(--tt-space-3);
- padding-top: var(--tt-space-4);
- border-top: 1px solid var(--tt-line)
+ margin: var(--tt-space-7) 0 var(--tt-space-3)
 }
 
 .season-pack-downloads h4 {
+ margin: 0;
  font-size: var(--tt-tv-text-lead);
  font-weight: var(--tt-weight-bold)
 }
@@ -1531,11 +2417,10 @@ button.primary.active {
 
 .season-pack-card {
  min-width: 0;
- margin-top: var(--tt-space-3);
- padding: var(--tt-space-4) var(--tt-space-5);
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
- background: var(--tt-raised)
+ margin-top: 10px;
+ padding: var(--tt-space-4) 28px;
+ border-radius: 18px;
+ background: var(--tt-fill-quiet)
 }
 
 .season-pack-head {
@@ -1576,7 +2461,7 @@ button.primary.active {
 }
 
 .season-pack-action>b {
- color: var(--tt-accent);
+ color: var(--tt-text-muted);
  font-weight: var(--tt-weight-bold)
 }
 
@@ -1660,108 +2545,289 @@ button.primary.active {
  margin-left: var(--tt-space-3)
 }
 
+/* Downloads (the Downloads board) -------------------------------------------
+   The heading carries the storage use against the Allocation on its right; then the filter chips with their
+   counts, Sort and the find field on one line; then one compact row per torrent: thumbnail, title, state with a
+   slim bar and one line of facts, the size, and Play, Pause or Resume and More. Every row keeps its actions
+   drawn, so each row is one focus band; they are quiet until the row holds focus (the navigation layer sets
+   .active-row: the old engines have no :focus-within). Release, path and peers sit behind Details in More. */
+.tv-list.tv-download-list {
+ max-width: none
+}
+
+/* Beside the shell's "Downloads" heading: the content column is the containing block (it is contained), so this
+   sits on the heading's line at the right edge without moving the heading or the list. */
+.tv-download-use {
+ position: absolute;
+ top: var(--tt-tv-safe-y);
+ right: var(--tt-tv-safe-x);
+ display: flex;
+ align-items: center;
+ height: 96px;
+ margin: 0;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
+ white-space: nowrap
+}
+
+.tv-download-use .tv-meter {
+ width: 220px;
+ height: 8px;
+ margin: 0 0 0 18px;
+ background: var(--tt-fill-selected)
+}
+
+.tv-download-use .tv-meter b {
+ background: var(--tt-text-muted)
+}
+
+.tv-download-tools {
+ flex-wrap: nowrap;
+ align-items: center;
+ margin: 0 0 var(--tt-space-6)
+}
+
+.tv-download-tools>* {
+ margin: 0 var(--tt-space-3) 0 0
+}
+
+.tv-download-tools button {
+ flex: 0 0 auto;
+ padding: 0 var(--tt-space-5);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap
+}
+
+/* The count after the chip's word, in the lighter tone of the pill's own text colour (it follows focus). */
+.tv-chip-count {
+ margin-left: 10px;
+ font-style: normal;
+ font-weight: var(--tt-weight-semibold);
+ font-variant-numeric: tabular-nums;
+ opacity: .66
+}
+
+.tv-download-tools input {
+ flex: 0 1 400px;
+ width: 400px;
+ min-width: 0;
+ margin: 0 0 0 auto;
+ font-size: var(--tt-tv-text-meta)
+}
+
 .tv-download-count {
- margin: 0 0 var(--tt-space-3);
+ margin: calc(-1 * var(--tt-space-4)) 0 var(--tt-space-4);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
 }
 
-.tv-download-tools input {
- width: 700px
+.tv-download-row {
+ margin: 0 0 10px;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet)
 }
 
-.tv-download-tools button {
- min-width: 300px;
- justify-content: flex-start
+.tv-download-row.active-row {
+ background: var(--tt-fill-selected)
 }
 
-/* Downloads: one card per torrent. The lines keep a fixed height so telemetry updates in place
-   and the focused control never moves. Release name, path and peers sit behind Details. */
-.tv-list .tv-download-row {
- flex-wrap: wrap;
- min-height: 292px;
- align-items: flex-start;
- overflow: visible
+.tv-download-line {
+ display: flex;
+ align-items: center;
+ height: 136px;
+ padding: 0 var(--tt-space-5) 0 18px
 }
 
-.tv-list .tv-download-row>.tv-download-main {
- flex: 0 0 100%;
- width: 100%;
- margin-right: 0
-}
-
-.tv-download-title,
-.tv-download-status,
-.tv-download-facts {
+.tv-download-thumb {
  display: block;
- max-width: 100%;
- min-height: 38px;
+ flex: 0 0 176px;
+ width: 176px;
+ height: 99px;
+ margin-right: 28px;
+ border-radius: var(--tt-radius-md);
+ background: var(--tt-raised);
+ overflow: hidden
+}
+
+.tv-download-thumb img {
+ display: block;
+ width: 100%;
+ height: 100%;
+ object-fit: cover
+}
+
+.tv-download-main {
+ flex: 1 1 0;
+ min-width: 0;
+ margin-right: 28px
+}
+
+.tv-download-title {
+ display: block;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-bold);
+ line-height: var(--tt-leading-tight);
  white-space: nowrap;
  overflow: hidden;
- text-overflow: ellipsis;
- font-variant-numeric: tabular-nums
+ text-overflow: ellipsis
 }
 
-.tv-list .tv-download-status {
- color: var(--tt-text);
- font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-bold)
+.tv-download-state {
+ display: flex;
+ align-items: center;
+ margin-top: 10px;
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
+ white-space: nowrap
 }
 
-.tv-list .tv-download-status.done {
+.tv-download-state>*+* {
+ margin-left: 18px
+}
+
+/* The state word: saffron while it moves (progress), the status colours otherwise, always as a word. */
+.tv-download-status {
+ flex: 0 0 auto;
+ font-weight: var(--tt-weight-semibold);
+ color: var(--tt-text-muted)
+}
+
+.tv-download-status.active {
+ color: var(--tt-accent)
+}
+
+.tv-download-status.done {
  color: var(--tt-ok)
 }
 
-.tv-list .tv-download-status.error {
+.tv-download-status.error {
  color: var(--tt-danger)
 }
 
-.tv-list .tv-download-status.paused {
- color: var(--tt-warn)
+.tv-download-facts {
+ flex: 1 1 auto;
+ min-width: 0;
+ color: var(--tt-text-subtle);
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
 .tv-meter {
  display: block;
- height: 12px;
- margin: var(--tt-space-1) 0 var(--tt-space-2);
- border-radius: var(--tt-radius-pill);
- background: var(--tt-line);
+ border-radius: 4px;
  overflow: hidden
 }
 
 .tv-meter b {
  display: block;
  height: 100%;
- border-radius: var(--tt-radius-pill);
+ border-radius: 4px;
  background: var(--tt-accent)
 }
 
-.tv-meter.done b {
- background: var(--tt-ok)
+.tv-download-state .tv-meter {
+ flex: 0 0 240px;
+ width: 240px;
+ height: 8px;
+ background: var(--tt-fill-selected)
 }
 
-.tv-meter.error b {
- background: var(--tt-danger)
-}
-
-.tv-meter.paused b {
+.tv-download-state .tv-meter.paused b,
+.tv-download-state .tv-meter.queued b,
+.tv-download-state .tv-meter.idle b {
  background: var(--tt-text-muted)
 }
 
+.tv-download-size {
+ flex: 0 0 auto;
+ min-width: 120px;
+ margin-right: 28px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-semibold);
+ font-variant-numeric: tabular-nums;
+ text-align: right;
+ white-space: nowrap
+}
+
+/* Wide enough for Play, Pause and More, right-aligned: More and the size line up down the list whether a row has a
+   transfer action or not. */
+.tv-download-actions {
+ display: flex;
+ flex: 0 0 auto;
+ align-items: center;
+ justify-content: flex-end;
+ min-width: 400px
+}
+
+.tv-download-actions>*+* {
+ margin-left: 14px
+}
+
+/* At rest the row's actions are quiet; the active row brings them up (the primary to the brighter pill). The focused
+   control still turns white with its outline, from the base rule's two signals. */
+.tv-download-actions button {
+ padding: 0 28px;
+ background: var(--tt-fill-quiet);
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ white-space: nowrap
+}
+
+.tv-download-actions button.primary {
+ padding: 0 30px 0 24px
+}
+
+.tv-download-actions button>.tv-icon:first-child {
+ width: 24px;
+ height: 24px;
+ flex: 0 0 24px;
+ margin: 0 10px 0 0
+}
+
+.tv-download-actions button.tv-download-more {
+ width: 72px;
+ padding: 0
+}
+
+.tv-download-actions button.tv-download-more>.tv-icon:first-child {
+ width: 28px;
+ height: 28px;
+ flex: 0 0 28px;
+ margin: 0
+}
+
+.active-row .tv-download-actions button {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
+}
+
+.active-row .tv-download-actions button.primary {
+ background: var(--tt-fill-strong)
+}
+
+.tv-download-actions button:focus,
+.active-row .tv-download-actions button:focus,
+.active-row .tv-download-actions button.primary:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
+/* Details and an opened torrent's files sit under the row, lined up with the title after the thumbnail. */
 .tv-download-details {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-3) 0 0;
- padding: var(--tt-space-3) var(--tt-space-4);
- border-radius: var(--tt-radius-md);
- background: var(--tt-ink);
+ margin: 0 var(--tt-space-5) 0 222px;
+ padding: 0 0 var(--tt-space-5);
+ color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
 }
 
 .tv-download-details dt {
  flex: 0 0 150px;
  margin: 0 0 var(--tt-space-1);
- color: var(--tt-text-muted)
+ color: var(--tt-text-subtle)
 }
 
 .tv-download-details dd {
@@ -1772,41 +2838,23 @@ button.primary.active {
  overflow-wrap: anywhere
 }
 
-.tv-list .tv-download-row>.tv-download-actions {
- display: flex;
- flex: 0 0 100%;
- flex-wrap: wrap;
- margin-top: var(--tt-space-3)
-}
-
-.tv-list .tv-download-row>.tv-download-actions>* {
- margin: 0 var(--tt-space-3) var(--tt-space-2) 0
-}
-
 .tv-download-files {
- flex: 0 0 100%;
  display: flex;
  flex-direction: column;
  max-height: 620px;
- margin-top: var(--tt-space-4);
- padding: 14px 0;
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
+ margin: 0 var(--tt-space-5) 0 222px;
+ padding: 0 0 var(--tt-space-4);
  overflow-y: auto
 }
 
 .tv-download-file {
  display: flex;
  align-items: center;
- padding: var(--tt-space-2) 20px
+ padding: var(--tt-space-2) 0
 }
 
 .tv-download-file>*+* {
  margin-left: var(--tt-space-4)
-}
-
-.tv-download-file+.tv-download-file {
- border-top: 1px solid var(--tt-line)
 }
 
 .tv-download-file strong {
@@ -1815,10 +2863,14 @@ button.primary.active {
  overflow: hidden;
  text-overflow: ellipsis;
  white-space: nowrap;
- font-size: var(--tt-tv-text-body)
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold)
 }
 
 .tv-download-file small {
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
  white-space: nowrap
 }
 
@@ -1831,10 +2883,84 @@ button.primary.active {
 }
 
 .tv-download-file button {
- min-width: 140px
+ min-width: 140px;
+ font-size: var(--tt-tv-text-meta)
 }
 
 /* Jobs */
+/* Background jobs (#60): one row per job on the quiet fill, Settings-row style: the status icon and its capitalised
+   word in the state's colour, what ran ("Refresh · Copper Archive · FileList") with when and how it ended under
+   it, then Details and Retry. The filters above are the chip row. */
+.tv-jobs .tv-job {
+ margin: 0 0 var(--tt-space-2);
+ padding: var(--tt-space-4) 28px;
+ border: 0;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet)
+}
+
+.tv-job-state {
+ display: flex;
+ align-items: center;
+ flex: 0 0 230px;
+ width: 230px;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ color: var(--tt-text-muted)
+}
+
+.tv-job-state .tv-icon {
+ width: 32px;
+ height: 32px;
+ flex: 0 0 32px;
+ margin-right: var(--tt-space-3)
+}
+
+.tv-job.active .tv-job-state {
+ color: var(--tt-accent)
+}
+
+.tv-job.error .tv-job-state {
+ color: var(--tt-danger)
+}
+
+.tv-job.done .tv-job-state {
+ color: var(--tt-ok)
+}
+
+.tv-job-main {
+ display: flex;
+ flex: 1 1 0;
+ flex-direction: column;
+ min-width: 0;
+ margin-right: var(--tt-space-5)
+}
+
+.tv-job-main>*+* {
+ margin-top: var(--tt-space-1)
+}
+
+.tv-jobs .tv-job .tv-job-main strong {
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-jobs .tv-job .tv-job-main span {
+ font-variant-numeric: var(--tt-figures);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-job-message {
+ margin: 0 0 var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta)
+}
+
 .job-detail {
  max-width: 1500px
 }
@@ -1851,6 +2977,7 @@ button.primary.active {
  width: 100%;
  margin: var(--tt-space-3) 0 0;
  padding: var(--tt-space-4) var(--tt-space-5);
+ border-radius: var(--tt-radius-xl);
  border-left: 6px solid var(--tt-line-strong);
  text-align: left
 }
@@ -1996,8 +3123,14 @@ button.primary.active {
  width: 100%;
  margin: var(--tt-space-4) 0 0;
  padding: var(--tt-space-4) var(--tt-space-5);
+ border-radius: var(--tt-radius-xl);
  background: var(--tt-surface);
  text-align: left
+}
+
+.tv-project:focus {
+ background: var(--tt-raised);
+ color: var(--tt-text)
 }
 
 .tv-project strong {
@@ -2032,10 +3165,14 @@ button.primary.active {
  display: block;
  width: 520px;
  padding: var(--tt-space-4) var(--tt-space-5);
- background: var(--tt-overlay);
- border-color: var(--tt-line-strong);
- border-radius: var(--tt-radius-md);
+ background: var(--tt-raised);
+ border-radius: var(--tt-radius-xl);
  text-align: left
+}
+
+.tv-promo:focus {
+ background: var(--tt-overlay);
+ color: var(--tt-text)
 }
 
 .tv-promo small {
@@ -2079,30 +3216,33 @@ button.primary.active {
  word-break: break-all
 }
 
-/* Setup: first run and server change ------------------------------------------- */
+/* Setup: first run and server change (#62). No board draws it, so it takes the Settings board's vocabulary: the
+   content edge at 168 px, the app mark over a 56 px screen heading, the found servers as one column of rows
+   (name on the left, address and version muted on the right, ring plus lighter fill on focus) and Manual address
+   under a muted section label instead of a hairline. One column keeps the D-pad map's list: Up and Down only. */
 .setup {
- width: 1220px;
- margin: 0 auto;
- padding-top: 84px
+ width: 1920px;
+ padding-top: 96px;
+ padding-left: 168px;
+ padding-right: 168px
 }
 
 .setup-mark {
- display: flex;
- align-items: center;
- justify-content: center;
- width: 96px;
- height: 80px;
- border-radius: var(--tt-radius-lg);
- background: var(--tt-accent);
- color: var(--tt-on-accent);
- font-size: var(--tt-tv-text-heading);
- font-weight: var(--tt-weight-black)
+ width: 72px;
+ height: 72px;
+ border-radius: var(--tt-radius-xl)
+}
+
+.setup-mark svg {
+ width: 32px;
+ height: 32px
 }
 
 .setup>h1 {
- margin: var(--tt-space-4) 0 var(--tt-space-2);
- font-size: var(--tt-tv-text-title);
- font-weight: var(--tt-weight-black)
+ margin: var(--tt-space-6) 0 var(--tt-space-3);
+ font-size: var(--tt-tv-text-heading);
+ font-weight: var(--tt-weight-black);
+ letter-spacing: var(--tt-tracking-heading)
 }
 
 .setup-lead {
@@ -2112,7 +3252,7 @@ button.primary.active {
 
 .setup-mode-actions {
  display: flex;
- margin: var(--tt-space-6) 0 var(--tt-space-3)
+ margin: var(--tt-space-7) 0 var(--tt-space-4)
 }
 
 .setup-mode-actions>*+* {
@@ -2123,57 +3263,77 @@ button.primary.active {
  min-width: 260px
 }
 
+.setup .focus-hint {
+ color: var(--tt-text-subtle)
+}
+
 .setup-results {
- display: flex;
- flex-wrap: wrap;
+ width: 1140px;
  max-height: 420px;
- margin: var(--tt-space-3) -16px 0;
- padding: 16px 16px 0;
+ margin: var(--tt-space-4) -20px 0;
+ padding: 16px 20px 0;
  overflow-y: auto
 }
 
 .setup-results>* {
- flex: 0 0 calc(50% - 16px);
- min-width: 0;
- margin: 0 var(--tt-space-4) var(--tt-space-4) 0
+ display: flex;
+ width: 100%;
+ margin: 0 0 var(--tt-space-2)
 }
 
 .setup-results button {
- display: flex;
- flex-direction: column;
- align-items: flex-start;
- justify-content: center;
- padding-top: var(--tt-space-3);
- padding-bottom: var(--tt-space-3);
+ flex-direction: row;
+ align-items: center;
+ justify-content: flex-start;
+ min-height: var(--tt-tv-target);
+ padding: var(--tt-space-4) var(--tt-space-6);
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet);
  text-align: left
 }
 
-.setup-results button>* {
- max-width: 100%
+.setup-results button:focus {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
 }
 
 .setup-results strong {
- font-size: var(--tt-tv-text-lead)
-}
-
-.setup-results span,
-.setup-results small {
- margin-top: var(--tt-space-1);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
+ min-width: 0;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold);
  white-space: nowrap;
  overflow: hidden;
  text-overflow: ellipsis
 }
 
+.setup-results span,
+.setup-results small {
+ flex: 0 0 auto;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium);
+ font-variant-numeric: var(--tt-figures);
+ white-space: nowrap
+}
+
+.setup-results span {
+ margin-left: auto;
+ padding-left: var(--tt-space-6)
+}
+
+.setup-results small {
+ margin-left: var(--tt-space-5)
+}
+
 .setup-manual {
- margin-top: var(--tt-space-5);
- padding-top: var(--tt-space-4);
- border-top: 1px solid var(--tt-line)
+ margin-top: var(--tt-space-7)
 }
 
 .setup-manual h2 {
- font-size: var(--tt-tv-text-lead)
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ letter-spacing: .02em;
+ color: var(--tt-text-subtle)
 }
 
 .setup-controls {
@@ -2192,11 +3352,11 @@ button.primary.active {
 
 .setup-status {
  min-height: 42px;
- margin-top: var(--tt-space-3);
+ margin-top: var(--tt-space-4);
  color: var(--tt-text-muted)
 }
 
-/* Player: one bar layer over a bottom scrim, inside the safe area (DESIGN.md "Player controls surface"). */
+/* Player: one controls layer over the picture, inside the safe area (DESIGN.md "Player controls surface"). */
 .player-shell {
  position: fixed;
  top: 0;
@@ -2230,11 +3390,12 @@ button.primary.active {
  z-index: 2
 }
 
-/* OSD: the bar's surface, shown and cleared with one opacity transition. */
+/* OSD: the controls' surface, shown and cleared with one opacity transition. It sits below the heading's band so a
+   status never covers the title or the current Audio and Subtitles choice. */
 .player-message {
  position: absolute;
  z-index: 5;
- top: var(--tt-tv-safe-y);
+ top: 190px;
  left: 50%;
  max-width: 1400px;
  padding: var(--tt-space-3) var(--tt-space-6);
@@ -2255,13 +3416,15 @@ button.primary.active {
  transition: opacity var(--tt-dur-base), visibility 0s
 }
 
+/* The controls layer (#61, the "Player controls" board): no boxed bar. The heading reads over a top scrim and the
+   timeline and toolbar over a bottom scrim, both painted by this one layer, which fades with one opacity transition. */
 .player-controls {
  position: absolute;
+ top: 0;
  left: 0;
- right: 0;
- bottom: 0;
- padding: 200px var(--tt-tv-safe-x) var(--tt-tv-safe-y);
- background: linear-gradient(transparent, var(--tt-scrim-bottom));
+ width: 1920px;
+ height: 1080px;
+ background: linear-gradient(180deg, var(--tt-scrim-text), transparent 240px), linear-gradient(0deg, var(--tt-scrim-bottom), var(--tt-scrim-text) 240px, transparent 560px);
  opacity: 0;
  visibility: hidden;
  transition: opacity var(--tt-controls-fade), visibility 0s linear var(--tt-controls-fade);
@@ -2274,49 +3437,81 @@ button.primary.active {
  transition: opacity var(--tt-controls-fade), visibility 0s
 }
 
-.player-bar {
- padding: var(--tt-space-5) var(--tt-space-6) var(--tt-space-5);
- background: var(--tt-controls-surface);
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-lg)
-}
-
+/* Heading: the show and episode code (muted) over the episode name on the left, the current Audio and Subtitles
+   choice on the right. */
 .player-heading {
+ position: absolute;
+ top: var(--tt-tv-safe-y);
+ left: var(--tt-tv-safe-x);
+ right: var(--tt-tv-safe-x);
  display: flex;
- align-items: baseline;
+ align-items: flex-start;
  justify-content: space-between;
- margin-bottom: var(--tt-space-3)
+ text-shadow: var(--tt-text-shade)
 }
 
-.player-title {
- min-width: 0;
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold);
+.player-name {
+ min-width: 0
+}
+
+.player-kicker {
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
  white-space: nowrap;
  overflow: hidden;
  text-overflow: ellipsis
 }
 
+.player-title {
+ font-size: 40px;
+ font-weight: var(--tt-weight-black);
+ letter-spacing: var(--tt-tracking-snug);
+ line-height: var(--tt-leading-tight);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.player-kicker+.player-title {
+ margin-top: 6px
+}
+
 .player-choice {
  flex: 0 0 auto;
- margin-left: var(--tt-space-5);
+ margin-left: var(--tt-space-6);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta);
  white-space: nowrap
 }
 
-/* The track is 12 px and grows to 20 px under Timeline focus; the button keeps one height, so nothing below it moves. */
+.player-bar {
+ position: absolute;
+ left: var(--tt-tv-safe-x);
+ right: var(--tt-tv-safe-x);
+ bottom: var(--tt-tv-safe-y)
+}
+
+/* Timeline: the track, the downloaded range over it, the played range on top, and a white handle at the play head.
+   The track is 12 px and grows to 20 px under Timeline focus; the button keeps one height, so nothing below it moves.
+   The handle grows by transform only. */
 .player-timeline {
  display: block;
  width: 100%;
  height: 36px;
  min-height: 36px;
  padding: 0;
- border-color: transparent;
+ border-radius: var(--tt-radius-sm);
  background: transparent
 }
 
+.player-timeline:focus {
+ background: transparent;
+ color: var(--tt-text)
+}
+
 .player-timeline:before,
+.player-buffered,
 .player-fill {
  position: absolute;
  left: 0;
@@ -2329,6 +3524,11 @@ button.primary.active {
 .player-timeline:before {
  content: "";
  right: 0;
+ background: var(--tt-fill-strong)
+}
+
+.player-buffered {
+ display: block;
  background: var(--tt-line-strong)
 }
 
@@ -2338,83 +3538,163 @@ button.primary.active {
 }
 
 .player-timeline:focus:before,
+.player-timeline:focus .player-buffered,
 .player-timeline:focus .player-fill {
  height: var(--tt-tv-timeline-height-focus);
  margin-top: -10px
 }
 
 .player-fill i {
- display: none;
+ display: block;
  position: absolute;
- right: -16px;
+ right: -14px;
  top: 50%;
- width: 32px;
- height: 32px;
- margin-top: -16px;
- border: 4px solid var(--tt-focus-edge);
+ width: 28px;
+ height: 28px;
+ margin-top: -14px;
  border-radius: 50%;
- background: var(--tt-accent)
+ background: var(--tt-fill-focus)
 }
 
 .player-timeline:focus .player-fill i {
- display: block
+ transform: scale(1.3)
 }
 
 .player-time {
  display: flex;
  justify-content: space-between;
- margin: var(--tt-space-1) 0 var(--tt-space-4);
+ margin-top: 10px;
  font-size: var(--tt-tv-text-body);
- font-variant-numeric: tabular-nums
+ font-weight: var(--tt-weight-semibold);
+ font-variant-numeric: tabular-nums;
+ text-shadow: var(--tt-text-shade)
 }
 
+.player-time span+span {
+ color: var(--tt-text-muted)
+}
+
+/* Toolbar: round icon buttons with their labels under them, centred; Play/Pause is larger; a wider break before
+   Audio and before Back groups transport, tracks and leaving. The button itself is a transparent 132 px column, so
+   focus draws on the circle: white with ground-coloured glyph and the halo, and the label turns white. */
 .player-toolbar {
  display: flex;
- align-items: center;
+ align-items: flex-start;
+ justify-content: center;
+ margin-top: 26px;
  white-space: nowrap
 }
 
 .player-toolbar>*+* {
- margin-left: 14px
-}
-
-.player-toolbar button,
-.player-retry {
- padding: 0 14px;
- font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-bold)
-}
-
-.player-toolbar button>.tv-icon {
- margin-right: 6px
-}
-
-.player-toolbar [data-player-control="play"] {
- padding: 0 var(--tt-space-4)
+ margin-left: 22px
 }
 
 .player-toolbar [data-player-control="audio"],
 .player-toolbar [data-player-control="back"] {
- margin-left: var(--tt-space-5)
+ margin-left: 78px
+}
+
+.player-toolbar button {
+ flex-direction: column;
+ justify-content: flex-start;
+ width: 132px;
+ min-height: 0;
+ padding: 0 0 10px;
+ border: 0;
+ background: transparent;
+ color: var(--tt-text)
+}
+
+.player-toolbar button:focus {
+ background: transparent;
+ color: var(--tt-text)
+}
+
+.player-toolbar [data-player-control]:focus {
+ outline: 0;
+ box-shadow: none
+}
+
+.player-glyph {
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ width: 80px;
+ height: 80px;
+ border-radius: 50%;
+ background: var(--tt-fill-selected)
+}
+
+.player-toolbar [data-player-control="play"] .player-glyph {
+ width: 96px;
+ height: 96px
+}
+
+.player-glyph .tv-icon {
+ width: 36px;
+ height: 36px;
+ flex: 0 0 36px
+}
+
+.player-toolbar [data-player-control="play"] .player-glyph .tv-icon {
+ width: 44px;
+ height: 44px;
+ flex: 0 0 44px
+}
+
+.player-label {
+ margin-top: 10px;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold)
+}
+
+.player-toolbar [data-player-control]:focus .player-glyph {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
+ box-shadow: var(--tt-focus-shadow-tv)
+}
+
+.player-toolbar [data-player-control]:focus .player-label {
+ color: var(--tt-text)
+}
+
+/* An open Player panel's control: a lighter circle, the bold label and the saffron marker under it, focused or not. */
+.player-toolbar button.open,
+.player-toolbar button.open:focus {
+ background: linear-gradient(var(--tt-accent), var(--tt-accent)) no-repeat 50% 100% / 40px 4px
+}
+
+.player-toolbar button.open .player-glyph {
+ background: var(--tt-fill-strong)
+}
+
+.player-toolbar button.open .player-label {
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold)
 }
 
 .player-retry {
- margin-top: var(--tt-space-4)
+ display: block;
+ margin: var(--tt-space-4) auto 0;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-bold)
 }
 
-/* Menus: solid surface on an overlay border, rows at target height, body type. */
+/* Player panels (Audio, Subtitles, Options, Playback information): a solid sheet at the top right above the
+   controls, rows at the 72 px TV target on the card radius, body type. */
 .player-dialog {
  position: absolute;
  right: var(--tt-tv-safe-x);
  top: var(--tt-tv-safe-y);
- width: 700px;
- max-height: 640px;
+ width: 760px;
+ max-height: 660px;
  overflow-y: auto;
  z-index: 10;
- padding: var(--tt-space-5);
+ padding: var(--tt-space-6);
  background: var(--tt-menu-surface);
- border: 2px solid var(--tt-overlay);
- border-radius: var(--tt-radius-lg);
+ border: 0;
+ border-radius: var(--tt-radius-xl);
  box-shadow: 0 24px 64px var(--tt-veil)
 }
 
@@ -2423,13 +3703,13 @@ button.primary.active {
 }
 
 .player-dialog h2 {
- margin: 0 0 var(--tt-space-3);
+ margin: 0 0 var(--tt-space-4);
  font-size: var(--tt-tv-text-lead);
  font-weight: var(--tt-weight-bold)
 }
 
 .player-dialog h3 {
- margin: var(--tt-space-4) 0 var(--tt-space-1);
+ margin: var(--tt-space-5) 0 var(--tt-space-2);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta);
  letter-spacing: .08em;
@@ -2437,17 +3717,33 @@ button.primary.active {
 }
 
 .player-dialog p {
- margin: 0 0 var(--tt-space-2);
+ display: flex;
+ align-items: center;
+ min-height: var(--tt-tv-target);
+ margin: 0;
+ padding: var(--tt-space-2) 0;
+ border-bottom: 1px solid var(--tt-line);
  color: var(--tt-text-muted)
 }
 
 .player-dialog button {
  display: block;
  width: 100%;
+ min-height: var(--tt-tv-target);
  margin: var(--tt-space-2) 0 0;
  padding: var(--tt-space-3) var(--tt-space-5);
- background: var(--tt-raised);
+ border-radius: var(--tt-radius-lg);
+ background: var(--tt-fill-quiet);
  text-align: left
+}
+
+.player-dialog p+button {
+ margin-top: var(--tt-space-4)
+}
+
+.player-dialog button:focus {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
 }
 
 .player-dialog button small {
@@ -2489,7 +3785,8 @@ button.primary.active {
  }
 }
 
-/* Getting ready: a calm centred panel while the stream opens, buffers or waits. Static, never focusable. */
+/* Getting ready: a calm centred panel while the stream opens, buffers or waits. Static, never focusable. A solid
+   rounded surface with no hairline; the bar is the translucent fill with the saffron progress (#62). */
 .player-ready {
  position: absolute;
  z-index: 4;
@@ -2498,8 +3795,7 @@ button.primary.active {
  width: 900px;
  padding: var(--tt-space-6) var(--tt-space-7);
  background: var(--tt-controls-surface);
- border: 1px solid var(--tt-line-strong);
- border-radius: var(--tt-radius-lg);
+ border-radius: var(--tt-radius-xl);
  transform: translateX(-50%);
  pointer-events: none
 }
@@ -2517,7 +3813,7 @@ button.primary.active {
  position: relative;
  height: var(--tt-tv-timeline-height);
  margin-top: var(--tt-space-5);
- background: var(--tt-line-strong);
+ background: var(--tt-fill);
  border-radius: var(--tt-radius-pill);
  overflow: hidden
 }
@@ -2538,6 +3834,90 @@ button.primary.active {
 .player-ready-facts b {
  margin-right: var(--tt-space-5);
  color: var(--tt-text)
+}
+
+/* More menu (more-menu.tsx) ----------------------------------------------
+   A screen's secondary actions on a solid sheet in the Player-panel style: the menu surface, rows at the TV target
+   height, the lighter fill inside the white ring on focus. It owns its focus region; the veil behind it is static. */
+.tv-more {
+ position: fixed;
+ top: 0;
+ left: 0;
+ width: 1920px;
+ height: 1080px;
+ z-index: 60;
+ background: var(--tt-veil)
+}
+
+.tv-more-sheet {
+ position: absolute;
+ right: var(--tt-tv-safe-x);
+ top: var(--tt-tv-safe-y);
+ width: 700px;
+ max-height: 972px;
+ overflow-y: auto;
+ padding: var(--tt-space-5);
+ background: var(--tt-menu-surface);
+ border: 2px solid var(--tt-overlay);
+ border-radius: var(--tt-radius-lg);
+ box-shadow: 0 24px 64px var(--tt-veil)
+}
+
+.tv-more-sheet h2 {
+ margin: 0 0 var(--tt-space-3);
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.tv-more-row {
+ display: block;
+ width: 100%;
+ margin: var(--tt-space-2) 0 0;
+ padding: var(--tt-space-3) var(--tt-space-5);
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet);
+ text-align: left
+}
+
+.tv-more-row:focus {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
+}
+
+.tv-more-row b {
+ display: block;
+ font-weight: var(--tt-weight-bold)
+}
+
+.tv-more-row small {
+ display: block;
+ margin-top: var(--tt-space-1);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-regular);
+ line-height: var(--tt-leading-body)
+}
+
+.tv-more-row.danger-button {
+ color: var(--tt-danger)
+}
+
+.tv-more-row.danger-button:focus {
+ background: var(--tt-danger);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-more-message {
+ margin: var(--tt-space-3) var(--tt-space-5) 0;
+ color: var(--tt-danger);
+ font-size: var(--tt-tv-text-meta)
+}
+
+.tv-more-close {
+ margin-top: var(--tt-space-4)
 }
 
 /* Info panel ----------------------------------------------------------
@@ -2564,7 +3944,7 @@ button.primary.active {
  display: flex;
  flex-direction: column;
  background: var(--tt-overlay);
- border-left: 1px solid var(--tt-line-strong)
+ box-shadow: -24px 0 64px var(--tt-veil)
 }
 
 .info-head {
@@ -2600,22 +3980,29 @@ button.primary.active {
  padding: var(--tt-space-4) var(--tt-space-5);
  text-align: left;
  font-weight: var(--tt-weight-regular, 400);
- background: transparent;
- border-color: transparent
+ border-radius: var(--tt-radius-xl);
+ background: transparent
 }
 
 .info-stop:focus {
- background: var(--tt-raised)
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
 }
 
 .info-stop>span {
  display: block
 }
 
+/* The avatar is a span too, but a centred circle: without this the block rule above put the initials in its corner,
+   where the round clip cut them. */
+.info-stop>.info-avatar {
+ display: flex
+}
+
 .info-meta {
- color: var(--tt-accent);
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold)
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-semibold)
 }
 
 .info-tagline {
@@ -2675,10 +4062,11 @@ button.primary.active {
  justify-content: center;
  overflow: hidden;
  border-radius: var(--tt-radius-pill);
- background: var(--tt-line);
+ background: var(--tt-fill-strong);
  color: var(--tt-text);
  font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ line-height: 1
 }
 
 .info-avatar img {
@@ -2869,6 +4257,3 @@ button.primary.active {
  font-weight: var(--tt-weight-bold)
 }
 
-.tv-danger-zone>h2 {
- color: var(--tt-danger)
-}

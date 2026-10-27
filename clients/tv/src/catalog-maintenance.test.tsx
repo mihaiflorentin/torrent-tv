@@ -2,6 +2,7 @@
 import { h, render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 
 // App-seam tests for the Catalog maintenance controls in TV Settings: the
 // Events page is gone from the menu, and the Rebuild catalog confirmation
@@ -66,7 +67,7 @@ describe('TV Settings catalog maintenance through the app', () => {
   it('has no Events entry in the menu', async () => {
     render(h(App, null), container);
     await wait(120);
-    const labels = Array.from(container.querySelectorAll('[data-menu-route]')).map(item => item.getAttribute('data-menu-route'));
+    const labels = Array.from(container.querySelectorAll('[data-menu-hub]')).map(item => item.getAttribute('data-menu-hub'));
     expect(labels).toContain('settings');
     expect(labels).not.toContain('events');
     expect(container.textContent).not.toContain('Events');
@@ -75,8 +76,10 @@ describe('TV Settings catalog maintenance through the app', () => {
   it('opens the rebuild dialog on Cancel, cancels on Back without syncing, and returns focus to the Rebuild button', async () => {
     render(h(App, null), container);
     await wait(120);
-    container.querySelector<HTMLElement>('[data-menu-route="settings"]')!.click();
+    await openRoute(container, 'settings', 0);
     await wait(120);
+    container.querySelector<HTMLButtonElement>('[data-focus-key="settings-group-danger"]')!.click();
+    await wait(30);
     const rebuild = container.querySelector<HTMLButtonElement>('[data-focus-key="catalog-rebuild"]')!;
     rebuild.focus();
     rebuild.click();
@@ -94,14 +97,16 @@ describe('TV Settings catalog maintenance through the app', () => {
   it('queues the rebuild only from the confirm button', async () => {
     render(h(App, null), container);
     await wait(120);
-    container.querySelector<HTMLElement>('[data-menu-route="settings"]')!.click();
+    await openRoute(container, 'settings', 0);
     await wait(120);
+    container.querySelector<HTMLButtonElement>('[data-focus-key="settings-group-danger"]')!.click();
+    await wait(30);
     container.querySelector<HTMLButtonElement>('[data-focus-key="catalog-rebuild"]')!.click();
     await wait(30);
     container.querySelector<HTMLButtonElement>('[data-focus-key="rebuild-confirm-apply"]')!.click();
     await wait(60);
     expect(syncModes).toEqual(['rebuild']);
     expect(container.querySelector('.tv-rebuild-confirm')).toBeNull();
-    expect(container.querySelector('.tv-danger-zone')!.textContent).toContain('queued');
+    expect(container.querySelector('[data-settings-pane="danger"]')!.textContent).toContain('queued');
   });
 });

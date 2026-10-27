@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { API, CatalogFacets, HouseholdState, PortalState } from '@torrent-tv/shared';
 import { exitApplication } from '../../tv/src/platform';
+import { openRoute } from '../../tv/src/test-nav';
 
 // Polyfill localStorage if needed in happy-dom test runner before main boots
 if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage.getItem) {
@@ -454,10 +455,8 @@ describe('webOS behavioral regression: link refusal and exit', () => {
       container
     );
 
-    // Switch to Projects route
-    const projectsBtn = container.querySelector<HTMLButtonElement>('[data-menu-route="projects"]');
-    projectsBtn?.click();
-    await new Promise(r => setTimeout(r, 20));
+    // Switch to the Projects route: Settings, then its Other projects entry (the six-hub rail, #54)
+    await openRoute(container, 'projects', 20);
 
     // Confirm the link is displayed with the exact URL
     const linkCard = container.querySelector<HTMLButtonElement>('[data-focus-key="project-1"]');

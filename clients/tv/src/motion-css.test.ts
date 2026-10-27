@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-// Motion on the TV (spec #45: the Velvet Booth look stays on capable engines, a cheaper equivalent on old ones).
+// Motion on the TV (spec #45: the full look stays on capable engines, a cheaper equivalent on old ones).
 // Read as text like chromium53-css.test.ts: the sidebar slides and its labels fade, and a focused poster eases its
 // scale, all on compositor properties only; the lean-graphics root class (capability.ts) snaps every one of them.
 const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'tv.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -19,7 +19,7 @@ const transitions = [...css.matchAll(/transition\s*:\s*([^;}]+)/g)].map(match =>
 
 describe('TV motion on capable engines', () => {
   it('never animates a main-thread property: only transform and opacity transition on the shell', () => {
-    for (const selector of ['.tv-sidebar::before', '.tv-sidebar button span', '.poster-card']) {
+    for (const selector of ['.tv-sidebar::before', '.tv-sidebar button span', '.tv-veil', '.poster-card']) {
       const value = /transition\s*:\s*([^;]+)/.exec(declarationsOf(selector))?.[1] ?? '';
       expect(value.split(',').every(part => /^\s*(transform|opacity)\b/.test(part)), `${selector}: ${value}`).toBe(true);
     }
@@ -27,7 +27,7 @@ describe('TV motion on capable engines', () => {
   });
 
   it('slides the sidebar panel with a transform, not by animating clip', () => {
-    expect(declarationsOf('.tv-sidebar::before')).toMatch(/transform:\s*translateX\(-280px\)/);
+    expect(declarationsOf('.tv-sidebar::before')).toMatch(/transform:\s*translateX\(-400px\)/);
     expect(declarationsOf('.tv-sidebar::before')).toMatch(/transition:\s*transform/);
     expect(declarationsOf('.tv-app.menu-open .tv-sidebar::before')).toMatch(/transform:\s*none/);
     expect(declarationsOf('.tv-sidebar')).not.toMatch(/\bclip\s*:/);

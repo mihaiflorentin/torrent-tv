@@ -871,7 +871,7 @@ describe('Player track selection and subtitle behavior honesty', () => {
 
     // Initially no audio tracks
     const audioBtn = container.querySelector<HTMLButtonElement>('[data-player-control="audio"]')!;
-    expect(audioBtn.textContent).toBe('Audio (0)');
+    expect(audioBtn.getAttribute('aria-label')).toBe('Audio, 0 tracks');
 
     const callsBefore = (mockAVPlay.getTotalTrackInfo as Mock).mock.calls.length;
 
@@ -884,7 +884,7 @@ describe('Player track selection and subtitle behavior honesty', () => {
 
     // Exactly one refreshTracks occurred
     expect((mockAVPlay.getTotalTrackInfo as Mock).mock.calls.length).toBe(callsBefore + 1);
-    expect(container.querySelector<HTMLButtonElement>('[data-player-control="audio"]')?.textContent).toBe('Audio (1)');
+    expect(container.querySelector<HTMLButtonElement>('[data-player-control="audio"]')?.getAttribute('aria-label')).toBe('Audio, 1 track');
   });
 });
 

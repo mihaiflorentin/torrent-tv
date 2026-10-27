@@ -1084,13 +1084,13 @@ async function runCleanAndFatal(state, session, errors, appBase, browser, output
    var subBtn = document.querySelector('[data-player-control="subtitles"]');
    var tracks = window.webapis && window.webapis.avplay ? window.webapis.avplay.getTotalTrackInfo() : null;
    return {
-    audioLabel: audioBtn ? audioBtn.textContent : null,
-    subLabel: subBtn ? subBtn.textContent : null,
+    audioLabel: audioBtn ? audioBtn.getAttribute('aria-label') : null,
+    subLabel: subBtn ? subBtn.getAttribute('aria-label') : null,
     tracksLength: tracks ? tracks.length : null,
    };
   })()`);
   return {
-   done: info.audioLabel === 'Audio (0)' && info.tracksLength === 0,
+   done: info.audioLabel === 'Audio, 0 tracks' && info.tracksLength === 0,
    view: info,
   };
  }, MILESTONE_TIMEOUT_MS);
@@ -1193,7 +1193,7 @@ async function runCleanAndFatal(state, session, errors, appBase, browser, output
  }
  const subOffFile = await screenshot(session, outputDir, 'clean-10-subtitles-off.png');
  artifacts.screenshots.push(subOffFile);
- console.log('case clean: audio/subtitle picker PASS — honest empty inventory Audio (0), audio dialog opened/closed, subtitles dialog Off cleared overlay.');
+ console.log('case clean: audio/subtitle picker PASS — honest empty inventory (Audio, 0 tracks), audio dialog opened/closed, subtitles dialog Off cleared overlay.');
 
  await pressKey(session, 'Escape');
  const exitProbe = await poll(async () => {

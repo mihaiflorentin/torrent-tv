@@ -1,19 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { UpdateStatus } from '@torrent-tv/shared';
 import {
-  PROJECTS_MENU_ROW,
   REBUILD_DIALOG_REGION,
-  SETTINGS_CATALOG_FETCH_ROW,
-  SETTINGS_CHANGE_SERVER_ROW,
-  SETTINGS_DIAGNOSTICS_ROW,
-  SETTINGS_FORGET_SERVER_ROW,
-  SETTINGS_REBUILD_ROW,
-  SETTINGS_SAVE_ROW,
-  SETTINGS_TEST_FIRST_ROW,
-  UPDATE_APPLY_ROW,
-  UPDATE_CHECK_ROW,
   UPDATE_DIALOG_REGION,
-  UPDATE_RELEASE_LINK_ROW,
   confirmDialogStale,
   dialogRestoreKey,
   promotionsVisible,
@@ -111,21 +100,8 @@ describe('dialog focus restore', () => {
 });
 
 describe('focus identities', () => {
-  it('pins the appended TVSettings rows and the projects menu row', () => {
-    expect(UPDATE_RELEASE_LINK_ROW).toBe(SETTINGS_SAVE_ROW + 1);
-    expect(SETTINGS_TEST_FIRST_ROW).toBe(UPDATE_RELEASE_LINK_ROW + 1);
-    expect(SETTINGS_DIAGNOSTICS_ROW).toBeGreaterThan(UPDATE_RELEASE_LINK_ROW);
-    expect(SETTINGS_DIAGNOSTICS_ROW).toBeLessThan(SETTINGS_TEST_FIRST_ROW);
-    expect(UPDATE_CHECK_ROW).toBe(SETTINGS_FORGET_SERVER_ROW + 1);
-    expect(UPDATE_APPLY_ROW).toBe(UPDATE_CHECK_ROW + 1);
-    expect(PROJECTS_MENU_ROW).toBe(33);
+  it('gives the update and rebuild dialogs their own focus regions, so each traps the D-pad', () => {
     expect(UPDATE_DIALOG_REGION).toBe('update-dialog');
-  });
-
-  it('places Fetch latest after the connection tests and Rebuild catalog below every other control', () => {
-    expect(SETTINGS_CATALOG_FETCH_ROW).toBeGreaterThan(SETTINGS_TEST_FIRST_ROW + 1);
-    expect(SETTINGS_CATALOG_FETCH_ROW).toBeLessThan(SETTINGS_CHANGE_SERVER_ROW);
-    expect(SETTINGS_REBUILD_ROW).toBeGreaterThan(UPDATE_APPLY_ROW);
     expect(REBUILD_DIALOG_REGION).toBe('rebuild-dialog');
     expect(REBUILD_DIALOG_REGION).not.toBe(UPDATE_DIALOG_REGION);
   });
