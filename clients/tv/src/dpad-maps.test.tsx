@@ -134,6 +134,50 @@ describe('screens the D-pad audit found bugs on', () => {
     expect(focusKey()).toBe(layout.groups.recent.members[0].element.key);
   });
 
+  it('walks Settings in two panes: the groups, Right into a group, Left and Back out to it, Left again to the rail', async () => {
+    await start();
+    await open('settings');
+    await wait(100);
+    const map = mapNamed('settings');
+    expect(focusKey()).toBe(screen(map).groups.rows.members[0].element.key);
+    expect(focusKey()).toBe('setting-audio-primary');
+    expect(await holdsLiteralMoves(map)).toEqual([]);
+    // The rows stop at both ends.
+    focusOn('setting-audio-primary');
+    press(...KEY.up);
+    await wait(20);
+    expect(focusKey()).toBe('setting-audio-primary');
+    focusOn('settings-save');
+    press(...KEY.down);
+    await wait(20);
+    expect(focusKey()).toBe('settings-save');
+    // Left from a row goes to the selected group; Down walks the groups without changing the pane.
+    press(...KEY.left);
+    await wait(20);
+    expect(focusKey()).toBe('settings-group-playback');
+    press(...KEY.down);
+    await wait(20);
+    expect(focusKey()).toBe('settings-group-trackers');
+    expect(container.querySelector('[data-settings-pane]')!.getAttribute('data-settings-pane')).toBe('playback');
+    // Right opens the focused group on its first row; Back returns to the group, then opens the rail.
+    press(...KEY.right);
+    await wait(60);
+    expect(focusKey()).toBe('setting-filelist-enabled');
+    expect(container.querySelector('[data-settings-pane]')!.getAttribute('data-settings-pane')).toBe('trackers');
+    back();
+    await wait(60);
+    expect(focusKey()).toBe('settings-group-trackers');
+    expect(container.querySelector('.tv-app.menu-open')).toBeNull();
+    back();
+    await wait(60);
+    expect(container.querySelector('.tv-app.menu-open')).not.toBeNull();
+    expect(focusKey()).toBe('menu-settings');
+    // Right closes the rail onto the group it was opened from.
+    press(...KEY.right);
+    await wait(60);
+    expect(focusKey()).toBe('settings-group-trackers');
+  });
+
   it('opens a job on the back-to-Jobs button, walks its map, and Back returns to the job row', async () => {
     await start();
     await open('jobs');

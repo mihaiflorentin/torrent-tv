@@ -4,7 +4,7 @@ import { useRef } from 'preact/hooks';
 import { describe, expect, it, vi } from 'vitest';
 import { chooseDirectionalTarget, chooseStructuredTarget, RectLike, remoteAction, useTVNavigation } from './navigation';
 import type { TVPlatformHooks } from './platform';
-import { REBUILD_DIALOG_REGION, SETTINGS_JOBS_ROW, SETTINGS_PROJECTS_ROW, SETTINGS_RELOAD_ROW, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_REBUILD_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION } from './portal';
+import { REBUILD_DIALOG_REGION, UPDATE_DIALOG_REGION } from './portal';
 
 const rect = (left: number, top: number, width = 100, height = 100): RectLike => ({ left, top, right: left + width, bottom: top + height, width, height });
 
@@ -88,52 +88,6 @@ describe('remoteAction', () => {
   });
 });
 
-describe('TVSettings update rows', () => {
-  const control = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
-  const change = control(SETTINGS_CHANGE_SERVER_ROW);
-  const forget = control(SETTINGS_FORGET_SERVER_ROW);
-  const check = control(UPDATE_CHECK_ROW);
-  const apply = control(UPDATE_APPLY_ROW);
-  const elements = [change, forget, check, apply];
-  it('walks from the existing rows onto the appended check and apply rows', () => {
-    expect(chooseStructuredTarget(forget, elements, 'down')).toBe(check);
-    expect(chooseStructuredTarget(check, elements, 'down')).toBe(apply);
-  });
-  it('walks back up without losing the appended rows', () => {
-    expect(chooseStructuredTarget(apply, elements, 'up')).toBe(check);
-    expect(chooseStructuredTarget(check, elements, 'up')).toBe(forget);
-  });
-  it('maintains continuous vertical order from save through tests and server actions', () => {
-    const save = control(SETTINGS_SAVE_ROW);
-    const firstTest = control(SETTINGS_TEST_FIRST_ROW);
-    const lastTest = control(SETTINGS_TEST_FIRST_ROW + 5);
-    const full = [save, firstTest, lastTest, change, forget, check, apply];
-    expect(chooseStructuredTarget(save, full, 'down')).toBe(firstTest);
-    expect(chooseStructuredTarget(lastTest, full, 'down')).toBe(change);
-    expect(chooseStructuredTarget(change, full, 'down')).toBe(forget);
-  });
-});
-
-describe('Settings entries for the screens that left the rail', () => {
-  const control = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
-  const latest = control(SETTINGS_CATALOG_FETCH_ROW);
-  const jobs = control(SETTINGS_JOBS_ROW);
-  const projects = control(SETTINGS_PROJECTS_ROW);
-  const reload = control(SETTINGS_RELOAD_ROW);
-  const change = control(SETTINGS_CHANGE_SERVER_ROW);
-  it('walks Fetch latest, Background jobs, Other projects, Reload library, Change server in that order', () => {
-    const all = [latest, jobs, projects, reload, change];
-    expect(chooseStructuredTarget(latest, all, 'down')).toBe(jobs);
-    expect(chooseStructuredTarget(jobs, all, 'down')).toBe(projects);
-    expect(chooseStructuredTarget(projects, all, 'down')).toBe(reload);
-    expect(chooseStructuredTarget(reload, all, 'down')).toBe(change);
-  });
-  it('skips Other projects when the server publishes no links', () => {
-    expect(chooseStructuredTarget(jobs, [latest, jobs, reload, change], 'down')).toBe(reload);
-    expect(chooseStructuredTarget(reload, [latest, jobs, reload, change], 'up')).toBe(jobs);
-  });
-});
-
 describe('modal dialog focus traps', () => {
   const dialogItem = (region: string, row: number, col: number) => ({ dataset: { focusRegion: region, focusRow: String(row), focusCol: String(col) } } as unknown as HTMLElement);
   const contentItem = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
@@ -163,27 +117,14 @@ describe('modal dialog focus traps', () => {
   });
 });
 
-describe('Catalog rows and the rebuild dialog', () => {
+describe('Settings rows and the rebuild dialog', () => {
   const dialogItem = (row: number, col: number) => ({ dataset: { focusRegion: REBUILD_DIALOG_REGION, focusRow: String(row), focusCol: String(col) } } as unknown as HTMLElement);
   const contentItem = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
-  it('walks down from the connection tests through Fetch latest and the server actions to Rebuild catalog', () => {
-    const lastTest = contentItem(SETTINGS_TEST_FIRST_ROW + 1);
-    const fetchLatest = contentItem(SETTINGS_CATALOG_FETCH_ROW);
-    const change = contentItem(SETTINGS_CHANGE_SERVER_ROW);
-    const apply = contentItem(UPDATE_APPLY_ROW);
-    const rebuild = contentItem(SETTINGS_REBUILD_ROW);
-    const all = [lastTest, fetchLatest, change, apply, rebuild];
-    expect(chooseStructuredTarget(lastTest, all, 'down')).toBe(fetchLatest);
-    expect(chooseStructuredTarget(fetchLatest, all, 'down')).toBe(change);
-    expect(chooseStructuredTarget(apply, all, 'down')).toBe(rebuild);
-    expect(chooseStructuredTarget(rebuild, all, 'up')).toBe(apply);
-    expect(chooseStructuredTarget(rebuild, all, 'down')).toBeNull();
-  });
   it('keeps focus inside the rebuild dialog between Cancel and Rebuild', () => {
     const cancel = dialogItem(0, 0);
     const confirm = dialogItem(0, 1);
-    const rebuild = contentItem(SETTINGS_REBUILD_ROW);
-    const elements = [cancel, confirm, rebuild, contentItem(UPDATE_APPLY_ROW)];
+    const rebuild = contentItem(20);
+    const elements = [cancel, confirm, rebuild, contentItem(21)];
     expect(chooseStructuredTarget(cancel, elements, 'right')).toBe(confirm);
     expect(chooseStructuredTarget(confirm, elements, 'left')).toBe(cancel);
     for (const direction of ['up', 'down'] as const) {

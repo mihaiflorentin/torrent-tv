@@ -445,10 +445,16 @@ describe('release link on the Settings screen', () => {
     await openRoute(container, 'settings', 0);
     await settle();
 
-    const save = control(container, 'settings-save');
-    expect(save).not.toBeNull();
-    save!.focus();
-    press('ArrowDown', 40);
+    const key = () => (document.activeElement as HTMLElement).dataset.focusKey;
+    // Settings opens on Playback; Left goes to the group list, Down walks it, Right opens Updates on its first row.
+    control(container, 'setting-audio-primary')!.focus();
+    press('ArrowLeft', 37);
+    expect(key()).toBe('settings-group-playback');
+    for (let i = 0; i < 5; i++) press('ArrowDown', 40);
+    expect(key()).toBe('settings-group-updates');
+    expect(container.querySelector('[data-settings-pane]')!.getAttribute('data-settings-pane')).toBe('playback');
+    press('ArrowRight', 39);
+    await settle();
 
     const link = control(container, 'update-release-link');
     expect(link).not.toBeNull();
@@ -460,19 +466,18 @@ describe('release link on the Settings screen', () => {
     await settle();
     expect(openExternal).toHaveBeenCalledWith(releaseUrl);
 
-    // Down continues to the connection tests disclosure, so the link is not a dead end.
+    // Down continues to Check for updates, so the link is not a dead end; Up walks back to it.
     press('ArrowDown', 40);
-    const diagnostics = control(container, 'settings-diagnostics');
-    expect(document.activeElement).toBe(diagnostics);
-    expect(control(container, 'test-filelist')).toBeNull();
-    press('Enter', 13);
-    await settle();
-    // Opened, the tests follow it and Up walks back to the same controls.
-    press('ArrowDown', 40);
-    expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('test-filelist');
-    press('ArrowUp', 38);
-    expect(document.activeElement).toBe(diagnostics);
+    expect(key()).toBe('update-check');
     press('ArrowUp', 38);
     expect(document.activeElement).toBe(link);
+    press('ArrowUp', 38);
+    expect(document.activeElement).toBe(link);
+    // Left returns to the selected group, and Left again opens the rail.
+    press('ArrowLeft', 37);
+    expect(key()).toBe('settings-group-updates');
+    press('ArrowLeft', 37);
+    await settle();
+    expect(container.querySelector('.tv-app.menu-open')).not.toBeNull();
   });
 });

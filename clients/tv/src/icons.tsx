@@ -30,6 +30,9 @@ const ICONS: Record<string, Shape[]> = {
  info: [{ cx: 12, cy: 12, r: 9 }, { d: 'M12 11v6M12 7.5v.2' }],
  plus: [{ d: 'M12 5v14M5 12h14' }],
  check: [{ d: 'm5 12.5 4.5 4.5L19 7.5' }],
+ // Job states (Background jobs).
+ alert: [{ cx: 12, cy: 12, r: 9 }, { d: 'M12 7.5v5.5M12 16.3v.2' }],
+ clock: [{ cx: 12, cy: 12, r: 9 }, { d: 'M12 7v5l3.5 2' }],
  more: [{ cx: 5, cy: 12, r: 2, solid: true }, { cx: 12, cy: 12, r: 2, solid: true }, { cx: 19, cy: 12, r: 2, solid: true }],
  star: [{ d: 'm12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z', solid: true }],
  // Player toolbar (names kept from the Player's first icon set).

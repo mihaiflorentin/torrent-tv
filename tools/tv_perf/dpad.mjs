@@ -101,7 +101,8 @@ function signature() {
     setup: !!document.querySelector('main.setup'), route: app ? app.getAttribute('data-route') : '', family: !!document.querySelector('[data-focus-key="family-back"]'),
     job: !!document.querySelector('[data-focus-key="job-detail-back"]'), panel: (document.querySelector('.player-dialog') || {}).className || '',
     infoLevel: (function () { var first = document.querySelector('.info-panel .info-scroll [data-focus-key]'); return first ? first.getAttribute('data-focus-key') : ''; })(),
-    controls: !!document.querySelector('.player.controls-visible') });
+    controls: !!document.querySelector('.player.controls-visible'),
+    settings: (function () { var pane = document.querySelector('[data-settings-pane]'); return pane ? pane.getAttribute('data-settings-pane') : ''; })() });
 }
 function observe(slack) {
   var a = document.activeElement;

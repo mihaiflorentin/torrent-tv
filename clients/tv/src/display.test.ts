@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogTitle, Download, HouseholdItem, Job, ParsedRelease, PlaybackPreferences } from '@torrent-tv/shared';
-import { cardMeta, cardRating, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
+import { cardMeta, cardRating, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, jobState, jobWhatRan, relativeTime, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
 
 // DESIGN.md "Information priorities": what each TV screen shows, decided as pure text so the
 // markup only places it. Unknown facts are omitted, never printed as a placeholder.
@@ -154,6 +154,28 @@ describe('jobs', () => {
   });
   it('shows progress only while running', () => expect(jobStatusLine(job({ state: 'running', progress: 0.25 }))).toBe('Running · 25%'));
   it('names a completed job and its update time', () => expect(jobStatusLine(job(), () => '14 Oct, 10:05')).toBe('Completed · 14 Oct, 10:05'));
+  it('says what ran as the action, the title and the tracker', () => {
+    expect(jobWhatRan(job({ kind: 'catalog-title-refresh', label: 'Refresh FileList for Copper Archive' }))).toBe('Refresh · Copper Archive · FileList');
+    expect(jobWhatRan(job({ label: 'Fetch latest releases · 120 refreshed · 80 retained (40 discoverable)' }))).toBe('Fetch latest releases · 120 refreshed · 80 retained (40 discoverable)');
+    expect(jobWhatRan(job({ label: '', kind: 'metadata' }))).toBe('Metadata');
+  });
+  it('names the state in one capitalised word with its tone and icon', () => {
+    expect(jobState(job({ state: 'running' }))).toEqual({ word: 'Running', tone: 'active', icon: 'jobs' });
+    expect(jobState(job({ state: 'failed' }))).toEqual({ word: 'Failed', tone: 'error', icon: 'alert' });
+    expect(jobState(job({ state: 'succeeded' }))).toEqual({ word: 'Completed', tone: 'done', icon: 'check' });
+    expect(jobState(job({ state: 'completed' }))).toEqual({ word: 'Completed', tone: 'done', icon: 'check' });
+    expect(jobState(job({ state: 'queued' }))).toEqual({ word: 'Queued', tone: 'quiet', icon: 'clock' });
+    expect(jobState(job({ state: 'retry_wait' }))).toEqual({ word: 'Retrying', tone: 'quiet', icon: 'clock' });
+  });
+  it('dates a job relative to now', () => {
+    const now = Date.parse('2026-10-14T12:00:00Z');
+    expect(relativeTime('2026-10-14T11:59:40Z', now)).toBe('Just now');
+    expect(relativeTime('2026-10-14T11:55:00Z', now)).toBe('5 min ago');
+    expect(relativeTime('2026-10-14T09:00:00Z', now)).toBe('3 h ago');
+    expect(relativeTime('2026-10-13T09:00:00Z', now)).toBe('Yesterday');
+    expect(relativeTime('2026-10-10T09:00:00Z', now)).toBe('4 days ago');
+    expect(relativeTime('not a date', now)).toBe('');
+  });
 });
 
 describe('getting ready panel', () => {
