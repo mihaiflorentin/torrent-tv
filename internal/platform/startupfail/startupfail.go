@@ -36,9 +36,11 @@ const (
 
 // Messenger surfaces a fatal startup error to the user. Windows shows a
 // native MessageBoxW dialog; every other platform keeps the historic
-// console-only behavior and no-ops.
+// console-only behavior and no-ops. Show returns a one-line outcome for the
+// startup log ("" when there is nothing to record), so a report of "no
+// dialog appeared" can be checked against what the dialog call returned.
 type Messenger interface {
-	Show(title, text string)
+	Show(title, text string) string
 }
 
 // Reporter records fatal startup errors. Every Report and Log appends a
@@ -141,7 +143,9 @@ func (r *Reporter) showLocked(text string) {
 		return
 	}
 	r.shown = true
-	r.messenger.Show(dialogTitle, text)
+	if outcome := r.messenger.Show(dialogTitle, text); outcome != "" {
+		r.writeLocked(time.Now().UTC().Format(time.RFC3339) + " dialog: " + outcome)
+	}
 }
 
 // writeLocked appends one line, opening (and pinning) the log on first use.

@@ -271,6 +271,18 @@ func main() {
 			os.Exit(2)
 		}
 	}()
+	// Update-helper mode comes first: the handoff starts a copy of the new
+	// executable with the helper environment, and that copy must swap,
+	// relaunch, and await health instead of booting the app. It runs before
+	// applyRelaunchArgs so the relaunch marker reaches the relaunched
+	// installation, not the helper.
+	if handled, err := updates.RunUpdateHelper(context.Background()); handled {
+		if err != nil {
+			startupfail.Default().Log("update helper failed: " + err.Error())
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	// Adopt a helper-carried invocation before any command wiring: the
 	// relaunched installation resumes as if started with those arguments.
 	applyRelaunchArgs()

@@ -8,4 +8,4 @@ func PlatformMessenger() Messenger { return nopMessenger{} }
 
 type nopMessenger struct{}
 
-func (nopMessenger) Show(title, text string) {}
+func (nopMessenger) Show(title, text string) string { return "" }

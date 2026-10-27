@@ -12,6 +12,17 @@ import (
 	"time"
 )
 
+// defaultMediaToolPath is the pre-discovery default for binary on goos. It
+// must be absolute there, or Load rejects the defaults before
+// ResolveMediaTools can look the tool up on PATH: Windows needs a drive
+// letter, so "/usr/bin/ffprobe" is not absolute on it.
+func defaultMediaToolPath(goos, binary string) string {
+	if goos == "windows" {
+		return `C:\Program Files\ffmpeg\bin\` + binary + ".exe"
+	}
+	return "/usr/bin/" + binary
+}
+
 // mediaToolName checks only the path shape: absolute, with a base name
 // starting with the expected binary (case-insensitive, optional .exe on
 // Windows). It does not touch the disk.

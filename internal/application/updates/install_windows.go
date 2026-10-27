@@ -138,6 +138,7 @@ func (windowsFilePlatform) runHelper(ctx context.Context, installer *Installer, 
 		// Timeout or early death: restore the backup and relaunch the
 		// previous installation. Suppression rides in the rolled-back
 		// journal so the recovery restart skips the updater once.
+		child.stop()
 		rollbackErr := installer.Rollback(op, err.Error())
 		if rollbackErr == nil {
 			rollbackErr = relaunchPrevious(installer.Executable)
@@ -232,16 +233,26 @@ func unlockExclusive(file *os.File) error {
 }
 
 // syncDir flushes a directory's metadata via a backup-semantics handle.
+// FlushFileBuffers needs GENERIC_WRITE, and filesystems that cannot flush a
+// directory refuse it with access denied or invalid function. Windows has no
+// portable directory fsync and NTFS journals directory metadata, so a
+// refused flush is best-effort rather than an install failure.
 func syncDir(dir string) error {
 	handle, err := windows.CreateFile(windows.StringToUTF16Ptr(dir),
-		windows.GENERIC_READ,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+		windows.GENERIC_READ|windows.GENERIC_WRITE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
+	if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("open directory: %w", err)
 	}
 	defer windows.CloseHandle(handle)
 	if err := windows.FlushFileBuffers(handle); err != nil {
+		if errors.Is(err, windows.ERROR_ACCESS_DENIED) || errors.Is(err, windows.ERROR_INVALID_FUNCTION) {
+			return nil
+		}
 		return fmt.Errorf("flush directory: %w", err)
 	}
 	return nil

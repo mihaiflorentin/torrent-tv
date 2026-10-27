@@ -746,6 +746,18 @@ func (d *detachedProcess) alive() bool {
 	}
 }
 
+// stop kills a still-running unacknowledged installation and waits for it
+// to exit, so a rollback never runs beside it: Windows refuses to replace a
+// running image, and elsewhere the relaunched previous installation would
+// share the data dir with it.
+func (d *detachedProcess) stop() {
+	if d == nil || !d.alive() {
+		return
+	}
+	_ = d.cmd.Process.Kill()
+	<-d.finished
+}
+
 // awaitHealth polls the journal until the new process acknowledges, the
 // deadline passes, or the new process dies early.
 func awaitHealth(ctx context.Context, installer *Installer, journal *Journal, child *detachedProcess) error {

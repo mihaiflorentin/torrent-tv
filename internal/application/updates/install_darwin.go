@@ -126,6 +126,7 @@ func (darwinBundlePlatform) runHelper(ctx context.Context, installer *Installer,
 		return err
 	}
 	if err := awaitHealth(ctx, installer, journal, child); err != nil {
+		child.stop()
 		rollbackErr := installer.Rollback(op, err.Error())
 		if rollbackErr == nil {
 			if _, launchErr := spawnDetached(installer.Executable, cleanEnvironment()); launchErr != nil {

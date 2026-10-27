@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -87,7 +88,7 @@ func Defaults() Settings {
 		MetadataProviders: []string{"tmdb", "tvmaze", "jikan"},
 		SubDLURL:          "https://api.subdl.com", MaxConcurrentJobs: 10, TitleRefreshTimeoutMinutes: 30,
 		SubtitleCachePath: "data/subtitles", SubtitleCacheMaxBytes: 256 << 20,
-		FFprobePath: "/usr/bin/ffprobe", FFmpegPath: "/usr/bin/ffmpeg",
+		FFprobePath: defaultMediaToolPath(runtime.GOOS, "ffprobe"), FFmpegPath: defaultMediaToolPath(runtime.GOOS, "ffmpeg"),
 		WatchedThresholdPercent: 90,
 	}
 }
@@ -179,10 +180,10 @@ func LoadAt(path string) (*Store, error) {
 			base.TitleRefreshTimeoutMinutes = 30
 		}
 		if base.FFprobePath == "" {
-			base.FFprobePath = "/usr/bin/ffprobe"
+			base.FFprobePath = defaultMediaToolPath(runtime.GOOS, "ffprobe")
 		}
 		if base.FFmpegPath == "" {
-			base.FFmpegPath = "/usr/bin/ffmpeg"
+			base.FFmpegPath = defaultMediaToolPath(runtime.GOOS, "ffmpeg")
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, err
@@ -254,6 +255,7 @@ func anchorNativePaths(v *Settings, managed map[string]bool, dir string) {
 		v.SubtitleCachePath = anchor(v.SubtitleCachePath)
 	}
 }
+
 // EnsureNativePathsWritableFor probes v's native paths where the store will
 // anchor them: relative values resolve next to the settings file, never in
 // the (arbitrary) process working directory.

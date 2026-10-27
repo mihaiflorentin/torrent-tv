@@ -102,7 +102,7 @@ func assemble(settings *config.Store, log *slog.Logger) (_ *App, retErr error) {
 	if len(unfound) > 0 {
 		log.Warn("media tools not found; subtitle probing and audio fallback are unavailable",
 			"tools", strings.Join(unfound, ", "),
-			"hint", "install ffmpeg (brew install ffmpeg, apt install ffmpeg) or set the paths in Settings")
+			"hint", "install ffmpeg (brew install ffmpeg, apt install ffmpeg, winget install Gyan.FFmpeg) or set the paths in Settings")
 	}
 	current := settings.Get()
 	repo, err := sqlite.Open(current.DatabasePath)
@@ -275,11 +275,16 @@ func assemble(settings *config.Store, log *slog.Logger) (_ *App, retErr error) {
 		return closeErr
 	}
 	app.Updates = newUpdateManager(updateCoordinatorOptions{
-		log:        log,
-		notice:     noticeHint,
-		stop:       stopServing,
-		sink:       sink,
-		beforeExit: func() { app.BeforeHandoffExit() },
+		log:    log,
+		notice: noticeHint,
+		stop:   stopServing,
+		sink:   sink,
+		// Only the GUI host sets BeforeHandoffExit; serve mode has no lock.
+		beforeExit: func() {
+			if app.BeforeHandoffExit != nil {
+				app.BeforeHandoffExit()
+			}
+		},
 	})
 	app.Portal = hub
 

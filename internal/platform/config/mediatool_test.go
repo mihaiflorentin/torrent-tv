@@ -100,7 +100,7 @@ func TestLoadFallsBackWhenFileHoldsArbitraryMediaToolPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := loadAt(t, path)
-	if got := store.Get().FFmpegPath; got != "/usr/bin/ffmpeg" {
+	if got := store.Get().FFmpegPath; got != Defaults().FFmpegPath {
 		t.Fatalf("FFmpegPath = %q, want default fallback", got)
 	}
 	if w := store.StartupWarnings(); len(w) != 1 || !strings.Contains(w[0], "ffmpegPath") {

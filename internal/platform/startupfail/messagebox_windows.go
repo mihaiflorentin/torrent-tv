@@ -3,6 +3,8 @@
 package startupfail
 
 import (
+	"fmt"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -29,19 +31,28 @@ const (
 	mbTopmost       = 0x00040000
 )
 
-func (messageBox) Show(title, text string) {
+// Show reports MessageBoxW's result and how long the dialog stayed up: 0
+// means the dialog never showed (the error names why), and a near-instant
+// IDOK means something dismissed it before the user could read it.
+func (messageBox) Show(title, text string) string {
 	caption, err := windows.UTF16PtrFromString(title)
 	if err != nil {
-		return
+		return "not shown: " + err.Error()
 	}
 	body, err := windows.UTF16PtrFromString(text)
 	if err != nil {
-		return
+		return "not shown: " + err.Error()
 	}
-	_, _, _ = procMessageBoxW.Call(
+	start := time.Now()
+	ret, _, callErr := procMessageBoxW.Call(
 		0, // hWnd: no owner; the app window may not exist yet
 		uintptr(unsafe.Pointer(body)),
 		uintptr(unsafe.Pointer(caption)),
 		mbOK|mbIconError|mbSetForeground|mbTopmost,
 	)
+	elapsed := time.Since(start).Round(time.Millisecond)
+	if ret == 0 {
+		return fmt.Sprintf("MessageBoxW failed after %s: %v", elapsed, callErr)
+	}
+	return fmt.Sprintf("MessageBoxW returned %d after %s", ret, elapsed)
 }

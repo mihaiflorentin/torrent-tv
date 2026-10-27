@@ -9,15 +9,17 @@ import (
 )
 
 type fakeMessenger struct {
-	calls int
-	title string
-	text  string
+	calls   int
+	title   string
+	text    string
+	outcome string
 }
 
-func (f *fakeMessenger) Show(title, text string) {
+func (f *fakeMessenger) Show(title, text string) string {
 	f.calls++
 	f.title = title
 	f.text = text
+	return f.outcome
 }
 
 // TestReportWritesLogAndShowsDialogOnce pins the fatal-error contract:
@@ -132,4 +134,18 @@ func readStartupLog(t *testing.T, path string) string {
 		t.Fatalf("read startup log %s: %v", path, err)
 	}
 	return string(b)
+}
+
+func TestReportLogsDialogOutcome(t *testing.T) {
+	dir := t.TempDir()
+	m := &fakeMessenger{outcome: "MessageBoxW returned 1 after 2ms"}
+	r := NewReporter(m, dir)
+	r.Report(errors.New("boom"))
+	data, err := os.ReadFile(filepath.Join(dir, startupLogName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "dialog: MessageBoxW returned 1 after 2ms") {
+		t.Fatalf("startup log lacks dialog outcome:\n%s", data)
+	}
 }

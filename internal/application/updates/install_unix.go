@@ -108,6 +108,7 @@ func (posixFilePlatform) runHelper(ctx context.Context, installer *Installer, jo
 		// Timeout or early death: restore the backup and relaunch the
 		// previous installation. Suppression rides in the rolled-back
 		// journal so the recovery restart skips the updater once.
+		child.stop()
 		rollbackErr := installer.Rollback(op, err.Error())
 		if rollbackErr == nil {
 			rollbackErr = relaunchPrevious(installer.Executable)

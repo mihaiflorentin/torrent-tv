@@ -18,6 +18,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -66,6 +67,12 @@ const (
 // update-helper relaunch dies with the service cgroup under systemd's
 // default KillMode. Everything else uses the update-helper relaunch.
 func DetectSupervision() Supervision {
+	// systemd exists only on Linux. Wine and Proton map /proc to the Linux
+	// host's, so a Windows build would otherwise read the host session's
+	// cgroup and exit after activation with no supervisor to relaunch it.
+	if runtime.GOOS != "linux" {
+		return SupervisionPlain
+	}
 	cg, _ := os.ReadFile("/proc/self/cgroup")
 	return supervisionFromEnvironment(os.Getenv("NOTIFY_SOCKET"), string(cg))
 }
@@ -692,8 +699,9 @@ func (m *Manager) StartupApply(ctx context.Context) {
 	m.startupOnce.Do(func() {
 		base := context.WithoutCancel(ctx)
 		go func() {
-			m.recoverPending()
-			if !m.Current().SelfUpdate {
+			// A rollback's one-shot suppression skips this start's apply:
+			// re-installing the release that just failed would loop.
+			if m.recoverPending() || !m.Current().SelfUpdate {
 				return
 			}
 			opCtx, cancel := context.WithTimeout(base, m.deps.OperationTimeout)
@@ -709,33 +717,61 @@ func (m *Manager) StartupApply(ctx context.Context) {
 // installation's side: the healthy new installation acknowledges after
 // readiness, a completed rollback consumes its one-shot startup
 // suppression, and cleanup/rollback disk effects run through the S5
-// installer. No pending operation is the common case.
-func (m *Manager) recoverPending() {
+// installer. No pending operation is the common case. It reports whether
+// the startup automatic apply must be skipped.
+func (m *Manager) recoverPending() (suppressed bool) {
 	if m.deps.InstallDir == "" {
-		return
+		return false
 	}
-	if _, found, err := LoadOperation(m.deps.InstallDir); err != nil || !found {
-		return
+	pending, found, err := LoadOperation(m.deps.InstallDir)
+	if err != nil || !found {
+		return false
 	}
 	journal, err := OpenJournal(m.deps.InstallDir)
 	if err != nil {
-		return
+		// A helper relaunch holds the operation lock while it waits for
+		// this process's health acknowledgement, so acknowledge without
+		// ownership; the helper finishes the cleanup.
+		if pending.Phase == PhaseActivated && pending.Version == m.deps.Identity.Version {
+			acknowledgeUntil(m.deps.InstallDir, pending)
+		}
+		// The helper relaunches the previous installation from inside the
+		// rollback, still holding the lock: honor the suppression now and
+		// leave clearing it to a later start that owns the journal.
+		return pending.Phase == PhaseRolledBack && pending.SuppressNext
 	}
 	defer journal.Close()
 	op, found, err := journal.Load()
 	if err != nil || !found {
-		return
+		return false
 	}
 	installer := NewInstaller(journal, payloadKindFor(op), m.executable, m.bundlePath(), DefaultHealthTimeout)
 	recovery, err := installer.Recover(m.deps.Identity.Version)
 	if err != nil {
-		return
+		return false
 	}
 	switch recovery.Action {
 	case RecoveryAcknowledge:
 		_ = installer.Acknowledge(m.deps.Identity.Version)
 	case RecoverySuppress:
 		_ = installer.ConsumeSuppression()
+		return true
+	}
+	return false
+}
+
+// acknowledgeUntil retries the lock-free acknowledgement until the
+// operation's deadline: on Windows the journal rename fails while the
+// helper's poll (or a virus scanner) has the file open, and a lost
+// acknowledgement rolls a healthy installation back. A mismatch means the
+// helper already moved on, so retrying cannot help.
+func acknowledgeUntil(installDir string, op Operation) {
+	for {
+		err := AcknowledgeOperation(installDir, op.ID, op.Version)
+		if err == nil || errors.Is(err, ErrOperationMismatch) || !time.Now().Before(op.Deadline) {
+			return
+		}
+		time.Sleep(ackPollInterval)
 	}
 }
 

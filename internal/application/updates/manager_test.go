@@ -942,3 +942,57 @@ func TestCgroupIndicatesSystemdService(t *testing.T) {
 		t.Error("empty cgroup content must not indicate systemd supervision")
 	}
 }
+
+func TestRecoverPendingSuppressesStartupApplyAfterRollback(t *testing.T) {
+	for _, helperHoldsLock := range []bool{false, true} {
+		installDir := t.TempDir()
+		journal, err := OpenJournal(installDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		op := newOperation(installDir, Selection{Version: "0.4.0"}, hostTarget(), "staged-a")
+		op.Phase = PhaseRolledBack
+		op.SuppressNext = true
+		if err := journal.Save(op); err != nil {
+			t.Fatal(err)
+		}
+		if !helperHoldsLock {
+			journal.Close()
+		}
+		manager := NewManager(ManagerDeps{Identity: hostIdentity("0.3.0"), InstallDir: installDir, Executable: filepath.Join(installDir, "torrent-tv")})
+		if !manager.recoverPending() {
+			t.Errorf("helperHoldsLock=%v: rolled-back operation did not suppress the startup apply", helperHoldsLock)
+		}
+		_, statErr := os.Stat(journalPath(installDir))
+		if cleared := os.IsNotExist(statErr); cleared == helperHoldsLock {
+			t.Errorf("helperHoldsLock=%v: journal cleared=%v", helperHoldsLock, cleared)
+		}
+		journal.Close()
+	}
+}
+
+func TestRecoverPendingAcknowledgesWhileHelperHoldsLock(t *testing.T) {
+	installDir := t.TempDir()
+	journal, err := OpenJournal(installDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer journal.Close()
+	op := newOperation(installDir, Selection{Version: "0.4.0"}, hostTarget(), "staged-a")
+	op.Phase = PhaseActivated
+	op.Deadline = time.Now().Add(time.Hour)
+	if err := journal.Save(op); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewManager(ManagerDeps{Identity: hostIdentity("0.4.0"), InstallDir: installDir, Executable: filepath.Join(installDir, "torrent-tv")})
+	if manager.recoverPending() {
+		t.Error("an acknowledgement must not suppress the startup apply")
+	}
+	got, _, err := journal.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Phase != PhaseConfirmed {
+		t.Fatalf("phase = %q, want %q", got.Phase, PhaseConfirmed)
+	}
+}
