@@ -51,12 +51,14 @@ async function mountApp() {
   await act(async () => { render(<App />, host) });
   await settle();
 }
-const sidebarButton = (group: string | null, label: string) => {
-  const groups = Array.from(document.querySelectorAll<HTMLElement>('.sidebar .nav-group'));
-  const scope: ParentNode = group === null ? document.querySelector('.sidebar nav')! : groups.find(item => item.querySelector('p')?.textContent === group)!;
-  return Array.from(scope.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.includes(label))!;
+// A hub from the rail, then (for Library and Discover) one of its tabs.
+const goTo = async (hub: string, tab?: string) => {
+  await act(async () => { Array.from(document.querySelectorAll<HTMLButtonElement>('.sidebar nav button')).find(button => button.textContent === hub)!.click() });
+  await settle();
+  if (!tab) return;
+  await act(async () => { Array.from(document.querySelectorAll<HTMLButtonElement>('.hub-tabs button')).find(button => button.textContent === tab)!.click() });
+  await settle();
 };
-const goTo = async (group: string | null, label: string) => { await act(async () => { sidebarButton(group, label).click() }); await settle() };
 const text = (element: Element | null) => element?.textContent || '';
 // Poster cards only: the Continue watching card for the same title carries the same label.
 const cardFor = (name: string) => Array.from(document.querySelectorAll<HTMLButtonElement>('.media-card:not(.library-card)')).find(button => button.getAttribute('aria-label') === `Open ${name}`)!;
@@ -141,7 +143,7 @@ describe('Poster cards', () => {
 
   it('show seeders only on the Strong swarms row', async () => {
     await mountApp();
-    await goTo('Tracker', 'Dashboard');
+    await goTo('Discover', 'Highlights');
     const rows = Array.from(document.querySelectorAll('.rail-section'));
     const swarms = rows.find(row => text(row.querySelector('h2')) === 'Strong swarms')!;
     const recent = rows.find(row => text(row.querySelector('h2')) === 'Recently added')!;
@@ -223,7 +225,7 @@ describe('Title detail', () => {
 describe('Browse and Search', () => {
   it('puts search and media type first and drops the tracker sync prose', async () => {
     await mountApp();
-    await goTo('Tracker', 'Browse');
+    await goTo('Discover', 'Browse');
     const tools = document.querySelector('.catalog-tools')!;
     expect(tools.querySelector('.tools-primary input[aria-label="Search"]')).not.toBeNull();
     expect(tools.querySelector('.tools-primary select[aria-label="Media type"]')).not.toBeNull();
@@ -237,7 +239,7 @@ describe('Browse and Search', () => {
       trackers: [{ id: 'filelist', name: 'FileList', enabled: true, configured: true }, { id: 'piratebay', name: 'The Pirate Bay', enabled: false, configured: true }, { id: 'other', name: 'Other', enabled: true, configured: false }] as never,
     });
     await mountApp();
-    await goTo('Tracker', 'Browse');
+    await goTo('Discover', 'Browse');
     const input = document.querySelector<HTMLInputElement>('.catalog-tools input[aria-label="Search"]')!;
     await act(async () => { input.value = 'lanterns'; input.dispatchEvent(new Event('input', { bubbles: true })) });
     await act(async () => { document.querySelector('.catalog-tools')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) });
@@ -251,7 +253,7 @@ describe('Browse and Search', () => {
   it('says what happened and what to do when the catalog is empty', async () => {
     vi.spyOn(API.prototype, 'titles').mockResolvedValue({ items: [], nextCursor: null, total: 0 });
     await mountApp();
-    await goTo('Tracker', 'Browse');
+    await goTo('Discover', 'Browse');
     const empty = document.querySelector('.empty-state')!;
     expect(text(empty.querySelector('h2'))).toBe('The catalog is empty');
     expect(text(empty.querySelector('p'))).toContain('Enable a tracker in Settings');
@@ -262,7 +264,7 @@ describe('Browse and Search', () => {
   it('explains an empty search with its cause and a way back', async () => {
     vi.spyOn(API.prototype, 'searchTitles').mockResolvedValue({ items: [], nextCursor: null, total: 0, job: {} as never, trackers: [] });
     await mountApp();
-    await goTo('Tracker', 'Browse');
+    await goTo('Discover', 'Browse');
     const input = document.querySelector<HTMLInputElement>('.catalog-tools input[aria-label="Search"]')!;
     vi.spyOn(API.prototype, 'titles').mockResolvedValue({ items: [], nextCursor: null, total: 0 });
     await act(async () => { input.value = 'zzz'; input.dispatchEvent(new Event('input', { bubbles: true })) });
@@ -301,7 +303,7 @@ describe('Backdrop that follows focus', () => {
     await mountApp();
     await act(async () => { cardFor('Vesper').dispatchEvent(new Event('pointerenter')) });
     await act(async () => { Array.from(document.querySelectorAll<HTMLImageElement>('.backdrop-art')).find(img => img.getAttribute('src') === '/b2.jpg')!.dispatchEvent(new Event('load')) });
-    await goTo(null, 'Jobs');
+    await goTo('Downloads');
     expect(document.querySelector('.backdrop')!.getAttribute('data-art')).toBe('false');
   });
 });

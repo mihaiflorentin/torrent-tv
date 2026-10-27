@@ -223,8 +223,12 @@ describe('projects page', () => {
     portalStateValue = enabledSnapshot;
     await mountApp();
     await settle();
-    await act(async () => { sidebarButton('Projects').click() });
+    // Other projects left the rail (#64): Settings leads to it.
+    await act(async () => { sidebarButton('Settings').click() });
     await settle();
+    await act(async () => { Array.from(latestHost().querySelectorAll<HTMLButtonElement>('.settings-links button')).find(button => button.textContent === 'Other projects')!.click() });
+    await settle();
+    expect(location.pathname).toBe('/projects');
     const card = document.querySelector<HTMLAnchorElement>('.project-card')!;
     expect(card.textContent).toContain('https://example.invalid/tool');
     const opened: string[] = [];
@@ -238,7 +242,11 @@ describe('projects page', () => {
     portalStateValue = disabledSnapshot;
     await mountApp();
     await settle();
-    await act(async () => { sidebarButton('Projects').click() });
+    // Settings offers no Other projects entry without links; a shared /projects link still opens the page.
+    await act(async () => { sidebarButton('Settings').click() });
+    await settle();
+    expect(latestHost().querySelector('.settings-links')!.textContent).not.toContain('Other projects');
+    await act(async () => { window.history.pushState(null, '', '/projects'); window.dispatchEvent(new PopStateEvent('popstate')) });
     await settle();
     expect(document.querySelector('.projects-empty')).toBeTruthy();
     expect(document.querySelector('.project-card')).toBeNull();
