@@ -478,12 +478,13 @@ button>.tv-icon:first-child {
  text-overflow: ellipsis
 }
 
+/* A screen notice (an action that failed, a title that would not open): a quiet rounded banner, no hairline edge. */
 .tv-notice {
+ max-width: 1400px;
  margin: 0 0 var(--tt-space-5);
- padding: var(--tt-space-4) var(--tt-space-5);
- background: var(--tt-raised);
- border-left: 6px solid var(--tt-info);
- border-radius: var(--tt-radius-md);
+ padding: var(--tt-space-4) var(--tt-space-6);
+ background: var(--tt-fill);
+ border-radius: var(--tt-radius-xl);
  font-size: var(--tt-tv-text-body)
 }
 
@@ -815,24 +816,23 @@ button>.tv-icon:first-child {
  background: currentColor
 }
 
-/* Empty and error states: what happened, then what to do. */
+/* Empty and error states (#62): what happened, then what to do, one sentence each, straight on the screen like the
+   boards' section text. No panel, no edge: an empty state never draws a box inside a box. */
 .tv-empty {
  max-width: 1100px;
  margin: var(--tt-space-7) 0;
- padding: var(--tt-space-6) var(--tt-space-7);
- background: var(--tt-surface);
- border: 1px solid var(--tt-line);
- border-left: 6px solid var(--tt-accent-line);
- border-radius: var(--tt-radius-lg)
+ padding: 0
 }
 
 .tv-empty h2 {
  font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold)
+ font-weight: var(--tt-weight-bold);
+ letter-spacing: var(--tt-tracking-snug)
 }
 
 .tv-empty p {
  margin-top: var(--tt-space-3);
+ font-size: var(--tt-tv-text-body);
  color: var(--tt-text-muted)
 }
 
@@ -1079,6 +1079,28 @@ button>.tv-icon:first-child {
  white-space: nowrap;
  overflow: hidden;
  text-overflow: ellipsis
+}
+
+/* The preparing dialog (getting ready, #62) is its own solid sheet like the Player panels, not the Settings panel:
+   the overlay surface, rounded, no hairline, a lead heading, muted supporting lines and pill actions. */
+.tv-prepare-confirm {
+ padding: var(--tt-space-7);
+ background: var(--tt-overlay);
+ border-radius: var(--tt-radius-xl)
+}
+
+.tv-prepare-confirm h2 {
+ font-size: var(--tt-tv-text-lead);
+ font-weight: var(--tt-weight-bold);
+ letter-spacing: var(--tt-tracking-snug)
+}
+
+.tv-prepare-confirm .supporting {
+ margin-top: var(--tt-space-3)
+}
+
+.tv-prepare-confirm>button {
+ margin-top: var(--tt-space-6)
 }
 
 .tv-prepare-wait {
@@ -2187,30 +2209,33 @@ button>.tv-icon:first-child {
  word-break: break-all
 }
 
-/* Setup: first run and server change ------------------------------------------- */
+/* Setup: first run and server change (#62). No board draws it, so it takes the Settings board's vocabulary: the
+   content edge at 168 px, the app mark over a 56 px screen heading, the found servers as one column of rows
+   (name on the left, address and version muted on the right, ring plus lighter fill on focus) and Manual address
+   under a muted section label instead of a hairline. One column keeps the D-pad map's list: Up and Down only. */
 .setup {
- width: 1220px;
- margin: 0 auto;
- padding-top: 84px
+ width: 1920px;
+ padding-top: 96px;
+ padding-left: 168px;
+ padding-right: 168px
 }
 
 .setup-mark {
- display: flex;
- align-items: center;
- justify-content: center;
- width: 96px;
- height: 80px;
- border-radius: var(--tt-radius-lg);
- background: var(--tt-accent);
- color: var(--tt-on-accent);
- font-size: var(--tt-tv-text-heading);
- font-weight: var(--tt-weight-black)
+ width: 72px;
+ height: 72px;
+ border-radius: var(--tt-radius-xl)
+}
+
+.setup-mark svg {
+ width: 32px;
+ height: 32px
 }
 
 .setup>h1 {
- margin: var(--tt-space-4) 0 var(--tt-space-2);
- font-size: var(--tt-tv-text-title);
- font-weight: var(--tt-weight-black)
+ margin: var(--tt-space-6) 0 var(--tt-space-3);
+ font-size: var(--tt-tv-text-heading);
+ font-weight: var(--tt-weight-black);
+ letter-spacing: var(--tt-tracking-heading)
 }
 
 .setup-lead {
@@ -2220,7 +2245,7 @@ button>.tv-icon:first-child {
 
 .setup-mode-actions {
  display: flex;
- margin: var(--tt-space-6) 0 var(--tt-space-3)
+ margin: var(--tt-space-7) 0 var(--tt-space-4)
 }
 
 .setup-mode-actions>*+* {
@@ -2231,28 +2256,30 @@ button>.tv-icon:first-child {
  min-width: 260px
 }
 
+.setup .focus-hint {
+ color: var(--tt-text-subtle)
+}
+
 .setup-results {
- display: flex;
- flex-wrap: wrap;
+ width: 1140px;
  max-height: 420px;
- margin: var(--tt-space-3) -16px 0;
- padding: 16px 16px 0;
+ margin: var(--tt-space-4) -20px 0;
+ padding: 16px 20px 0;
  overflow-y: auto
 }
 
 .setup-results>* {
- flex: 0 0 calc(50% - 16px);
- min-width: 0;
- margin: 0 var(--tt-space-4) var(--tt-space-4) 0
+ display: flex;
+ width: 100%;
+ margin: 0 0 var(--tt-space-2)
 }
 
 .setup-results button {
- display: flex;
- flex-direction: column;
- align-items: flex-start;
- justify-content: center;
- padding-top: var(--tt-space-3);
- padding-bottom: var(--tt-space-3);
+ flex-direction: row;
+ align-items: center;
+ justify-content: flex-start;
+ min-height: var(--tt-tv-target);
+ padding: var(--tt-space-4) var(--tt-space-6);
  border-radius: var(--tt-radius-xl);
  background: var(--tt-fill-quiet);
  text-align: left
@@ -2263,32 +2290,43 @@ button>.tv-icon:first-child {
  color: var(--tt-text)
 }
 
-.setup-results button>* {
- max-width: 100%
-}
-
 .setup-results strong {
- font-size: var(--tt-tv-text-lead)
-}
-
-.setup-results span,
-.setup-results small {
- margin-top: var(--tt-space-1);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
+ min-width: 0;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold);
  white-space: nowrap;
  overflow: hidden;
  text-overflow: ellipsis
 }
 
+.setup-results span,
+.setup-results small {
+ flex: 0 0 auto;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-medium);
+ font-variant-numeric: var(--tt-figures);
+ white-space: nowrap
+}
+
+.setup-results span {
+ margin-left: auto;
+ padding-left: var(--tt-space-6)
+}
+
+.setup-results small {
+ margin-left: var(--tt-space-5)
+}
+
 .setup-manual {
- margin-top: var(--tt-space-5);
- padding-top: var(--tt-space-4);
- border-top: 1px solid var(--tt-line)
+ margin-top: var(--tt-space-7)
 }
 
 .setup-manual h2 {
- font-size: var(--tt-tv-text-lead)
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ letter-spacing: .02em;
+ color: var(--tt-text-subtle)
 }
 
 .setup-controls {
@@ -2307,7 +2345,7 @@ button>.tv-icon:first-child {
 
 .setup-status {
  min-height: 42px;
- margin-top: var(--tt-space-3);
+ margin-top: var(--tt-space-4);
  color: var(--tt-text-muted)
 }
 
@@ -2740,7 +2778,8 @@ button>.tv-icon:first-child {
  }
 }
 
-/* Getting ready: a calm centred panel while the stream opens, buffers or waits. Static, never focusable. */
+/* Getting ready: a calm centred panel while the stream opens, buffers or waits. Static, never focusable. A solid
+   rounded surface with no hairline; the bar is the translucent fill with the saffron progress (#62). */
 .player-ready {
  position: absolute;
  z-index: 4;
@@ -2749,8 +2788,7 @@ button>.tv-icon:first-child {
  width: 900px;
  padding: var(--tt-space-6) var(--tt-space-7);
  background: var(--tt-controls-surface);
- border: 1px solid var(--tt-line-strong);
- border-radius: var(--tt-radius-lg);
+ border-radius: var(--tt-radius-xl);
  transform: translateX(-50%);
  pointer-events: none
 }
@@ -2768,7 +2806,7 @@ button>.tv-icon:first-child {
  position: relative;
  height: var(--tt-tv-timeline-height);
  margin-top: var(--tt-space-5);
- background: var(--tt-line-strong);
+ background: var(--tt-fill);
  border-radius: var(--tt-radius-pill);
  overflow: hidden
 }

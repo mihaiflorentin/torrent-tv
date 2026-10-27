@@ -168,6 +168,27 @@ describe('fatal error panel (shipped ES5 bytes)', () => {
   expect(exit).toHaveBeenCalledTimes(1);
  });
 
+ // Ticket #62: the Error panel in the Night Screen look. The status colour comes with a word, the heading is white
+ // like every other screen heading, and under the cause the next action is one sentence.
+ it('leads with the word Error, then a white heading, the cause and one next action', () => {
+  vi.stubGlobal('fetch', vi.fn());
+  loadScript().install({ endpoint: '/api/v1/diagnostics/client' });
+  window.dispatchEvent(new ErrorEvent('error', { message: 'Cannot read properties of undefined' }));
+
+  const lines = Array.from(panel()!.children, child => child as HTMLElement);
+  expect(lines.map(line => line.textContent)).toEqual([
+   'Error',
+   'Something went wrong',
+   'Cannot read properties of undefined',
+   'Tell the household admin what this message says, then press Back to exit.',
+  ]);
+  expect(lines[0].style.color).toContain('--tt-danger');
+  expect(lines[1].tagName).toBe('H1');
+  expect(lines[1].style.color).toContain('--tt-text,');
+  expect(lines[2].style.color).toContain('--tt-text-muted');
+  for (const line of lines) expect(parseInt(line.style.fontSize, 10), line.textContent ?? '').toBeGreaterThanOrEqual(26);
+ });
+
  it('prefers the onExit escape hatch over the Tizen API', () => {
   vi.stubGlobal('fetch', vi.fn());
   const onExit = vi.fn();
