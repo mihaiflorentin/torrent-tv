@@ -196,28 +196,31 @@ describe('TV screens show what helps the next decision', () => {
       await wait();
     };
 
-    it('leads the version row with resolution, chips, size and seeders; the file name is evidence on the row but not a headline', async () => {
+    it('draws the version row as aligned columns: resolution, Best match slot, quality and codec, size, seeders, tracker, action; the file name is evidence, not a headline', async () => {
       await open(detail());
       const row = container.querySelector('.source-button')!;
+      const columns = Array.from(row.querySelector('.source-main')!.children).map(cell => cell.className.split(' ')[0]);
+      expect(columns).toEqual(['source-resolution', 'source-best', 'source-quality', 'source-size', 'source-seeders', 'source-tracker', 'source-action']);
       expect(row.querySelector('.source-resolution')?.textContent).toBe('1080p');
-      expect(Array.from(row.querySelectorAll('.source-chip')).map(chip => chip.textContent)).toEqual(['WEB-DL', 'H264']);
-      expect(row.querySelector('.source-facts')?.textContent).toBe('4.2 GB · 77 seeders');
+      expect(row.querySelector('.source-quality')?.textContent).toBe('WEB-DL · H264');
+      expect(row.querySelector('.source-size')?.textContent).toBe('4.2 GB');
+      expect(row.querySelector('.source-seeders')?.textContent).toBe('77 seeders');
       expect(row.querySelector('.source-action-label')?.textContent).toBe('Play and download');
-      expect(row.querySelector('.source-secondary')?.textContent).toBe('FileList · DDP 5.1');
+      expect(row.querySelector('.source-tracker')?.textContent).toBe('FileList · DDP 5.1');
       expect(row.querySelector('.source-filename')?.textContent).toBe('Alpha.2019.1080p.WEB-DL.mkv');
     });
 
     it('omits an unknown codec instead of printing a placeholder', async () => {
       await open(detail({}, [source({ videoCodec: undefined })]));
       expect(container.textContent).not.toMatch(/codec unknown/i);
-      expect(Array.from(container.querySelectorAll('.source-chip')).map(chip => chip.textContent)).toEqual(['WEB-DL']);
+      expect(container.querySelector('.source-quality')?.textContent).toBe('WEB-DL');
     });
 
     it('moves tracker names off the header and summarises a series by its seasons', async () => {
       await open(detail({ kind: 'series', seasonCount: 3, genres: ['Drama', 'Mystery'] }));
       const header = text('.detail-copy');
-      expect(header).toContain('3 seasons · Since 2019');
-      expect(header).toContain('Drama · Mystery');
+      expect(text('.detail-kind')).toBe('3 seasons');
+      expect(text('.detail-facts')).toBe('Since 2019·Drama, Mystery');
       expect(header).not.toMatch(/FileList|seeders/);
     });
 

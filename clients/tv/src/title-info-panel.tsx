@@ -117,9 +117,10 @@ function EpisodeLevel({ api, title, season, episode, cache, reach }: { api: API;
   </>;
 }
 
-export function TitleInfoPanel({ api, title, onClose }: { api: API; title: CatalogTitle; onClose: () => void }): JSX.Element {
-  const [info, setInfo] = useState<TitleInfo | undefined>(undefined);
-  const [phase, setPhase] = useState<Phase>('loading');
+export function TitleInfoPanel({ api, title, initialInfo, onClose }: { api: API; title: CatalogTitle; initialInfo?: TitleInfo; onClose: () => void }): JSX.Element {
+  // The title page may already hold the provider's answer (it asks once for the facts line): then the panel opens on it.
+  const [info, setInfo] = useState<TitleInfo | undefined>(initialInfo);
+  const [phase, setPhase] = useState<Phase>(initialInfo ? 'ready' : 'loading');
   const [stack, setStack] = useState<Frame[]>([]);
   const stackRef = useRef<Frame[]>([]);
   const restoreKey = useRef<string | null>(null);
@@ -134,6 +135,7 @@ export function TitleInfoPanel({ api, title, onClose }: { api: API; title: Catal
   const scroll = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (initialInfo) return;
     let live = true;
     api.titleInfo(title.id).then(value => { if (live) { setInfo(value); setPhase('ready') } }, () => { if (live) setPhase('failed') });
     return () => { live = false };

@@ -173,10 +173,13 @@ describe('TV stylesheets use the shared tokens', () => {
     expect(/\.source-button:focus \.source-filename\s*\{([^{}]*)\}/.exec(text)?.[1]).toMatch(/opacity:\s*1/);
   });
 
-  it('keeps the hero and detail text on their own scrim panel over the backdrop', () => {
+  it('keeps the hero text on its scrim panel, and puts the title page text straight on the art under its scrims', () => {
     const text = css('tv.css');
     expect(/\.tv-hero-copy\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-scrim-text)');
-    expect(/\.detail-copy\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-scrim-text)');
+    // No boxed header on the title page (#56): the left and bottom scrims of the sharp backdrop carry the contrast.
+    expect(/\.detail-copy\s*\{([^{}]*)\}/.exec(text)?.[1]).not.toMatch(/background/);
+    const scrim = /\.tv-backdrop\.sharp \.tv-backdrop-scrim\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(scrim).toMatch(/linear-gradient\(90deg,\s*var\(--tt-scrim-bottom\) 0,\s*var\(--tt-scrim-text\) 38%/);
   });
 
   it('grows the focused timeline track to the token height without moving the controls below', () => {

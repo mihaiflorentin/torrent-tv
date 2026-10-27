@@ -3,24 +3,52 @@
 // returns to the card the page was opened from: the audit opens each title from its first card on
 // Home, which for the fixture's movie is Continue watching's first and for its series the fourth.
 
-const ACTIONS = '^detail-(playback|versions|favorite|refresh|info)$';
+const ACTIONS = '^detail-(playback|versions|favorite|info|more)$';
 const MOVIE_OPENER = 'home:continue[0]';
 const SERIES_OPENER = 'home:continue[3]';
 
 export const movieTitle = {
   name: 'movie-title',
-  notes: 'Movie page: Back, the action row (Play best, Choose version, My List, Refresh data, Info), then the versions list. Lands on Play.',
+  notes: 'Movie page: Back, the action row (Resume or Play best, Choose version, My List, Info, More), then the versions list. Lands on the primary. OK on More opens its sheet (Refresh data).',
   detect: ['.detail-screen', '.source-list'],
   regions: ['content'],
   reach: [{ openTitle: 'movie' }],
   landing: 'actions[first]',
   stops: { 'detail-back': { up: 'stay', down: 'actions[first]', left: 'stay', right: 'stay', back: MOVIE_OPENER } },
   groups: {
-    actions: { keys: ACTIONS, each: { up: 'detail-back', down: 'versions[first]', left: '-1', right: '+1' }, start: { left: 'stay' }, end: { right: 'stay', ok: 'movie-info:info-close' } },
+    actions: { keys: ACTIONS, each: { up: 'detail-back', down: 'versions[first]', left: '-1', right: '+1' }, start: { left: 'stay' }, end: { right: 'stay', ok: 'movie-more:rows[first]' } },
     versions: { keys: '^source-', each: { up: '-1', down: '+1', left: 'stay', right: 'stay' }, first: { up: 'actions[first]' }, last: { down: 'stay' } },
   },
   bursts: [{ from: 'versions[first]', key: 'down', expect: 'versions[last]' }, { from: 'actions[first]', key: 'right', expect: 'actions[last]' }],
 };
+
+// The More sheet (more-menu.tsx): the page's secondary actions in their own focus region, then Close. Back (or Close)
+// returns to the More button.
+const moreSheet = ({ name, opener, reach, notes }) => ({
+  name,
+  notes,
+  detect: '.tv-more',
+  regions: ['more-menu'],
+  reach,
+  opener,
+  landing: 'rows[first]',
+  stops: { 'more-close': { up: 'rows[last]', down: 'stay', left: 'stay', right: 'stay', back: 'return', ok: 'return' } },
+  groups: { rows: { keys: '^more-(?!close$)', each: { up: '-1', down: '+1', left: 'stay', right: 'stay', back: 'return' }, first: { up: 'stay' }, last: { down: 'more-close' } } },
+});
+
+export const movieMore = moreSheet({
+  name: 'movie-more',
+  notes: 'More over a movie page: Refresh data, then Close.',
+  opener: 'movie-title:detail-more',
+  reach: [{ openTitle: 'movie' }, { focus: '[data-focus-key="detail-more"]' }, { press: 'enter' }],
+});
+
+export const seriesMore = moreSheet({
+  name: 'series-more',
+  notes: 'More over a series page: Refresh data, then Close.',
+  opener: 'series-title:detail-more',
+  reach: [{ openTitle: 'series' }, { focus: '[data-focus-key="detail-more"]' }, { press: 'enter' }],
+});
 
 // The Info panel: a column of stops; Back (or Close) returns to the Info button.
 const infoPanel = ({ name, opener, reach, notes }) => ({
@@ -39,14 +67,14 @@ const infoPanel = ({ name, opener, reach, notes }) => ({
 export const movieInfo = infoPanel({
   name: 'movie-info',
   notes: 'Info panel over a movie page: summary, cast, fine print.',
-  opener: 'movie-title:actions[last]',
+  opener: 'movie-title:detail-info',
   reach: [{ openTitle: 'movie' }, { focus: '[data-focus-key="detail-info"]' }, { press: 'enter' }],
 });
 
 export const seriesInfo = infoPanel({
   name: 'series-info',
   notes: 'Info panel over a series page: summary, Seasons (OK drills into the seasons), cast, fine print.',
-  opener: 'series-title:actions[last]',
+  opener: 'series-title:detail-info',
   reach: [{ openTitle: 'series' }, { focus: '[data-focus-key="detail-info"]' }, { press: 'enter' }],
 });
 
@@ -89,7 +117,7 @@ export const infoSeason = drillLevel({
 const seriesStops = back => ({
   'detail-back': { up: 'stay', down: 'actions[first]', left: 'stay', right: 'stay', back },
 });
-const seriesActions = { keys: ACTIONS, each: { up: 'detail-back', down: 'seasons[same]', left: '-1', right: '+1' }, start: { left: 'stay' }, end: { right: 'stay' } };
+const seriesActions = { keys: ACTIONS, each: { up: 'detail-back', down: 'seasons[same]', left: '-1', right: '+1' }, start: { left: 'stay' }, end: { right: 'stay', ok: 'series-more:rows[first]' } };
 
 export const seriesTitle = {
   name: 'series-title',
@@ -124,4 +152,4 @@ export const seriesVersions = {
   bursts: [{ from: 'versions[first]', key: 'down', expect: 'versions[last]' }],
 };
 
-export const TITLE_MAPS = [infoSeason, infoSeasons, movieInfo, seriesInfo, movieTitle, seriesVersions, seriesTitle];
+export const TITLE_MAPS = [infoSeason, infoSeasons, movieInfo, seriesInfo, movieMore, seriesMore, movieTitle, seriesVersions, seriesTitle];

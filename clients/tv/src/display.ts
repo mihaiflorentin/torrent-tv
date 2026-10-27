@@ -1,4 +1,4 @@
-import { canonicalLanguage, episodeRowLine, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogTitle, type EpisodePageView, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
+import { canonicalLanguage, episodeRowLine, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogSource, type CatalogTitle, type EpisodePageView, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
 import { formatTime } from './player';
 
 // Display decisions for the TV screens (DESIGN.md "Information priorities"), kept as pure text
@@ -67,6 +67,27 @@ export function libraryCardLine(item: HouseholdItem): string {
 /** One-line resume summary on the title detail header. */
 export function resumeLine(item: HouseholdItem, kind: MediaKind): string {
   return joined([kind === 'series' ? episodeCode(item.seasonNumber, item.episodeNumber) : '', `Continue at ${formatTime(item.positionMs)}`]);
+}
+
+/** What the primary will play, as the board words it: resolution, HDR and quality as one phrase, the size, and Downloaded once it is local. */
+function versionFacts(source: CatalogSource): string[] {
+  const phrase = [source.parsed?.resolution, source.parsed?.hdr, source.parsed?.quality].filter(Boolean).join(' ');
+  const bytes = source.fileSizeBytes || source.release?.sizeBytes || 0;
+  return [phrase, bytes > 0 ? formatBytes(bytes) : '', source.libraryState?.downloadState === 'downloaded' ? 'Downloaded' : ''].filter(Boolean);
+}
+
+/**
+ * The muted line under the title page's action row: what one press of the primary will play. The Best match and its
+ * facts; a resume names the version being resumed (and the episode), or its file when the list no longer has it.
+ * Tracker, codec and seeders stay on the version rows, where versions are compared.
+ */
+export function playsLine(primary: { source?: CatalogSource; resume?: HouseholdItem; kind: MediaKind }): string {
+  if (primary.resume) {
+    const code = primary.kind === 'series' ? episodeCode(primary.resume.seasonNumber, primary.resume.episodeNumber) : '';
+    const facts = primary.source ? versionFacts(primary.source) : [primary.resume.filePath || primary.resume.release.name];
+    return `Plays ${joined([code, ...facts])}`;
+  }
+  return primary.source ? `Plays the Best match: ${joined(versionFacts(primary.source))}` : '';
 }
 
 // The getting-ready wording lives in the shared package so the web client says the same thing.
