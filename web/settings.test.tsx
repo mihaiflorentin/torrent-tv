@@ -439,7 +439,7 @@ describe('settings tabs', () => {
  it('guards sidebar navigation away from dirty settings', async () => {
   await openSettings();
   await act(async () => { setFieldInput('FileList URL', 'https://nav-guard.example') });
-  await act(async () => { sidebarButton('Jobs').click() });
+  await act(async () => { sidebarButton('Downloads').click() });
   await settle();
   const dialog = document.querySelector('.overlay[aria-label="Unsaved changes"]')!;
   expect(dialog).not.toBeNull();
@@ -447,11 +447,11 @@ describe('settings tabs', () => {
   await act(async () => { Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Keep editing')!.click() });
   await settle();
   expect(document.querySelector('.topbar h1')!.textContent).toBe('Settings');
-  await act(async () => { sidebarButton('Jobs').click() });
+  await act(async () => { sidebarButton('Downloads').click() });
   await settle();
   await act(async () => { Array.from(document.querySelectorAll<HTMLButtonElement>('.overlay[aria-label="Unsaved changes"] button')).find(button => button.textContent === 'Discard and leave')!.click() });
   await settle();
-  expect(document.querySelector('.topbar h1')!.textContent).toBe('Jobs');
+  expect(document.querySelector('.topbar h1')!.textContent).toBe('Downloads');
   expect(document.querySelector('.overlay[aria-label="Unsaved changes"]')).toBeNull();
  });
 
@@ -477,10 +477,10 @@ describe('settings tabs', () => {
  it('never guards when everything is clean', async () => {
   await openSettings();
 
-  await act(async () => { sidebarButton('Jobs').click() });
+  await act(async () => { sidebarButton('Downloads').click() });
   await settle();
   expect(document.querySelector('.overlay[aria-label="Unsaved changes"]')).toBeNull();
-  expect(document.querySelector('.topbar h1')!.textContent).toBe('Jobs');
+  expect(document.querySelector('.topbar h1')!.textContent).toBe('Downloads');
  });
 
  it('edits subtitle settings in exactly one place', async () => {
@@ -601,7 +601,7 @@ describe('settings tabs', () => {
   await settle();
   expect(putCalls[0].body.trustedCidrs).toEqual(['10.0.0.0/8']);
   expect(settingsTabs().find(button => button.textContent === 'Server')!.className).not.toContain('dirty');
-  await act(async () => { sidebarButton('Jobs').click() });
+  await act(async () => { sidebarButton('Downloads').click() });
   await settle();
   await act(async () => { sidebarButton('Settings').click() });
   await settle();
