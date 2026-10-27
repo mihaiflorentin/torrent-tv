@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, HouseholdState, PortalState, UpdateStatus } from '@torrent-tv/shared';
 import { withETag } from './test-api';
 import type { TVPlatformHooks } from './platform';
@@ -193,9 +194,7 @@ describe('Setup and link handoff behavioral regressions', () => {
       />,
       container
     );
-    const projectsMenuBtn = container.querySelector<HTMLButtonElement>('[data-menu-route="projects"]');
-    projectsMenuBtn?.click();
-    await sleep(20);
+    await openRoute(container, 'projects', 20);
 
     // Confirm the project button is visible with the displayed address
     const projectBtn = container.querySelector<HTMLButtonElement>('[data-focus-key="project-1"]');

@@ -55,6 +55,8 @@ describe('declared D-pad maps', () => {
     expect(resolveTarget(shelf, layout, at('tiles[3]'), '+row', 'down')).toEqual({ screen: 'shelf', stop: 'tiles[4]' });
     expect(resolveTarget(shelf, layout, at('play'), 'stay', 'up')).toEqual({ screen: 'shelf', stop: 'play' });
     expect(resolveTarget(shelf, layout, at('play'), 'rail', 'left')).toEqual({ screen: 'rail', token: 'menu-home' });
+    // A tab of a hub opens the rail on the hub's item, not on a rail item named like the route.
+    expect(resolveTarget({ ...shelf, route: 'watched', hub: 'library' }, layout, at('play'), 'rail', 'left')).toEqual({ screen: 'rail', token: 'menu-library' });
     expect(resolveTarget(shelf, layout, at('play'), 'title:detail-back', 'ok')).toEqual({ screen: 'title', token: 'detail-back' });
   });
 

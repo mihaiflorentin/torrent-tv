@@ -1,5 +1,8 @@
-// Jobs, Settings and Other projects. See ../model.mjs for the map format.
-import { header, lines, onRoute, row } from './common.mjs';
+// Settings and the screens reached from it (Background jobs, Other projects). See ../model.mjs for the map format.
+import { lines, onRoute, row } from './common.mjs';
+
+// Background jobs and Other projects left the rail: they belong to the Settings hub, and Back returns to their entry there.
+const FROM_SETTINGS = { hub: 'settings', regions: ['content'] };
 
 // A job row is "job-<id>" and its Retry button "job-<id>-retry"; the filters are "jobs-*".
 const JOB = '^job-(?!detail-back$|log-|logs-)';
@@ -7,15 +10,15 @@ const JOB = '^job-(?!detail-back$|log-|logs-)';
 export const jobs = {
   name: 'jobs',
   route: 'jobs',
-  notes: 'Jobs: search and filter cycles, then one line per job (the job, its Retry when retryable). Down near the end pages more in.',
+  ...FROM_SETTINGS,
+  notes: 'Background jobs (Settings > Background jobs): search and filter cycles, then one line per job (the job, its Retry when retryable). Down near the end pages more in. Back returns to the Background jobs entry in Settings.',
   detect: [onRoute('jobs'), '[data-focus-key="jobs-search"]'],
-  regions: ['content'],
   reach: [{ go: 'jobs' }],
   landing: 'list[first]',
-  stops: header('filters[first]'),
+  stops: {},
   groups: {
-    filters: row('^jobs-', { up: 'header-retry', down: 'list[same]' }),
-    list: lines(JOB, { up: 'filters[same]', down: 'stay' }),
+    filters: { ...row('^jobs-', { up: 'stay', down: 'list[same]' }), first: { back: 'settings:settings-jobs' } },
+    list: { ...lines(JOB, { up: 'filters[same]', down: 'stay' }), first: { back: 'settings:settings-jobs' } },
   },
   bursts: [{ from: 'list[first]', key: 'down', presses: 14 }],
 };
@@ -23,15 +26,14 @@ export const jobs = {
 export const jobDetail = {
   name: 'job-detail',
   route: 'jobs',
+  ...FROM_SETTINGS,
   notes: 'A job\'s detail: the back-to-Jobs button, the log filters, the log entries. It opens on the back-to-Jobs button; Back (or the back-to-Jobs button) returns to the job row it was opened from.',
   detect: [onRoute('jobs'), '[data-focus-key="job-detail-back"]'],
-  regions: ['content'],
   reach: [{ go: 'jobs' }, { focus: '[data-focus-key^="job-job-"]' }, { press: 'enter' }],
   landing: 'job-detail-back',
   stops: {
-    // Back closes the detail first, from any stop, before the rail.
-    'header-retry': { ...header('job-detail-back')['header-retry'], back: 'jobs:list[first]' },
-    'job-detail-back': { up: 'header-retry', down: 'filters[first]', left: 'rail', right: 'stay', back: 'jobs:list[first]', ok: 'jobs:list[first]' },
+    // Back closes the detail first, from any stop.
+    'job-detail-back': { up: 'stay', down: 'filters[first]', left: 'rail', right: 'stay', back: 'jobs:list[first]', ok: 'jobs:list[first]' },
     'job-logs-older': { optional: true, up: 'logs[last]', down: 'stay', left: 'rail', right: 'stay' },
   },
   groups: {
@@ -42,19 +44,19 @@ export const jobDetail = {
 };
 
 // The Settings page is one column; "settings-diagnostics" opens the connection tests below it.
-const SETTINGS = '^(setting-|settings-save$|update-|catalog-|change-server$|forget-server$|settings-diagnostics$)';
+const SETTINGS = '^(setting-|settings-(save|diagnostics|jobs|projects|reload)$|update-|catalog-|change-server$|forget-server$)';
 
 export const settings = {
   name: 'settings',
   route: 'settings',
-  notes: 'Settings: one column of fields and actions top to bottom (Playback, Background work, trackers, Save, Updates, Diagnostics, Catalog, Server, Danger zone). Left opens the rail from every row.',
+  notes: 'Settings: one column of fields and actions top to bottom (Playback, Background work, trackers, Save, Updates, Diagnostics, Catalog, Background jobs and Other projects, Server with Reload library, Danger zone). Left opens the rail from every row.',
   detect: onRoute('settings'),
   regions: ['content'],
   reach: [{ go: 'settings' }],
   landing: 'list[first]',
-  stops: header('list[first]'),
-  groups: { list: lines(SETTINGS, { up: 'header-retry', down: 'stay', sample: 'all' }) },
-  bursts: [{ from: 'list[first]', key: 'down', expect: 'list[last]' }, { from: 'list[last]', key: 'up', expect: 'header-retry' }],
+  stops: {},
+  groups: { list: lines(SETTINGS, { up: 'stay', down: 'stay', sample: 'all' }) },
+  bursts: [{ from: 'list[first]', key: 'down', expect: 'list[last]' }, { from: 'list[last]', key: 'up', expect: 'list[first]' }],
 };
 
 export const settingsDiagnostics = {
@@ -67,13 +69,12 @@ export const settingsDiagnostics = {
   landing: 'settings-diagnostics',
   settleMs: 900,
   stops: {
-    ...header('list[first]'),
     'settings-diagnostics': { up: 'list[same]', down: 'tests[first]', left: 'rail', right: 'stay' },
   },
   groups: {
-    list: lines('^(setting-|settings-save$|update-)', { up: 'header-retry', down: 'settings-diagnostics' }),
+    list: lines('^(setting-|settings-save$|update-)', { up: 'stay', down: 'settings-diagnostics' }),
     tests: lines('^test-', { up: 'settings-diagnostics', down: 'below[first]' }),
-    below: lines('^(catalog-|change-server$|forget-server$)', { up: 'tests[same]', down: 'stay' }),
+    below: lines('^(catalog-|settings-(jobs|projects|reload)$|change-server$|forget-server$)', { up: 'tests[same]', down: 'stay' }),
   },
 };
 
@@ -94,13 +95,13 @@ export const rebuildDialog = {
 export const projects = {
   name: 'projects',
   route: 'projects',
-  notes: 'Other projects: one link per line.',
+  ...FROM_SETTINGS,
+  notes: 'Other projects (Settings > Other projects): one link per line. Back returns to the Other projects entry in Settings.',
   detect: onRoute('projects'),
-  regions: ['content'],
   reach: [{ go: 'projects' }],
   landing: 'links[first]',
-  stops: header('links[first]'),
-  groups: { links: lines('^project-', { up: 'header-retry', down: 'stay' }) },
+  stops: {},
+  groups: { links: { ...lines('^project-', { up: 'stay', down: 'stay' }), first: { back: 'settings:settings-projects' } } },
 };
 
 export const setup = {

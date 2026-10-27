@@ -69,6 +69,7 @@ const PAGE_HOOK = (serverUrl, storageKey, frameClock = true) => `
 })();`;
 
 const MENU_GROUP = 'Left toward the menu, Up/Down in the menu';
+const TAB_GROUP = 'Up to the tab strip, Left/Right along it';
 const KEYS = {
   right: { key: 'ArrowRight', code: 'ArrowRight', vk: 39 },
   left: { key: 'ArrowLeft', code: 'ArrowLeft', vk: 37 },
@@ -126,7 +127,7 @@ async function main() {
       return pressed++;
     };
     const quiet = () => sleep(450);
-    const active = () => cdp.eval(`(() => { const a = document.activeElement; return a && a.dataset ? { key: a.dataset.focusKey || '', region: a.dataset.focusRegion || '', row: a.dataset.focusRow || '', col: a.dataset.focusCol || '', route: a.dataset.menuRoute || '' } : null })()`);
+    const active = () => cdp.eval(`(() => { const a = document.activeElement; return a && a.dataset ? { key: a.dataset.focusKey || '', region: a.dataset.focusRegion || '', row: a.dataset.focusRow || '', col: a.dataset.focusCol || '', route: a.dataset.menuHub || '', tab: a.dataset.hubTab || '' } : null })()`);
     const menuOpen = () => cdp.eval(`document.querySelector('.tv-app').classList.contains('menu-open')`);
     const discrete = async (id, kind, name, label) => { const key = press(name); const index = await key; steps.push({ id, label: label || id, kind, key: index }); await quiet(); };
     const held = async (prefix, kind, name, count, label) => {
@@ -161,8 +162,9 @@ async function main() {
     await held('rail-2 right', 'move', 'right', options.railPresses, 'Home: hold Right along the last rail');
     log(`after Right: focus ${JSON.stringify(await active())}`);
 
-    // Journey 3: open the menu and walk every destination. Each switch is Down/Up inside the menu (D-pad moves) then OK (the route change).
-    const routes = await cdp.eval(`Array.from(document.querySelectorAll('[data-menu-route]')).map(b => ({ route: b.dataset.menuRoute, label: b.textContent.trim() }))`);
+    // Journey 3: open the menu and walk every hub. Each switch is Down/Up inside the menu (D-pad moves) then OK (the route
+    // change). In a hub with tabs (Library, Discover) every other tab follows: Up to the tab strip, Right along it, OK.
+    const routes = await cdp.eval(`Array.from(document.querySelectorAll('[data-menu-hub]')).map(b => ({ route: b.dataset.menuHub, label: (b.querySelector('b') || b).textContent.trim() }))`);
     let current = 'home';
     for (const target of routes) {
       if (target.route === current && target.route === 'home') continue;
@@ -186,6 +188,27 @@ async function main() {
       steps.push({ id: `route ${target.route}`, label: `OK on ${target.label}`, kind: 'route', key: index });
       await sleep(1200);
       current = target.route;
+      const tabs = await cdp.eval(`Array.from(document.querySelectorAll('[data-hub-tab]')).map(b => ({ route: b.dataset.hubTab, label: b.textContent.trim(), selected: b.getAttribute('aria-selected') === 'true' }))`);
+      for (const tab of tabs.filter(t => !t.selected)) {
+        for (let attempt = 0; attempt < 8 && !(await active())?.tab; attempt++) {
+          const up = await press('up');
+          steps.push({ id: `up to tabs on ${current} ${attempt + 1}`, label: 'Up to the tab strip', group: TAB_GROUP, kind: 'move', key: up });
+          await quiet();
+        }
+        const tabOrder = tabs.map(t => t.route);
+        for (let guard = 0; guard < 8; guard++) {
+          const at = (await active())?.tab;
+          if (!at || at === tab.route) break;
+          const dir = tabOrder.indexOf(at) < tabOrder.indexOf(tab.route) ? 'right' : 'left';
+          const move = await press(dir);
+          steps.push({ id: `tab ${dir} to ${tab.route} (${guard + 1})`, label: `Tab ${dir}`, group: TAB_GROUP, kind: 'move', key: move });
+          await quiet();
+        }
+        const ok = await press('enter');
+        steps.push({ id: `route ${tab.route}`, label: `OK on the ${tab.label} tab`, kind: 'route', key: ok });
+        await sleep(1200);
+        current = tab.route;
+      }
     }
 
     await cdp.send('Tracing.end');

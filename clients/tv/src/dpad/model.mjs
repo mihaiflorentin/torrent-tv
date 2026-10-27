@@ -4,7 +4,9 @@
 //
 // A map describes one screen or overlay:
 //   name      unique, lower-case words joined by hyphens
-//   route     the rail route the screen belongs to (expected target "rail" opens the rail on it)
+//   route     the route the screen shows (.tv-app[data-route]); target "rail" opens the rail on its hub
+//   hub       the rail item of that route when it is not named like the route (Library's tabs, Discover's, the screens
+//             reached from Settings): the rail opens with menu-<hub> focused
 //   detect    CSS selector (or a list, all of them) visible only while this screen or overlay is up
 //   regions   the data-focus-region values whose stops belong to this map
 //   landing   the stop focus lands on when the screen opens
@@ -155,7 +157,7 @@ function memberAt(layout, name, which, from, direction) {
  */
 export function resolveTarget(map, layout, stop, token, direction) {
   if (token === 'stay') return { screen: map.name, stop: stop.id };
-  if (token === 'rail') return { screen: 'rail', token: `menu-${map.route}` };
+  if (token === 'rail') return { screen: 'rail', token: `menu-${map.hub || map.route}` };
   if (token === 'return') { const [screen, target] = splitScreen(map.opener); return { screen, token: target }; }
   if (token.includes(':')) { const [screen, target] = splitScreen(token); return { screen, token: target }; }
   if (/^[+-](1|row)$/.test(token)) {

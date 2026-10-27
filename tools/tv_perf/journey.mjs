@@ -1,12 +1,13 @@
 // The screen capture journeys (screens.mjs): one screenshot per step, named by step.
 // Pure data plus the small rules the runner applies, so they are unit tested.
 //
-// Steps name screens by destination, never by rail position: { go: 'downloads' } opens the
-// rail and walks it to the button whose data-menu-route is "downloads", wherever it sits.
-// A rail change (the six-hub rail) edits only the `go` values in TV_JOURNEY.
+// Steps name screens by route, never by rail position: { go: 'browse' } opens the rail, walks it
+// to the hub that holds the route (Discover, data-menu-hub="discover"), presses OK, then walks the
+// hub's tab strip to the Browse tab (data-hub-tab="browse"); { go: 'jobs' } goes through Settings
+// to its Background jobs entry. ROUTE_PLACES is the one table that knows where a route lives.
 //
 // Actions, run in order by screens.mjs:
-//   { go: route }                    TV: open the rail, walk Up/Down to data-menu-route=route, OK
+//   { go: route }                    TV: open the rail, walk to the route's hub, OK, then its tab or Settings entry, OK
 //   { openRail: true }               TV: Left until the rail is open
 //   { press: key, times }            a real key event (up, down, left, right, enter, back)
 //   { pressUntil: key, focused, max } press until document.activeElement matches the selector
@@ -23,11 +24,21 @@
 const ACTIONS = new Set(['go', 'openRail', 'press', 'pressUntil', 'focus', 'click', 'input', 'openTitle', 'visit', 'pointer', 'wait']);
 const rail = (name, route, selector) => ({ name, actions: [{ go: route }], ready: { selector } });
 
+// Where each TV route is reached (clients/tv/src/hubs.ts): its rail hub, and the tab or the Settings
+// entry inside it. A route missing here is a hub of its own.
+export const ROUTE_PLACES = {
+  library: { hub: 'library', tab: 'library' }, continue: { hub: 'library', tab: 'continue' }, favorites: { hub: 'library', tab: 'favorites' },
+  watched: { hub: 'library', tab: 'watched' }, 'library-categories': { hub: 'library', tab: 'library-categories' },
+  tracker: { hub: 'discover', tab: 'tracker' }, browse: { hub: 'discover', tab: 'browse' }, categories: { hub: 'discover', tab: 'categories' },
+  jobs: { hub: 'settings', entry: 'settings-jobs' }, projects: { hub: 'settings', entry: 'settings-projects' },
+};
+export function routePlace(route) { return ROUTE_PLACES[route] || { hub: route }; }
+
 export const TV_JOURNEY = [
   { name: 'home', actions: [], ready: { selector: '.tv-app .poster-card' } },
   { name: 'home-rows', actions: [{ pressUntil: 'down', focused: '.poster-card', max: 6 }, { press: 'down' }], ready: { selector: '.poster-card', focused: '.poster-card' } },
   { name: 'home-rows-lower', actions: [{ press: 'down', times: 3 }], ready: { selector: '.poster-card', focused: '.poster-card' } },
-  { name: 'rail-open', actions: [{ openRail: true }], ready: { selector: '.tv-app.menu-open', focused: '[data-menu-route]' } },
+  { name: 'rail-open', actions: [{ openRail: true }], ready: { selector: '.tv-app.menu-open', focused: '[data-menu-hub]' } },
   { name: 'search', actions: [{ go: 'search' }], ready: { selector: '[data-focus-key="search-input"]' } },
   { name: 'search-results', actions: [{ input: '[data-focus-key="search-input"]', text: 'Kingdom' }, { click: '[data-focus-key="search-submit"]' }, { wait: 800 }], ready: { selector: '.tv-search ~ * .poster-card, .poster-card' } },
   rail('library-dashboard', 'library', '.tv-app [data-focus-region="content"]'),

@@ -1,9 +1,9 @@
 // The rail and Home. See ../model.mjs for the map format.
-import { header, lines, onRoute, row } from './common.mjs';
+import { lines, onRoute, row } from './common.mjs';
 
 export const rail = {
   name: 'rail',
-  notes: 'Opened by Left from column 0 of any screen (here: the Home hero). Up/Down walk the routes in screen order and stop at both ends; Right and Back close it and return to the exact control it was opened from.',
+  notes: 'The six hubs: Home, Search, Library, Discover, Downloads, Settings. Opened by Left from column 0 of any screen (here: the Home hero) with the current hub focused. Up/Down walk the hubs and stop at both ends; OK opens a hub (Library and Discover on their last-used tab); Right and Back close it and return to the exact control it was opened from.',
   detect: '.tv-app.menu-open',
   regions: ['sidebar'],
   reach: [{ openRail: true }],
@@ -29,9 +29,9 @@ export const home = {
   regions: ['content'],
   reach: [],
   landing: 'hero[first]',
-  stops: header('hero[first]'),
+  stops: {},
   groups: {
-    hero: { keys: '^hero-', each: { up: 'header-retry', down: 'continue[same]', left: '-1', right: '+1', back: 'rail' }, start: { left: 'rail' }, end: { right: 'stay' } },
+    hero: { keys: '^hero-', each: { up: 'stay', down: 'continue[same]', left: '-1', right: '+1', back: 'rail' }, start: { left: 'rail' }, end: { right: 'stay' } },
     continue: row('^library-', { rows: 3, up: 'hero[same]', down: 'recent[same]' }),
     recent: row('^title-', { up: 'continue[same]', down: 'more[same]' }),
     more: lines('^rail-', { up: 'recent[same]', down: 'favorites[same]', optional: true }),
@@ -41,6 +41,6 @@ export const home = {
     // Pages of 12 load as the cursor nears the end; a held Right must keep going through them.
     { from: 'recent[first]', key: 'right', presses: 40 },
     { from: 'hero[first]', key: 'down', expect: 'favorites[first]', presses: 12 },
-    { from: 'favorites[first]', key: 'up', expect: 'header-retry', presses: 12 },
+    { from: 'favorites[first]', key: 'up', expect: 'hero[first]', presses: 12 },
   ],
 };

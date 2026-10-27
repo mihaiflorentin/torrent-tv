@@ -2,7 +2,7 @@
 // a stand-in AVPlay. Shared by the screen capture script (screens.mjs) and the D-pad audit (dpad.mjs).
 import { setTimeout as sleep } from 'node:timers/promises';
 import { waitFor, LEAN_USER_AGENT } from './chrome.mjs';
-import { railMove, stepFailure, resolvePath } from './journey.mjs';
+import { railMove, routePlace, stepFailure, resolvePath } from './journey.mjs';
 
 export const STORAGE_KEY = 'filelist.serverUrl'; // clients/tv/src/main.tsx
 // Escape is Back: remoteAction() maps keyCode 27 to back, like the remote's Return key.
@@ -69,16 +69,35 @@ export function makeDriver(cdp, server, fixture, picks, { gapMs = 250 } = {}) {
     for (let i = 0; i < 12 && !(await menuOpen()); i++) await press('left');
     if (!(await menuOpen())) throw stepFailure(step, 'Left never opened the rail');
   };
-  const go = async (step, route) => {
-    await openRail(step);
-    const order = await cdp.eval(`Array.from(document.querySelectorAll('[data-menu-route]')).map(function (b) { return b.dataset.menuRoute; })`);
+  const activeData = name => cdp.eval(`document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.${name} : undefined`);
+  // Walks a row of buttons (the rail's hubs, a hub's tabs) with the D-pad until the one named `target` has focus, then presses OK.
+  const walkTo = async (step, selector, attribute, target, keys) => {
+    const order = await cdp.eval(`Array.from(document.querySelectorAll('${selector}')).map(function (b) { return b.dataset.${attribute}; })`);
     for (let guard = 0; guard < 30; guard++) {
-      const at = await cdp.eval(`document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.menuRoute : undefined`);
-      const direction = railMove(order, at, route, step.name);
+      const direction = railMove(order, await activeData(attribute), target, step.name);
       if (!direction) { await press('enter'); await sleep(1200); return; }
-      await press(direction);
+      await press(keys[direction]);
     }
-    throw stepFailure(step, `the rail cursor never reached ${route}`);
+    throw stepFailure(step, `the cursor never reached ${target}`);
+  };
+  const go = async (step, route) => {
+    const place = routePlace(route);
+    await openRail(step);
+    await walkTo(step, '[data-menu-hub]', 'menuHub', place.hub, { down: 'down', up: 'up' });
+    const shown = () => cdp.eval(`(document.querySelector('.tv-app') || { dataset: {} }).dataset.route`);
+    if (place.tab && (await shown()) !== place.tab) {
+      // Up from the content reaches the selected tab; the tabs run left to right.
+      for (let i = 0; i < 12 && !(await activeData('hubTab')); i++) await press('up');
+      if (!(await activeData('hubTab'))) throw stepFailure(step, 'Up never reached the tab strip');
+      await walkTo(step, '[data-hub-tab]', 'hubTab', place.tab, { down: 'right', up: 'left' });
+    }
+    if (place.entry) {
+      for (let i = 0; i < 40 && (await activeData('focusKey')) !== place.entry; i++) await press('down', 1, 120);
+      if ((await activeData('focusKey')) !== place.entry) throw stepFailure(step, `Down never reached ${place.entry}`);
+      await press('enter');
+      await sleep(1200);
+    }
+    if ((await shown()) !== route) throw stepFailure(step, `the screen shows ${await shown()}, not ${route}`);
   };
   const actions = {
     go: (step, action) => go(step, action.go),

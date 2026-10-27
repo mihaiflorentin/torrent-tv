@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 import type { API, CatalogFacets, CatalogTitle, HouseholdItem, HouseholdState } from '@torrent-tv/shared';
 
 // TV Home: the hero resumes what the household is watching, discovery rows load only as focus
@@ -98,7 +99,7 @@ describe('TV home', () => {
     expect(names).toEqual(['Recently added', 'Top rated', 'Movies', 'Series', 'Most seeded', 'My List']);
     const rows = Array.from(container.querySelectorAll<HTMLElement>('.tv-content [data-focus-row]')).map(node => Number(node.dataset.focusRow));
     expect(rows).toEqual([...rows].sort((a, b) => a - b));
-    expect(Array.from(new Set(rows))).toEqual([0, 1, 10, 11, 12, 13, 14, 20]);
+    expect(Array.from(new Set(rows))).toEqual([1, 10, 11, 12, 13, 14, 20]);
     expect(container.querySelectorAll('.tv-rows .poster-card').length).toBeLessThanOrEqual(5 * 10);
   });
 
@@ -142,12 +143,14 @@ describe('TV home', () => {
     mount({ ...empty, favorites: [{ ...resumeItem, favorite: true, titleId: 'fav', catalog: make('fav') } as HouseholdItem] });
     await wait();
     expect(heading('My List')).toBeDefined();
-    expect(container.querySelector('[data-menu-route="favorites"]')?.textContent).toContain('My List');
+    expect(container.querySelector('[data-hub-tab="favorites"]')).toBeNull();
+    await openRoute(container, 'library', 0);
+    expect(container.querySelector('[data-hub-tab="favorites"]')?.textContent).toBe('My List');
     expect(container.textContent).not.toContain('Favorites');
     render(null, container);
     mount();
     await wait();
-    container.querySelector<HTMLButtonElement>('[data-menu-route="favorites"]')!.click();
+    await openRoute(container, 'favorites', 0);
     await wait();
     expect(container.querySelector('.tv-muted')?.textContent).toBe('Your list is empty. Open a title and choose Add to My List.');
   });

@@ -41,18 +41,18 @@ describe('TV icons and app mark', () => {
   it('draws every rail item as a line icon beside its label, with no glyph character', async () => {
     mount({ links: [{ id: 'p', name: 'Other', url: 'https://example.test' }], promotions: [] });
     await wait();
-    const items = Array.from(container.querySelectorAll<HTMLElement>('.tv-sidebar [data-menu-route]'));
-    expect(items.length).toBeGreaterThan(10);
+    const items = Array.from(container.querySelectorAll<HTMLElement>('.tv-sidebar [data-menu-hub]'));
+    expect(items.length).toBe(6);
     for (const item of items) {
       const icon = item.querySelector('svg');
-      expect(icon, item.dataset.menuRoute).not.toBeNull();
+      expect(icon, item.dataset.menuHub).not.toBeNull();
       expect(icon!.getAttribute('aria-hidden')).toBe('true');
       expect(item.textContent).toBe(item.querySelector('span')!.textContent);
       expect(item.textContent).not.toMatch(GLYPH_ICONS);
     }
     // Hubs that look alike in words still get different drawings.
-    const drawing = (route: string) => container.querySelector(`[data-menu-route="${route}"] svg`)!.innerHTML;
-    expect(new Set(['home', 'search', 'library', 'continue', 'favorites', 'watched', 'downloads', 'tracker', 'browse', 'jobs', 'settings', 'projects'].map(drawing)).size).toBe(12);
+    const drawing = (hub: string) => container.querySelector(`[data-menu-hub="${hub}"] svg`)!.innerHTML;
+    expect(new Set(['home', 'search', 'library', 'discover', 'downloads', 'settings'].map(drawing)).size).toBe(6);
   });
 
   it('shows the app mark, a drawn play shape, instead of the TT letters', async () => {

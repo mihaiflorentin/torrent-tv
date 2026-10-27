@@ -228,7 +228,7 @@ describe('TV title page', () => {
       try {
         mount(container, {}, { titles: [title()], household: { ...empty, continueWatching: [resumeItem()] }, initialNav: nav({ route: 'continue', focusKey: 'library-a-0-0-0' }), restoreFocus: 'library-a-0-0-0' });
         await wait(80);
-        expect(container.querySelector('.tv-top h1')!.textContent).toBe('Continue watching');
+        expect(container.querySelector('[data-hub-tab][aria-selected="true"]')!.textContent).toBe('Continue watching');
         expect((document.activeElement as HTMLElement).dataset.focusKey).toBe('library-a-0-0-0');
       } finally {
         delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetWidth;
@@ -254,7 +254,7 @@ describe('TV title page', () => {
     it('starts on Home as before when there is no initialNav', async () => {
       mount(container, {}, { titles: [title()] });
       await wait(80);
-      expect(container.querySelector('.tv-top h1')!.textContent).toBe('Home');
+      expect(container.querySelector('.tv-app')!.getAttribute('data-route')).toBe('home');
       expect(key('detail-playback')).toBeNull();
     });
 

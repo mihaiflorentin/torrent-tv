@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleep } from './test-wait';
+import { openRoute } from './test-nav';
 import type { API, CatalogDetail, CatalogFacets, CatalogTitle, Download, MediaState, UpdateStatus } from '@torrent-tv/shared';
 import { withETag } from './test-api';
 import type { TVPlatformHooks } from './platform';
@@ -161,7 +162,7 @@ const activeDownload: Download = {
 async function openDownloads(container: HTMLElement, onManageDownload: CatalogProps['onManageDownload']) {
   render(<Catalog {...catalogProps({}, { downloads: [activeDownload], onManageDownload })} />, container);
   await settle();
-  container.querySelector<HTMLButtonElement>('[data-menu-route="downloads"]')!.click();
+  await openRoute(container, 'downloads', 0);
   await settle();
 }
 
@@ -213,7 +214,7 @@ describe('busy controls keep focus and ignore their action', () => {
     const searchTitles = vi.fn(() => new Promise<{ items: never[]; nextCursor: null }>(resolve => { resolveSearch = resolve; }));
     render(<Catalog {...catalogProps({ searchTitles } as unknown as Partial<API>)} />, container);
     await settle();
-    container.querySelector<HTMLButtonElement>('[data-menu-route="search"]')!.click();
+    await openRoute(container, 'search', 0);
     await settle();
 
     const input = control(container, 'search-input') as unknown as HTMLInputElement;
@@ -439,7 +440,7 @@ describe('release link on the Settings screen', () => {
 
     render(<Catalog {...catalogProps({}, { updateStatus })} />, container);
     await settle();
-    container.querySelector<HTMLButtonElement>('[data-menu-route="settings"]')!.click();
+    await openRoute(container, 'settings', 0);
     await settle();
 
     const save = control(container, 'settings-save');

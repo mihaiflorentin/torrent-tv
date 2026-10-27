@@ -4,7 +4,7 @@ import { useRef } from 'preact/hooks';
 import { describe, expect, it, vi } from 'vitest';
 import { chooseDirectionalTarget, chooseStructuredTarget, RectLike, remoteAction, useTVNavigation } from './navigation';
 import type { TVPlatformHooks } from './platform';
-import { PROJECTS_MENU_ROW, REBUILD_DIALOG_REGION, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_REBUILD_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION } from './portal';
+import { REBUILD_DIALOG_REGION, SETTINGS_JOBS_ROW, SETTINGS_PROJECTS_ROW, SETTINGS_RELOAD_ROW, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_REBUILD_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION } from './portal';
 
 const rect = (left: number, top: number, width = 100, height = 100): RectLike => ({ left, top, right: left + width, bottom: top + height, width, height });
 
@@ -114,13 +114,23 @@ describe('TVSettings update rows', () => {
   });
 });
 
-describe('Other projects sidebar entry', () => {
-  const menuItem = (row: number) => ({ dataset: { focusRegion: 'sidebar', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
-  const settings = menuItem(32);
-  const projects = menuItem(PROJECTS_MENU_ROW);
-  it('sits below the last fixed menu row and never renumbers it', () => {
-    expect(chooseStructuredTarget(settings, [settings, projects], 'down')).toBe(projects);
-    expect(chooseStructuredTarget(projects, [settings, projects], 'up')).toBe(settings);
+describe('Settings entries for the screens that left the rail', () => {
+  const control = (row: number) => ({ dataset: { focusRegion: 'content', focusRow: String(row), focusCol: '0' } } as unknown as HTMLElement);
+  const latest = control(SETTINGS_CATALOG_FETCH_ROW);
+  const jobs = control(SETTINGS_JOBS_ROW);
+  const projects = control(SETTINGS_PROJECTS_ROW);
+  const reload = control(SETTINGS_RELOAD_ROW);
+  const change = control(SETTINGS_CHANGE_SERVER_ROW);
+  it('walks Fetch latest, Background jobs, Other projects, Reload library, Change server in that order', () => {
+    const all = [latest, jobs, projects, reload, change];
+    expect(chooseStructuredTarget(latest, all, 'down')).toBe(jobs);
+    expect(chooseStructuredTarget(jobs, all, 'down')).toBe(projects);
+    expect(chooseStructuredTarget(projects, all, 'down')).toBe(reload);
+    expect(chooseStructuredTarget(reload, all, 'down')).toBe(change);
+  });
+  it('skips Other projects when the server publishes no links', () => {
+    expect(chooseStructuredTarget(jobs, [latest, jobs, reload, change], 'down')).toBe(reload);
+    expect(chooseStructuredTarget(reload, [latest, jobs, reload, change], 'up')).toBe(jobs);
   });
 });
 

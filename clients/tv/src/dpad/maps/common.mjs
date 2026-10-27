@@ -1,13 +1,15 @@
 // Pieces every top-level screen shares. See ../model.mjs for the map format.
 
-/** Visible while the rail's current route is `route` (the shell, not a title page, is drawn). */
-export const onRoute = route => `[data-menu-route="${route}"][aria-current="page"]`;
+/** Visible while the shell (not a title page) shows `route`. */
+export const onRoute = route => `.tv-app[data-route="${route}"]`;
 
 /**
- * The header Refresh button (chrome: never a landing, row 0 of every screen). Up and Right stay,
- * Left opens the rail, Back opens the rail like anywhere at the top level of a screen.
+ * The tab strip of a hub (Library, Discover): one focus row above the content. Left from the first tab opens
+ * the rail, Right at the last stays, Up stays (nothing is above it), Down enters the content at `down` (its
+ * first stop, whatever tab it left), Back opens the rail like anywhere at the top level of a screen. OK on a
+ * tab opens that tab's screen; on the selected tab it does nothing.
  */
-export const header = down => ({ 'header-retry': { up: 'stay', down, left: 'rail', right: 'stay', back: 'rail' } });
+export const tabs = (down, rest = {}) => ({ keys: '^tab-', each: { up: 'stay', down, left: '-1', right: '+1', back: 'rail', ...rest }, start: { left: 'rail' }, end: { right: 'stay' } });
 
 /** A horizontal list (a poster rail, a chip row): Left at its start opens the rail, Right at its end stays. */
 export const row = (keys, { up, down, ...rest }) => ({ keys, each: { up, down, left: '-1', right: '+1' }, start: { left: 'rail' }, end: { right: 'stay' }, ...rest });
