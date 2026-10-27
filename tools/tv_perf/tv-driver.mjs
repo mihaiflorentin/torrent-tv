@@ -33,7 +33,7 @@ export const AVPLAY_STUB = `(() => {
 /** Lean TV user agent, the saved server address and the AVPlay stand-in on every page load. */
 export async function prepareTVPage(cdp, server) {
   await cdp.send('Emulation.setUserAgentOverride', { userAgent: LEAN_USER_AGENT });
-  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem(${JSON.stringify(STORAGE_KEY)}, ${JSON.stringify(server.url)}) } catch (e) {}\n${AVPLAY_STUB}` });
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem(${jsLiteral(STORAGE_KEY)}, ${jsLiteral(server.url)}) } catch (e) {}\n${AVPLAY_STUB}` });
 }
 
 /** Loads the TV app and waits for Home with its landing focus. */
@@ -42,6 +42,10 @@ export async function openTVHome(cdp, server, { settleMs = 2000 } = {}) {
   await waitFor(cdp, `document.querySelectorAll('.poster-card').length > 3`, 30000, 'the TV Home screen to render');
   await sleep(settleMs); // boot-time fetches and the landing focus
 }
+
+// A value as a JS literal inside generated page code: JSON, with the characters that could end a script or a line escaped.
+const UNSAFE = { '<': '\\u003C', '>': '\\u003E', '/': '\\u002F', '\u2028': '\\u2028', '\u2029': '\\u2029' };
+export const jsLiteral = value => JSON.stringify(value).replace(/[<>/\u2028\u2029]/g, ch => UNSAFE[ch]);
 
 // Visible = laid out and not hidden; the page helpers are inlined into each evaluation.
 export const VISIBLE = `function visible(el) { if (!el || !el.getClientRects().length) return false; var s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0; }
@@ -59,10 +63,10 @@ export function makeDriver(cdp, server, fixture, picks, { gapMs = 250 } = {}) {
       if (gap) await sleep(gap);
     }
   };
-  const focusedMatches = selector => cdp.eval(inPage(`var a = document.activeElement; return !!(a && a.matches && a.matches(${JSON.stringify(selector)}));`));
+  const focusedMatches = selector => cdp.eval(inPage(`var a = document.activeElement; return !!(a && a.matches && a.matches(${jsLiteral(selector)}));`));
   const menuOpen = () => cdp.eval(`!!document.querySelector('.tv-app.menu-open')`);
   const element = async (step, selector, act) => {
-    const done = await cdp.eval(inPage(`var el = first(${JSON.stringify(selector)}); if (!el) return false; ${act}; return true;`));
+    const done = await cdp.eval(inPage(`var el = first(${jsLiteral(selector)}); if (!el) return false; ${act}; return true;`));
     if (!done) throw stepFailure(step, `no visible element matches ${selector}`);
   };
   const openRail = async step => {
@@ -114,11 +118,11 @@ export function makeDriver(cdp, server, fixture, picks, { gapMs = 250 } = {}) {
     },
     focus: (step, action) => element(step, action.focus, 'el.focus()'),
     click: (step, action) => element(step, action.click, 'el.click()'),
-    input: (step, action) => element(step, action.input, `el.value = ${JSON.stringify(action.text)}; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }))`),
+    input: (step, action) => element(step, action.input, `el.value = ${jsLiteral(action.text)}; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }))`),
     openTitle: async (step, action) => {
       const id = picks[action.openTitle];
       const card = `.poster-card[data-focus-key*=${JSON.stringify(id)}]`;
-      if (!(await cdp.eval(inPage(`return !!first(${JSON.stringify(card)});`)))) await go(step, 'home');
+      if (!(await cdp.eval(inPage(`return !!first(${jsLiteral(card)});`)))) await go(step, 'home');
       await element(step, card, 'el.focus()');
       await press('enter');
       await sleep(1200);
@@ -158,10 +162,10 @@ export function makeDriver(cdp, server, fixture, picks, { gapMs = 250 } = {}) {
     },
     async ready(step) {
       const { selector, focused } = step.ready;
-      const check = inPage(`if (!first(${JSON.stringify(selector)})) return false; ${focused ? `var a = document.activeElement; return !!(a && a.matches && a.matches(${JSON.stringify(focused)}));` : 'return true;'}`);
+      const check = inPage(`if (!first(${jsLiteral(selector)})) return false; ${focused ? `var a = document.activeElement; return !!(a && a.matches && a.matches(${jsLiteral(focused)}));` : 'return true;'}`);
       try { await waitFor(cdp, check, READY_MS, 'ready'); }
       catch {
-        const seen = await cdp.eval(inPage(`var a = document.activeElement; return { matched: !!first(${JSON.stringify(selector)}), focus: a ? (a.dataset && a.dataset.focusKey) || a.tagName.toLowerCase() + '.' + a.className : '' };`));
+        const seen = await cdp.eval(inPage(`var a = document.activeElement; return { matched: !!first(${jsLiteral(selector)}), focus: a ? (a.dataset && a.dataset.focusKey) || a.tagName.toLowerCase() + '.' + a.className : '' };`));
         throw stepFailure(step, !seen.matched ? `no visible element matches ${selector}` : `focus is on ${seen.focus}, not ${focused}`);
       }
     },

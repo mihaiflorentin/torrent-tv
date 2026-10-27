@@ -31,7 +31,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { buildFixture, serve } from './fixture.mjs';
 import { CDP, findChrome, launchChrome, waitFor } from './chrome.mjs';
 import { pickTitles } from './journey.mjs';
-import { makeDriver, prepareTVPage, openTVHome } from './tv-driver.mjs';
+import { makeDriver, prepareTVPage, openTVHome, jsLiteral } from './tv-driver.mjs';
 import { DIRECTIONS, classify, sampleStops, movesOf, resolveTarget, resolveOn, checkMaps, formatTable } from '../../clients/tv/src/dpad/model.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -169,7 +169,7 @@ async function main() {
 async function reach(cdp, server, driver, map) {
   await openTVHome(cdp, server, { settleMs: 1200 });
   await driver.perform({ name: map.name, actions: map.reach });
-  await waitFor(cdp, page(`return ${JSON.stringify([].concat(map.detect))}.every(seen);`), 10000, `${[].concat(map.detect).join(' + ')} (map ${map.name})`);
+  await waitFor(cdp, page(`return ${jsLiteral([].concat(map.detect))}.every(seen);`), 10000, `${[].concat(map.detect).join(' + ')} (map ${map.name})`);
   await sleep(map.settleMs || 600);
 }
 
@@ -191,7 +191,7 @@ function locate(observation, preferred) {
 
 async function look(cdp) {
   const observation = await observe(cdp);
-  observation.visibleMaps = await cdp.eval(page(`var names = ${JSON.stringify(MAPS.map(map => [map.name, map.detect]))}; return names.filter(function (pair) { return [].concat(pair[1]).every(seen); }).map(function (pair) { return pair[0]; });`));
+  observation.visibleMaps = await cdp.eval(page(`var names = ${jsLiteral(MAPS.map(map => [map.name, map.detect]))}; return names.filter(function (pair) { return [].concat(pair[1]).every(seen); }).map(function (pair) { return pair[0]; });`));
   return observation;
 }
 
@@ -276,7 +276,7 @@ async function auditMap(cdp, server, driver, map) {
         layout = classify(map, before.elements);
         const stop = layout.stops.find(candidate => candidate.element.key === sample.element.key) || (record ? sample : null);
         if (!stop) { fail(sample.id, key, '-', 'stop vanished', 'stop not on screen after restoring the screen'); continue; }
-        const focused = await cdp.eval(page(`var el = focusables().filter(function (e) { return e.getAttribute('data-focus-key') === ${JSON.stringify(stop.element.key)}; })[0]; if (!el) return false; el.focus(); return document.activeElement === el;`));
+        const focused = await cdp.eval(page(`var el = focusables().filter(function (e) { return e.getAttribute('data-focus-key') === ${jsLiteral(stop.element.key)}; })[0]; if (!el) return false; el.focus(); return document.activeElement === el;`));
         if (!focused) { fail(stop.id, key, '-', 'cannot focus', 'stop does not take focus'); continue; }
         await sleep(40);
         const signatureBefore = await cdp.eval(page('return signature();'));
@@ -329,7 +329,7 @@ async function auditMap(cdp, server, driver, map) {
     // Enough presses to cross the longest list on the screen and push once past its end.
     const presses = burst.presses || Math.max(4, ...Object.values(layout.groups).map(group => group.members.length + 2));
     await cdp.eval(page(`window.__dpadTrail = []; if (!window.__dpadTrailHook) { window.__dpadTrailHook = true; document.addEventListener('focusin', function (e) { var k = e.target && e.target.getAttribute && e.target.getAttribute('data-focus-key'); if (window.__dpadTrail) window.__dpadTrail.push(k || '?'); }); }
-      var el = focusables().filter(function (e) { return e.getAttribute('data-focus-key') === ${JSON.stringify(from.element.key)}; })[0]; el.focus(); window.__dpadTrail = []; return true;`));
+      var el = focusables().filter(function (e) { return e.getAttribute('data-focus-key') === ${jsLiteral(from.element.key)}; })[0]; el.focus(); window.__dpadTrail = []; return true;`));
     await sleep(40);
     await driver.hold(burst.key, presses, BURST_CADENCE_MS);
     await settle(cdp, before.signature);

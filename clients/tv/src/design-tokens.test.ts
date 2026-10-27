@@ -156,7 +156,8 @@ describe('TV stylesheets use the shared tokens', () => {
 
   it('makes every Player panel row the 72 px TV target', () => {
     const text = css('tv.css');
-    for (const row of ['.player-dialog button', '.player-dialog p']) expect(/min-height:\s*var\(--tt-tv-target\)/.test(new RegExp(`\\n${row.replace(/[.]/g, '\\.')}\\s*\\{([^{}]*)\\}`).exec(text)?.[1] ?? ''), row).toBe(true);
+    const escape = (literal: string) => literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    for (const row of ['.player-dialog button', '.player-dialog p']) expect(/min-height:\s*var\(--tt-tv-target\)/.test(new RegExp(`\\n${escape(row)}\\s*\\{([^{}]*)\\}`).exec(text)?.[1] ?? ''), row).toBe(true);
   });
 
   it('puts the player menu on the solid menu surface and every control at the TV target height', () => {
