@@ -379,11 +379,55 @@ describe('busy controls keep focus and ignore their action', () => {
     expect(document.activeElement).toBe(pause);
   });
 
+  it('download Resume keeps focus while pending, runs once, and is the same focused control afterwards', async () => {
+    let finish: () => void = () => { };
+    const onManageDownload = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    render(<Catalog {...catalogProps({}, { downloads: [{ ...activeDownload, state: 'pausedDL' }], onManageDownload })} />, container);
+    await settle();
+    await openRoute(container, 'downloads', 0);
+    await settle();
+
+    const resume = control(container, 'download-dl-1-resume');
+    expectIdle(resume);
+    resume!.focus();
+    resume!.click();
+    await settle();
+    expectBusyAndFocusable(resume);
+    expect(resume!.textContent).toBe('Resuming…');
+    expect(document.activeElement).toBe(resume);
+
+    resume!.click();
+    await settle();
+    expect(onManageDownload).toHaveBeenCalledTimes(1);
+    expect(onManageDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 'dl-1' }), 'resume');
+
+    finish();
+    await settle();
+    expectIdle(resume);
+    expect(control(container, 'download-dl-1-resume')).toBe(resume);
+    expect(document.activeElement).toBe(resume);
+  });
+
+  it('download Play stays a plain control that plays the download', async () => {
+    const onPlayDownload = vi.fn();
+    render(<Catalog {...catalogProps({}, { downloads: [activeDownload], onPlayDownload })} />, container);
+    await settle();
+    await openRoute(container, 'downloads', 0);
+    await settle();
+    const play = control(container, 'download-dl-1-play');
+    expectIdle(play);
+    play!.click();
+    expect(onPlayDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 'dl-1' }));
+  });
+
   it('download delete dialog keeps focus on Delete while deleting and ignores Cancel and repeat presses', async () => {
     let finish: () => void = () => { };
     const onManageDownload = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
     await openDownloads(container, onManageDownload);
-    control(container, 'download-dl-1-delete')!.click();
+    // Delete download lives in the row's More sheet (drawn on its own layer on <body>).
+    control(container, 'download-dl-1-more')!.click();
+    await settle();
+    control(document, 'more-delete')!.click();
     await settle();
 
     const confirm = control(container, 'download-confirm');

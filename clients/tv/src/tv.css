@@ -2449,108 +2449,289 @@ button>.tv-icon:first-child {
  margin-left: var(--tt-space-3)
 }
 
+/* Downloads (the Downloads board) -------------------------------------------
+   The heading carries the storage use against the Allocation on its right; then the filter chips with their
+   counts, Sort and the find field on one line; then one compact row per torrent: thumbnail, title, state with a
+   slim bar and one line of facts, the size, and Play, Pause or Resume and More. Every row keeps its actions
+   drawn, so each row is one focus band; they are quiet until the row holds focus (the navigation layer sets
+   .active-row: the old engines have no :focus-within). Release, path and peers sit behind Details in More. */
+.tv-list.tv-download-list {
+ max-width: none
+}
+
+/* Beside the shell's "Downloads" heading: the content column is the containing block (it is contained), so this
+   sits on the heading's line at the right edge without moving the heading or the list. */
+.tv-download-use {
+ position: absolute;
+ top: var(--tt-tv-safe-y);
+ right: var(--tt-tv-safe-x);
+ display: flex;
+ align-items: center;
+ height: 96px;
+ margin: 0;
+ color: var(--tt-text-subtle);
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
+ white-space: nowrap
+}
+
+.tv-download-use .tv-meter {
+ width: 220px;
+ height: 8px;
+ margin: 0 0 0 18px;
+ background: var(--tt-fill-selected)
+}
+
+.tv-download-use .tv-meter b {
+ background: var(--tt-text-muted)
+}
+
+.tv-download-tools {
+ flex-wrap: nowrap;
+ align-items: center;
+ margin: 0 0 var(--tt-space-6)
+}
+
+.tv-download-tools>* {
+ margin: 0 var(--tt-space-3) 0 0
+}
+
+.tv-download-tools button {
+ flex: 0 0 auto;
+ padding: 0 var(--tt-space-5);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap
+}
+
+/* The count after the chip's word, in the lighter tone of the pill's own text colour (it follows focus). */
+.tv-chip-count {
+ margin-left: 10px;
+ font-style: normal;
+ font-weight: var(--tt-weight-semibold);
+ font-variant-numeric: tabular-nums;
+ opacity: .66
+}
+
+.tv-download-tools input {
+ flex: 0 1 400px;
+ width: 400px;
+ min-width: 0;
+ margin: 0 0 0 auto;
+ font-size: var(--tt-tv-text-meta)
+}
+
 .tv-download-count {
- margin: 0 0 var(--tt-space-3);
+ margin: calc(-1 * var(--tt-space-4)) 0 var(--tt-space-4);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
 }
 
-.tv-download-tools input {
- width: 700px
+.tv-download-row {
+ margin: 0 0 10px;
+ border-radius: var(--tt-radius-xl);
+ background: var(--tt-fill-quiet)
 }
 
-.tv-download-tools button {
- min-width: 300px;
- justify-content: flex-start
+.tv-download-row.active-row {
+ background: var(--tt-fill-selected)
 }
 
-/* Downloads: one card per torrent. The lines keep a fixed height so telemetry updates in place
-   and the focused control never moves. Release name, path and peers sit behind Details. */
-.tv-list .tv-download-row {
- flex-wrap: wrap;
- min-height: 292px;
- align-items: flex-start;
- overflow: visible
+.tv-download-line {
+ display: flex;
+ align-items: center;
+ height: 136px;
+ padding: 0 var(--tt-space-5) 0 18px
 }
 
-.tv-list .tv-download-row>.tv-download-main {
- flex: 0 0 100%;
- width: 100%;
- margin-right: 0
-}
-
-.tv-download-title,
-.tv-download-status,
-.tv-download-facts {
+.tv-download-thumb {
  display: block;
- max-width: 100%;
- min-height: 38px;
+ flex: 0 0 176px;
+ width: 176px;
+ height: 99px;
+ margin-right: 28px;
+ border-radius: var(--tt-radius-md);
+ background: var(--tt-raised);
+ overflow: hidden
+}
+
+.tv-download-thumb img {
+ display: block;
+ width: 100%;
+ height: 100%;
+ object-fit: cover
+}
+
+.tv-download-main {
+ flex: 1 1 0;
+ min-width: 0;
+ margin-right: 28px
+}
+
+.tv-download-title {
+ display: block;
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-bold);
+ line-height: var(--tt-leading-tight);
  white-space: nowrap;
  overflow: hidden;
- text-overflow: ellipsis;
- font-variant-numeric: tabular-nums
+ text-overflow: ellipsis
 }
 
-.tv-list .tv-download-status {
- color: var(--tt-text);
- font-size: var(--tt-tv-text-body);
- font-weight: var(--tt-weight-bold)
+.tv-download-state {
+ display: flex;
+ align-items: center;
+ margin-top: 10px;
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
+ white-space: nowrap
 }
 
-.tv-list .tv-download-status.done {
+.tv-download-state>*+* {
+ margin-left: 18px
+}
+
+/* The state word: saffron while it moves (progress), the status colours otherwise, always as a word. */
+.tv-download-status {
+ flex: 0 0 auto;
+ font-weight: var(--tt-weight-semibold);
+ color: var(--tt-text-muted)
+}
+
+.tv-download-status.active {
+ color: var(--tt-accent)
+}
+
+.tv-download-status.done {
  color: var(--tt-ok)
 }
 
-.tv-list .tv-download-status.error {
+.tv-download-status.error {
  color: var(--tt-danger)
 }
 
-.tv-list .tv-download-status.paused {
- color: var(--tt-warn)
+.tv-download-facts {
+ flex: 1 1 auto;
+ min-width: 0;
+ color: var(--tt-text-subtle);
+ overflow: hidden;
+ text-overflow: ellipsis
 }
 
 .tv-meter {
  display: block;
- height: 12px;
- margin: var(--tt-space-1) 0 var(--tt-space-2);
- border-radius: var(--tt-radius-pill);
- background: var(--tt-line);
+ border-radius: 4px;
  overflow: hidden
 }
 
 .tv-meter b {
  display: block;
  height: 100%;
- border-radius: var(--tt-radius-pill);
+ border-radius: 4px;
  background: var(--tt-accent)
 }
 
-.tv-meter.done b {
- background: var(--tt-ok)
+.tv-download-state .tv-meter {
+ flex: 0 0 240px;
+ width: 240px;
+ height: 8px;
+ background: var(--tt-fill-selected)
 }
 
-.tv-meter.error b {
- background: var(--tt-danger)
-}
-
-.tv-meter.paused b {
+.tv-download-state .tv-meter.paused b,
+.tv-download-state .tv-meter.queued b,
+.tv-download-state .tv-meter.idle b {
  background: var(--tt-text-muted)
 }
 
+.tv-download-size {
+ flex: 0 0 auto;
+ min-width: 120px;
+ margin-right: 28px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-semibold);
+ font-variant-numeric: tabular-nums;
+ text-align: right;
+ white-space: nowrap
+}
+
+/* Wide enough for Play, Pause and More, right-aligned: More and the size line up down the list whether a row has a
+   transfer action or not. */
+.tv-download-actions {
+ display: flex;
+ flex: 0 0 auto;
+ align-items: center;
+ justify-content: flex-end;
+ min-width: 400px
+}
+
+.tv-download-actions>*+* {
+ margin-left: 14px
+}
+
+/* At rest the row's actions are quiet; the active row brings them up (the primary to the brighter pill). The focused
+   control still turns white with its outline, from the base rule's two signals. */
+.tv-download-actions button {
+ padding: 0 28px;
+ background: var(--tt-fill-quiet);
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ white-space: nowrap
+}
+
+.tv-download-actions button.primary {
+ padding: 0 30px 0 24px
+}
+
+.tv-download-actions button>.tv-icon:first-child {
+ width: 24px;
+ height: 24px;
+ flex: 0 0 24px;
+ margin: 0 10px 0 0
+}
+
+.tv-download-actions button.tv-download-more {
+ width: 72px;
+ padding: 0
+}
+
+.tv-download-actions button.tv-download-more>.tv-icon:first-child {
+ width: 28px;
+ height: 28px;
+ flex: 0 0 28px;
+ margin: 0
+}
+
+.active-row .tv-download-actions button {
+ background: var(--tt-fill-selected);
+ color: var(--tt-text)
+}
+
+.active-row .tv-download-actions button.primary {
+ background: var(--tt-fill-strong)
+}
+
+.tv-download-actions button:focus,
+.active-row .tv-download-actions button:focus,
+.active-row .tv-download-actions button.primary:focus {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus)
+}
+
+/* Details and an opened torrent's files sit under the row, lined up with the title after the thumbnail. */
 .tv-download-details {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-3) 0 0;
- padding: var(--tt-space-3) var(--tt-space-4);
- border-radius: var(--tt-radius-md);
- background: var(--tt-ink);
+ margin: 0 var(--tt-space-5) 0 222px;
+ padding: 0 0 var(--tt-space-5);
+ color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta)
 }
 
 .tv-download-details dt {
  flex: 0 0 150px;
  margin: 0 0 var(--tt-space-1);
- color: var(--tt-text-muted)
+ color: var(--tt-text-subtle)
 }
 
 .tv-download-details dd {
@@ -2561,41 +2742,23 @@ button>.tv-icon:first-child {
  overflow-wrap: anywhere
 }
 
-.tv-list .tv-download-row>.tv-download-actions {
- display: flex;
- flex: 0 0 100%;
- flex-wrap: wrap;
- margin-top: var(--tt-space-3)
-}
-
-.tv-list .tv-download-row>.tv-download-actions>* {
- margin: 0 var(--tt-space-3) var(--tt-space-2) 0
-}
-
 .tv-download-files {
- flex: 0 0 100%;
  display: flex;
  flex-direction: column;
  max-height: 620px;
- margin-top: var(--tt-space-4);
- padding: 14px 0;
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
+ margin: 0 var(--tt-space-5) 0 222px;
+ padding: 0 0 var(--tt-space-4);
  overflow-y: auto
 }
 
 .tv-download-file {
  display: flex;
  align-items: center;
- padding: var(--tt-space-2) 20px
+ padding: var(--tt-space-2) 0
 }
 
 .tv-download-file>*+* {
  margin-left: var(--tt-space-4)
-}
-
-.tv-download-file+.tv-download-file {
- border-top: 1px solid var(--tt-line)
 }
 
 .tv-download-file strong {
@@ -2604,10 +2767,14 @@ button>.tv-icon:first-child {
  overflow: hidden;
  text-overflow: ellipsis;
  white-space: nowrap;
- font-size: var(--tt-tv-text-body)
+ font-size: var(--tt-tv-text-body);
+ font-weight: var(--tt-weight-semibold)
 }
 
 .tv-download-file small {
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-variant-numeric: tabular-nums;
  white-space: nowrap
 }
 
@@ -2620,7 +2787,8 @@ button>.tv-icon:first-child {
 }
 
 .tv-download-file button {
- min-width: 140px
+ min-width: 140px;
+ font-size: var(--tt-tv-text-meta)
 }
 
 /* Jobs */
