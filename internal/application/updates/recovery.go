@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -521,9 +522,24 @@ func (i *Installer) Recover(currentVersion string) (Recovery, error) {
 	return recovery, nil
 }
 
-// ConsumeSuppression clears the journal after the caller honored a
-// suppression decision for this startup only.
+// ConsumeSuppression removes the rolled-back operation's staging debris
+// and clears the journal after the caller honored a suppression decision
+// for this startup only. The backup is left alone: rollback already moved
+// it back over the live path. Staged paths still held open (the helper copy
+// may still be running) are retried by the next startup's stale sweep.
 func (i *Installer) ConsumeSuppression() error {
+	op, found, err := i.journal.Load()
+	if err != nil {
+		return err
+	}
+	if found {
+		for _, path := range op.StagedPaths {
+			os.RemoveAll(path)
+		}
+		if err := syncDir(i.journal.dir); err != nil {
+			return fmt.Errorf("suppression: flush install directory: %w", err)
+		}
+	}
 	return i.journal.Clear()
 }
 
@@ -538,6 +554,58 @@ func (i *Installer) Cleanup(op Operation) error {
 		return fmt.Errorf("cleanup: flush install directory: %w", err)
 	}
 	return i.journal.Clear()
+}
+
+// staleStagingPatterns name the staging entries StageArchive and Extract
+// create inside the install directory.
+var staleStagingPatterns = []string{".filelist-extract-*", ".filelist-stage-*.part"}
+
+// SweepStaleStaging removes staging entries left in installDir by finished
+// or abandoned operations: the helper copy a Windows helper cannot delete
+// while it runs, or the staging a rollback leaves behind. Staging happens
+// before the journal lock is taken, so an entry is removed only when it is
+// older than grace and no recorded operation names it (or anything inside
+// it) as staged or backup. The journal is read whether or not another
+// process holds its lock. Best effort: failures are left for the next sweep.
+func SweepStaleStaging(installDir string, now time.Time, grace time.Duration) {
+	var keep []string
+	op, found, err := LoadOperation(installDir)
+	if err != nil {
+		// An unreadable journal may still name live staging.
+		return
+	}
+	if found {
+		keep = backupAndStagingPaths(op)
+	}
+	for _, pattern := range staleStagingPatterns {
+		matches, err := filepath.Glob(filepath.Join(installDir, pattern))
+		if err != nil {
+			continue
+		}
+		for _, entry := range matches {
+			if namesOrContains(entry, keep) {
+				continue
+			}
+			info, err := os.Lstat(entry)
+			if err != nil || now.Sub(info.ModTime()) < grace {
+				continue
+			}
+			os.RemoveAll(entry)
+		}
+	}
+}
+
+// namesOrContains reports whether entry is one of paths or a directory
+// containing one of them.
+func namesOrContains(entry string, paths []string) bool {
+	entry = filepath.Clean(entry)
+	for _, path := range paths {
+		path = filepath.Clean(path)
+		if path == entry || strings.HasPrefix(path, entry+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 func backupAndStagingPaths(op Operation) []string {

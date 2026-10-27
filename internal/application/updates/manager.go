@@ -709,12 +709,18 @@ func (m *Manager) StartupApply(ctx context.Context) {
 // installation's side: the healthy new installation acknowledges after
 // readiness, a completed rollback consumes its one-shot startup
 // suppression, and cleanup/rollback disk effects run through the S5
-// installer. No pending operation is the common case.
+// installer. No pending operation is the common case; it sweeps stale
+// staging debris instead.
 func (m *Manager) recoverPending() {
 	if m.deps.InstallDir == "" {
 		return
 	}
 	if _, found, err := LoadOperation(m.deps.InstallDir); err != nil || !found {
+		if err == nil {
+			// Nothing pending: drop staging earlier operations could not
+			// remove. Anything younger than one operation may be live.
+			SweepStaleStaging(m.deps.InstallDir, m.deps.Now(), m.deps.OperationTimeout)
+		}
 		return
 	}
 	journal, err := OpenJournal(m.deps.InstallDir)
