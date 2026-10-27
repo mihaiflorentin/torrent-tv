@@ -212,6 +212,24 @@ describe('TV Settings in two panes', () => {
     expect(pane().querySelector('[role="status"]')!.textContent).toBe('tmdb reachable');
   });
 
+  it('keeps each pane\'s status to itself: a Save or a connection test result shows only in the pane it came from', async () => {
+    const test = vi.fn(async (name: string) => ({ message: `${name} reachable` }));
+    await mount(fakeApi(settingsValue('native'), { put: () => { }, test }));
+    const said = () => pane().querySelector('[role="status"]')?.textContent || '';
+    byKey('settings-save')!.click();
+    await sleep(20);
+    expect(said()).toContain('Settings saved');
+    for (const other of ['trackers', 'jobs', 'server']) { await open(other); expect(said(), other).toBe(''); }
+    byKey('settings-diagnostics')!.click();
+    await sleep(10);
+    byKey('test-tmdb')!.click();
+    await sleep(20);
+    expect(said()).toBe('tmdb reachable');
+    for (const other of ['trackers', 'jobs']) { await open(other); expect(said(), other).toBe(''); }
+    await open('playback');
+    expect(said()).toContain('Settings saved');
+  });
+
   it('says a failed connection test in one sentence instead of the raw error', async () => {
     await mount(fakeApi(settingsValue('native'), { test: async () => { throw new Error('dial tcp 10.0.0.2:8080: connect: connection refused'); } }), { group: 'server' });
     byKey('settings-diagnostics')!.click();

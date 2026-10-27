@@ -153,7 +153,10 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
  const wanted = shownGroup ?? ownGroup;
  const group = groups.some(item => item.id === wanted) ? wanted : 'playback';
  const [value, setValue] = useState<Record<string, unknown> | null>(null); const [managed, setManaged] = useState<Set<string>>(new Set());
- const [loadFailed, setLoadFailed] = useState(false); const [dirty, setDirty] = useState(false); const [message, setMessage] = useState('');
+ const [loadFailed, setLoadFailed] = useState(false); const [dirty, setDirty] = useState(false);
+ // Each pane says its own outcome (a Save, a connection test): a result never shows in another pane.
+ const [messages, setMessages] = useState<Partial<Record<SettingsGroupId, string>>>({});
+ const say = (id: SettingsGroupId, text: string) => { if (settingsMounted.current) setMessages(current => ({ ...current, [id]: text })); };
  const [trackers, setTrackers] = useState<TrackerStatus[] | null>(null);
  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
  const [coverage, setCoverage] = useState<{ observed: number; seeded: number } | null>(null);
@@ -174,7 +177,7 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
    if (!settingsMounted.current) return;
    setValue(settings);
    setManaged(new Set(schema.items.filter(field => field.readOnly).map(field => field.key)));
-   setMessage('');
+   setMessages({});
   }).catch(() => { if (settingsMounted.current) setLoadFailed(true); });
  };
  useEffect(() => { loadSettings(); void refreshTrackers(); }, []);
@@ -197,18 +200,19 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
  const edit = (patch: Record<string, unknown>) => { if (!value) return; setValue({ ...value, ...patch }); setDirty(true); };
  async function save() {
   if (!value) return;
+  const from = group;
   const out = { ...value };
   Object.keys(out).filter(key => key.endsWith('Configured') || key === 'settingsPath' || key === 'engineRunning').forEach(key => delete out[key]);
   try {
    await api.call('/settings', { method: 'PUT', body: JSON.stringify(out) });
    setDirty(false);
-   setMessage('Settings saved. Restart the server to apply worker-limit changes.');
+   say(from, 'Settings saved. Restart the server to apply worker-limit changes.');
    void refreshTrackers();
   } catch (error) {
-   setMessage('Settings were not saved. Check the values, then choose Save again.');
+   say(from, 'Settings were not saved. Check the values, then choose Save again.');
   }
  }
- async function test(name: string) { const label = TEST_NAMES[name] || name; setMessage(`Testing ${label}…`); try { const result = await api.call<{ message: string }>(`/dependencies/${name}/test`, { method: 'POST' }); setMessage(result.message) } catch (error) { setMessage(`The ${label} test failed. Check its settings in the browser Settings.`) } }
+ async function test(name: string) { const label = TEST_NAMES[name] || name; say('server', `Testing ${label}…`); try { const result = await api.call<{ message: string }>(`/dependencies/${name}/test`, { method: 'POST' }); say('server', result.message) } catch (error) { say('server', `The ${label} test failed. Check its settings in the browser Settings.`) } }
  async function fetchLatest() { setFetchMessage('Queuing…'); try { const job = await api.syncCatalog('latest'); if (settingsMounted.current) setFetchMessage(`${job.label} queued. Follow it in Background jobs.`) } catch (error) { if (settingsMounted.current) setFetchMessage('Fetch latest could not start. Try again in a minute.') } }
  async function rebuildCatalog() { if (rebuilding) return; setRebuilding(true); try { const job = await api.syncCatalog('rebuild'); if (settingsMounted.current) setRebuildMessage(`${job.label} queued. Follow it in Background jobs.`) } catch (error) { if (settingsMounted.current) setRebuildMessage('Rebuild catalog could not start. Try again in a minute.') } finally { if (settingsMounted.current) setRebuilding(false); onRebuildConfirmClose() } }
  async function checkUpdate() {
@@ -247,7 +251,7 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
    <Field focusKey="setting-subtitle-fallback" row={at()} label="Fallback subtitle language" value={String(v.fallbackSubtitleLanguage || '')} managed={locked('fallbackSubtitleLanguage')} onInput={text => edit({ fallbackSubtitleLanguage: text })} />
    <Field focusKey="setting-watched" row={at()} label="Mark as watched at" type="number" suffix="%" value={String(v.watchedThresholdPercent || 90)} managed={locked('watchedThresholdPercent')} onInput={text => edit({ watchedThresholdPercent: Number(text) })} />
    {saveRow()}
-  </>)}{status(message)}</>,
+  </>)}{status(messages[group] || '')}</>,
   trackers: () => <>{needsValue(v => <>
    <Switch focusKey="setting-filelist-enabled" row={at()} label="FileList" on={Boolean(v.fileListEnabled)} managed={locked('fileListEnabled')} onToggle={() => edit({ fileListEnabled: !v.fileListEnabled })} />
    <Switch focusKey="setting-piratebay-enabled" row={at()} label="The Pirate Bay" on={Boolean(v.pirateBayEnabled)} managed={locked('pirateBayEnabled')} onToggle={() => edit({ pirateBayEnabled: !v.pirateBayEnabled })} />
@@ -256,7 +260,7 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
    <Field focusKey="setting-piratebay-api" row={at()} label="Pirate Bay API" wide value={String(v.pirateBayApiUrl || '')} managed={locked('pirateBayApiUrl')} onInput={text => edit({ pirateBayApiUrl: text })} />
    <p class="tv-setting-note">Selection controls new acquisitions. Existing downloads keep the engine that owns them.{engineFeedback(v)}</p>
    {saveRow()}
-  </>)}{status(message)}</>,
+  </>)}{status(messages[group] || '')}</>,
   catalog: () => <>
    {coverage && <Info label="Releases kept" value={`${coverage.observed.toLocaleString('en-US')} · ${coverage.seeded.toLocaleString('en-US')} seeded now`} />}
    <Row focusKey="catalog-fetch-latest" row={at()} label="Fetch latest" class="primary" onClick={() => void fetchLatest()} />
@@ -269,7 +273,7 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
    <Row focusKey="forget-server" row={at()} label="Forget this server" onClick={onForgetServer} />
    <Row focusKey="settings-diagnostics" row={at()} label="Connection tests" value={diagnosticsOpen ? 'Hide' : 'Show'} chevron="down" expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen(open => !open)} />
    {diagnosticsOpen && <div class="tv-test-buttons">{['filelist', 'qbittorrent', 'storage', 'ffmpeg', 'ffprobe', 'tmdb', 'subdl', 'piratebay'].map((name, index) => { const row = index % 4 === 0 ? at() : next - 1; return <button data-focus-region="content" data-focus-row={row} data-focus-col={index % 4} data-focus-key={`test-${name}`} onClick={() => void test(name)}>Test {TEST_NAMES[name] || name}</button> })}</div>}
-   {status(message)}
+   {status(messages[group] || '')}
   </>,
   jobs: () => <>
    <Row focusKey="settings-jobs" row={at()} label="Background jobs" value={running ? `${running} running` : 'Nothing running'} chevron="right" onClick={() => onOpen?.('jobs')} />
@@ -277,7 +281,7 @@ export function TVSettings({ api, hasProjects = false, projectCount = 0, jobs = 
     <Field focusKey="setting-workers" row={at()} label="Jobs at once" type="number" min="1" max="20" value={String(v.maxConcurrentJobs || 10)} managed={locked('maxConcurrentJobs')} onInput={text => edit({ maxConcurrentJobs: Number(text) })} />
     <Field focusKey="setting-title-timeout" row={at()} label="Title refresh timeout" type="number" min="5" max="120" suffix="min" value={String(v.titleRefreshTimeoutMinutes || 30)} managed={locked('titleRefreshTimeoutMinutes')} onInput={text => edit({ titleRefreshTimeoutMinutes: Number(text) })} />
     {saveRow()}
-   </>)}{status(message)}
+   </>)}{status(messages[group] || '')}
   </>,
   updates: () => <>
    {updateStatus ? <Info label={`Version ${updateStatus.currentVersion}`} value={updateStatus.applying ? 'Installing an update' : updateStatus.available ? 'Update available' : updateStatus.selfUpdate ? 'Up to date' : 'Updates by hand'} /> : <p class="tv-setting-note">The server did not say which version it runs.</p>}
