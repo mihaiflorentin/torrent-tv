@@ -28,9 +28,11 @@ async function mountApp() {
   await act(async () => { render(<App />, host) });
   await settle();
 }
-const goTo = async (group: string, label: string) => {
-  const scope = Array.from(document.querySelectorAll<HTMLElement>('.sidebar .nav-group')).find(item => item.querySelector('p')?.textContent === group)!;
-  await act(async () => { Array.from(scope.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.includes(label))!.click() });
+// The Categories tab of a hub: the rail item, then the tab under the heading.
+const goTo = async (hub: string, tab: string) => {
+  await act(async () => { Array.from(document.querySelectorAll<HTMLButtonElement>('.sidebar nav button')).find(button => button.textContent === hub)!.click() });
+  await settle();
+  await act(async () => { Array.from(document.querySelectorAll<HTMLButtonElement>('.hub-tabs button')).find(button => button.textContent === tab)!.click() });
   await settle();
 };
 const tiles = () => Array.from(document.querySelectorAll<HTMLButtonElement>('.family-tile'));
@@ -59,7 +61,7 @@ afterEach(() => {
 describe('Tracker > Categories', () => {
   it('shows one wide tile per family with name, count and newest title', async () => {
     await mountApp();
-    await goTo('Tracker', 'Categories');
+    await goTo('Discover', 'Categories');
     expect(tiles().map(tile => tile.querySelector('strong')!.textContent)).toEqual(['Movies', 'Series', '4K & UHD']);
     expect(tiles()[0].textContent).toContain('12 titles');
     expect(tiles()[0].textContent).toContain('Newest: Dune');
@@ -69,7 +71,7 @@ describe('Tracker > Categories', () => {
 
   it('lazy-loads every tile image and keeps the tile readable without it', async () => {
     await mountApp();
-    await goTo('Tracker', 'Categories');
+    await goTo('Discover', 'Categories');
     const images = Array.from(document.querySelectorAll<HTMLImageElement>('.family-tile img'));
     expect(images).toHaveLength(3);
     expect(images.every(image => image.getAttribute('loading') === 'lazy' && image.getAttribute('alt') === '')).toBe(true);
@@ -80,7 +82,7 @@ describe('Tracker > Categories', () => {
 
   it('opens a family with chips and its titles, narrows by chip and returns to the tiles', async () => {
     await mountApp();
-    await goTo('Tracker', 'Categories');
+    await goTo('Discover', 'Categories');
     await click(tiles()[0]);
     expect(titlesSpy).toHaveBeenLastCalledWith(expect.objectContaining({ family: 'movies', sort: 'newest' }));
     const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('.family-chips button'));
@@ -96,7 +98,7 @@ describe('Tracker > Categories', () => {
 
   it('sorts and filters by kind inside a family', async () => {
     await mountApp();
-    await goTo('Tracker', 'Categories');
+    await goTo('Discover', 'Categories');
     await click(tiles()[0]);
     const sort = document.querySelector<HTMLSelectElement>('select[aria-label="Sort"]')!;
     await act(async () => { sort.value = 'seeders'; sort.dispatchEvent(new Event('change', { bubbles: true })) });
@@ -112,7 +114,7 @@ describe('Tracker > Categories', () => {
 describe('My Library > Categories', () => {
   it('shows library families and opens one with its managed items', async () => {
     await mountApp();
-    await goTo('My Library', 'Categories');
+    await goTo('Library', 'Categories');
     expect(tiles()).toHaveLength(1);
     expect(tiles()[0].textContent).toContain('1 item');
     await click(tiles()[0]);

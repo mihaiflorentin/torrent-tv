@@ -22,8 +22,8 @@ const px = (selector: string, property: string) => Number(/^(\d+)px$/.exec(value
 describe('TV series page in the new look', () => {
   const series = ['.season-browser', '.season-tabs', '.season-tabs button', '.season-panes', '.episode-column', '.episode-pane', '.episode-row', '.episode-tile', '.episode-tile .info-still-small', '.episode-tile .episode-progress', '.episode-state'];
 
-  it('draws no card or hairlines: the pills and rows sit on the art', () => {
-    for (const selector of ['.season-browser', '.episode-row', '.versions-head', '.season-pack-downloads', '.season-pack-card']) {
+  it('draws no card or hairlines: the pills, rows and the list-being-prepared sentence sit on the art', () => {
+    for (const selector of ['.season-browser', '.episode-row', '.versions-head', '.season-pack-downloads', '.season-pack-card', '.episode-loading']) {
       const body = declarationsOf(selector);
       expect(body, selector).not.toMatch(/(?:^|[;\s])border(?:-top|-bottom)?\s*:\s*\d/);
       expect(body, selector).not.toMatch(/background\s*:\s*var\(--tt-(card-surface|raised)\)/);

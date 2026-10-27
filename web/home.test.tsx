@@ -105,10 +105,12 @@ describe('Home', () => {
     expect(document.querySelector('[role="alert"], .error-banner')).toBeNull();
   });
 
-  it('calls Favorites My List on Home, in the sidebar and when empty', async () => {
+  it('calls Favorites My List on Home, in the Library tabs and when empty', async () => {
     await mountHome({ ...empty, favorites: [{ ...resumeItem, favorite: true, titleId: 'fav', catalog: make('fav') } as HouseholdItem] });
     expect(headings()).toContain('My List');
-    const entry = Array.from(document.querySelectorAll<HTMLButtonElement>('.sidebar button')).find(button => button.textContent?.includes('My List'));
+    await act(async () => { Array.from(document.querySelectorAll<HTMLButtonElement>('.sidebar button')).find(button => button.textContent === 'Library')!.click() });
+    await settle();
+    const entry = Array.from(document.querySelectorAll<HTMLButtonElement>('.hub-tabs button')).find(button => button.textContent === 'My List');
     expect(entry).toBeDefined();
     expect(document.body.textContent).not.toContain('Favorites');
     await act(async () => { entry!.click() });
