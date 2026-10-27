@@ -51,6 +51,7 @@ export const TV_JOURNEY = [
   rail('tracker-dashboard', 'tracker', '.poster-card'),
   rail('browse', 'browse', '[data-focus-key="sort-newest"]'),
   rail('tracker-categories', 'categories', '[data-focus-key^="family-"]'),
+  { name: 'tracker-family', actions: [{ focus: '[data-focus-key^="family-"]' }, { press: 'enter' }], ready: { selector: '[data-focus-key^="family-title-"]' } },
   rail('jobs', 'jobs', '[data-focus-key="jobs-search"]'),
   { name: 'job-detail', actions: [{ focus: '[data-focus-key^="job-job-"]' }, { press: 'enter' }], ready: { selector: '[data-focus-key="job-detail-back"]' } },
   rail('settings', 'settings', '[data-focus-key="settings-save"]'),

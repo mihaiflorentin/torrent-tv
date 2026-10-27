@@ -120,7 +120,8 @@ export const ART_ROW_KEEP = 4;
 export type RowReach = [number, number];
 
 function rowReachFor(firstRow: number, current: FocusPoint, previous: RowReach | null): RowReach {
-  return slideReach(previous, current.row < 0 ? firstRow : current.row, ART_ROW_REACH, ART_ROW_KEEP, -Infinity) as RowReach;
+  // Focus above the grid (its chips, the search field) counts as its first line, so the lines on screen stay loaded.
+  return slideReach(previous, current.row < firstRow ? firstRow : current.row, ART_ROW_REACH, ART_ROW_KEEP, -Infinity) as RowReach;
 }
 
 /** The inclusive row range of a grid whose artwork should be loaded. Starts around `firstRow`, slides with focus, and sets state only when it changes. */

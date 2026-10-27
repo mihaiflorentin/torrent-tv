@@ -149,6 +149,33 @@ describe('Categories pages show Category families', () => {
     expect((document.activeElement as HTMLElement | null)?.dataset.focusKey).toBe('family-movies');
   });
 
+  it('lays the titles of a family out as a grid seven to a line, with Show more titles on the line under it', async () => {
+    const nine = Array.from({ length: 9 }, (_, index) => title(`t${index}`, `Title ${index}`));
+    const base = (globalThis.fetch as ReturnType<typeof vi.fn>).getMockImplementation() as (input: RequestInfo | URL) => Promise<unknown>;
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => String(input).includes('/catalog/titles?') && String(input).includes('family=movies') ? respond({ items: nine, nextCursor: 'more', total: 20 }) : base(input));
+    await openScreen('categories');
+    tile('movies').click();
+    await wait();
+    const cards = Array.from(container.querySelectorAll<HTMLElement>('[data-focus-key^="family-title-"]'));
+    expect(cards.map(card => `${card.dataset.focusRow}:${card.dataset.focusCol}`)).toEqual(['10:0', '10:1', '10:2', '10:3', '10:4', '10:5', '10:6', '11:0', '11:1']);
+    const more = container.querySelector<HTMLElement>('[data-focus-key="family-more"]')!;
+    expect(more.dataset.focusRow).toBe('12');
+  });
+
+  it('marks the selected category chip with a check as well as the fill', async () => {
+    await openScreen('categories');
+    tile('movies').click();
+    await wait();
+    const chip = (category: string) => container.querySelector<HTMLButtonElement>(`[data-focus-key="family-chip-${category}"]`)!;
+    expect(chip('all').querySelector('svg')).not.toBeNull();
+    expect(chip('Movies HD').querySelector('svg')).toBeNull();
+    chip('Movies HD').click();
+    await wait();
+    expect(chip('Movies HD').querySelector('svg')).not.toBeNull();
+    expect(chip('all').querySelector('svg')).toBeNull();
+    expect(chip('Movies HD').textContent).toBe('Movies HD');
+  });
+
   it('keeps the family open across a title page and marks its first card as the landing card', async () => {
     await openScreen('categories');
     tile('movies').click();

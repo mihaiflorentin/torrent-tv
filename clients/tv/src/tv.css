@@ -587,28 +587,114 @@ button>.tv-icon:first-child {
  font-size: var(--tt-tv-text-body)
 }
 
+/* Search (#58, the "Search" board): a large rounded field with the search icon and, once there is a query, the
+   result count inside it; Search and Clear follow it. The field is the input itself (the icon and the count sit on
+   it), so the focus ring goes round the whole pill. */
 .tv-search {
  display: flex;
  align-items: center;
- margin: var(--tt-space-3) 0 var(--tt-space-4)
+ margin: 10px 0 0
 }
 
 .tv-search>*+* {
  margin-left: var(--tt-space-4)
 }
 
-.tv-search input {
- width: 860px
+.tv-search-field {
+ position: relative;
+ display: block;
+ flex: 0 0 1100px;
+ width: 1100px
 }
 
-.tv-recent {
- display: flex;
- flex-wrap: wrap;
- margin: 0 0 var(--tt-space-3)
+.tv-search-field input {
+ display: block;
+ width: 1100px;
+ height: 92px;
+ padding: 0 220px 0 90px;
+ background: var(--tt-fill);
+ border-color: transparent;
+ font-size: 36px;
+ font-weight: var(--tt-weight-semibold)
 }
 
-.tv-recent>* {
- margin: 0 var(--tt-space-4) var(--tt-space-3) 0
+.tv-search-field .tv-icon,
+.tv-search-count {
+ position: absolute;
+ z-index: 31;
+ pointer-events: none
+}
+
+.tv-search-field .tv-icon {
+ left: 36px;
+ top: 29px;
+ width: 34px;
+ height: 34px;
+ color: var(--tt-text-muted)
+}
+
+.tv-search-field input:focus~.tv-search-count {
+ color: var(--tt-text)
+}
+
+.tv-search-count {
+ right: 36px;
+ top: 0;
+ line-height: 92px;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap
+}
+
+/* The chip line of Search, Browse and the family sort row: a muted label ("Sort", "Recent") before each set of
+   chips, the chips at the meta size, all on one line. Recent searches are outlined and quieter than the sort chips
+   (the board), and a long term ends in an ellipsis. */
+.tv-chip-line {
+ flex-wrap: nowrap;
+ align-items: center
+}
+
+.tv-filters.tv-chip-line>* {
+ flex: 0 0 auto;
+ margin: 0 var(--tt-space-3) var(--tt-space-3) 0
+}
+
+.tv-chip-line>button {
+ padding: 0 var(--tt-space-5);
+ font-size: var(--tt-tv-text-meta);
+ white-space: nowrap
+}
+
+.tv-chip-line>.tv-chip-label {
+ margin-right: 20px;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta)
+}
+
+.tv-chip-line>.tv-chip-label-next {
+ margin-left: var(--tt-space-6)
+}
+
+.tv-chip-line>.tv-recent-chip {
+ display: block;
+ max-width: 260px;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ line-height: 60px;
+ background: transparent;
+ border-color: var(--tt-fill-strong);
+ color: var(--tt-text-muted);
+ font-weight: var(--tt-weight-medium)
+}
+
+.tv-chip-line>.tv-recent-chip:focus {
+ background: var(--tt-fill-focus);
+ border-color: var(--tt-focus-edge);
+ color: var(--tt-on-fill-focus)
+}
+
+.tv-app[data-route="search"] .tv-chip-line {
+ margin-top: 28px
 }
 
 .tv-filters {
@@ -929,15 +1015,18 @@ button>.tv-icon:first-child {
  text-overflow: ellipsis
 }
 
-/* Seven cards to a line, as main.tsx numbers its focus rows: the right margin takes the last card's 28 px. */
-.tv-library-grid {
+/* The poster grid of Search, Browse and the family pages: seven cards to a line, as main.tsx numbers its focus
+   rows, 28 px apart (the right margin takes the last card's 28 px). The padding leaves room for the focus lift. */
+.tv-poster-grid {
  display: flex;
  flex-wrap: wrap;
+ align-items: flex-start;
  padding: 28px 24px 0;
  margin: 0 -52px 0 -24px
 }
 
-.tv-library-grid .poster-card {
+.tv-poster-grid>* {
+ flex: 0 0 210px;
  margin: 0 28px var(--tt-space-5) 0
 }
 

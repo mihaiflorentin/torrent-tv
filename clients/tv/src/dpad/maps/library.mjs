@@ -86,7 +86,7 @@ export const libraryFamily = {
   name: 'library-family',
   route: 'library-categories',
   ...LIBRARY,
-  notes: 'One Library category: the tab strip, back to the tiles, category chips, then the titles seven to a line (#55). Back closes it onto its tile, from any stop.',
+  notes: 'One Library category: the tab strip, back to the tiles, category chips (the selected one carries a check mark), then the titles seven to a line (#55, the grid Search and Browse share since #58). Back closes it onto its tile, from any stop.',
   detect: [onRoute('library-categories'), '[data-focus-key="family-back"]'],
   reach: [{ go: 'library-categories' }, { focus: '[data-focus-key^="family-"]' }, { press: 'enter' }],
   landing: 'grid[first]',

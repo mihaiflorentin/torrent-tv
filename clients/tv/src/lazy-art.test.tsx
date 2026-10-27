@@ -190,6 +190,16 @@ describe('hooks', () => {
     await settle();
     expect(inRowReach(reach, 8 - ART_ROW_REACH)).toBe(false);
   });
+  it('keeps the first lines of a grid loaded while focus is on the chips above it', async () => {
+    let reach: RowReach = [0, 0];
+    const Probe = () => { reach = useRowReach(10); return null; };
+    render(<Probe />, host);
+    await settle();
+    setFocusPoint(2, 0);
+    await settle();
+    expect(inRowReach(reach, 10)).toBe(true);
+    expect(inRowReach(reach, 10 + ART_ROW_REACH)).toBe(true);
+  });
 });
 
 describe('lazy poster artwork in the catalog', () => {

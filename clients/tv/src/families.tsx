@@ -1,5 +1,6 @@
 import type { API, CategoryFamily } from '@torrent-tv/shared';
 import { familyCountLabel, familyNewestLine, familyTileLabel } from '@torrent-tv/shared';
+import { Icon } from './icons';
 import { inRowReach, useRowReach } from './lazy-art';
 
 // Category family tiles: wide 16:9 image tiles in a wrapped flex grid (no CSS grid on webOS 4). The tiles
@@ -24,9 +25,10 @@ export function FamilyTiles({ api, families, unit, onOpen }: { api: API; familie
   </section>;
 }
 
-/** One chip per raw tracker category inside the family, plus All. */
+/** One chip per raw tracker category inside the family, plus All. The selected chip carries a check mark beside the
+    selected fill, bold word and saffron bar, so the choice never rests on the fill alone (#58). */
 export function FamilyChips({ name, categories, active, row, onPick }: { name: string; categories: string[]; active: string; row: number; onPick: (category: string) => void }) {
   return <div class="tv-filters tv-family-chips" role="group" aria-label={`Categories in ${name}`}>
-    {['', ...categories].map((category, index) => <button key={category || 'all'} class={active === category ? 'active' : ''} aria-pressed={active === category ? 'true' : 'false'} data-focus-region="content" data-focus-row={row} data-focus-col={index} data-focus-key={`family-chip-${category || 'all'}`} onClick={() => onPick(category)}>{category || 'All'}</button>)}
+    {['', ...categories].map((category, index) => <button key={category || 'all'} class={active === category ? 'active' : ''} aria-pressed={active === category ? 'true' : 'false'} data-focus-region="content" data-focus-row={row} data-focus-col={index} data-focus-key={`family-chip-${category || 'all'}`} onClick={() => onPick(category)}>{active === category && <Icon name="check" />}{category || 'All'}</button>)}
   </div>;
 }
