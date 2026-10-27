@@ -159,6 +159,16 @@ export function revealElement(element: HTMLElement | null): void {
   }
 }
 
+/**
+ * The scroll position that puts a row's middle at the middle of its scrolling list, clamped to the list's ends: a
+ * list that keeps the focused row centred (the series episode list) always shows a piece of the row above and below.
+ * `row.top` is the row's offset inside the list's content.
+ */
+export function centredScrollTop(row: { top: number; height: number }, list: { height: number; scrollHeight: number }): number {
+  const end = Math.max(0, list.scrollHeight - list.height);
+  return Math.max(0, Math.min(Math.round(row.top + row.height / 2 - list.height / 2), end));
+}
+
 export function focusElement(element: HTMLElement | null): void {
   if (!element) return;
   if (isTextInput(element) && element.dataset.tvEditing !== 'true') element.readOnly = true;

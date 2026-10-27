@@ -2,7 +2,26 @@
 import { h, render } from 'preact';
 import { useRef } from 'preact/hooks';
 import { describe, expect, it, vi } from 'vitest';
-import { chooseDirectionalTarget, chooseStructuredTarget, RectLike, remoteAction, useTVNavigation } from './navigation';
+import { centredScrollTop, chooseDirectionalTarget, chooseStructuredTarget, RectLike, remoteAction, useTVNavigation } from './navigation';
+
+// A scrolling list that keeps the focused row in its middle (the series episode list): the row above and the row
+// below both peek, so the viewer sees there is more either way, and the ends never scroll past the list.
+describe('centredScrollTop', () => {
+  it('puts the row\'s middle at the list\'s middle', () => {
+    // A 466 px list of 176 px rows 10 px apart: the third row (top 372) centres at 372 + 88 - 233.
+    expect(centredScrollTop({ top: 372, height: 176 }, { height: 466, scrollHeight: 1100 })).toBe(227);
+  });
+  it('stays at the top for the first row', () => {
+    expect(centredScrollTop({ top: 0, height: 176 }, { height: 466, scrollHeight: 1100 })).toBe(0);
+    expect(centredScrollTop({ top: 186, height: 176 }, { height: 466, scrollHeight: 1100 })).toBe(41);
+  });
+  it('stops at the end of the list', () => {
+    expect(centredScrollTop({ top: 924, height: 176 }, { height: 466, scrollHeight: 1100 })).toBe(634);
+  });
+  it('never scrolls a list that fits', () => {
+    expect(centredScrollTop({ top: 186, height: 176 }, { height: 466, scrollHeight: 362 })).toBe(0);
+  });
+});
 import type { TVPlatformHooks } from './platform';
 import { REBUILD_DIALOG_REGION, SETTINGS_JOBS_ROW, SETTINGS_PROJECTS_ROW, SETTINGS_RELOAD_ROW, SETTINGS_CATALOG_FETCH_ROW, SETTINGS_REBUILD_ROW, SETTINGS_CHANGE_SERVER_ROW, SETTINGS_FORGET_SERVER_ROW, SETTINGS_SAVE_ROW, SETTINGS_TEST_FIRST_ROW, UPDATE_APPLY_ROW, UPDATE_CHECK_ROW, UPDATE_DIALOG_REGION } from './portal';
 

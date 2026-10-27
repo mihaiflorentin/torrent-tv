@@ -128,11 +128,22 @@ export function titleDetail(fixture, title) {
   const n = fixture.titles.indexOf(title);
   const base = 1_000_000 + n * 1000;
   if (title.kind !== 'series') return { title, seasons: [], sources: [0, 1, 2, 3].map(k => source(title, base + k, k)) };
+  // A series the household is part-way through: the earlier episodes of that season are watched (and on disk), the
+  // resumed one is in progress at the saved position, the next one is downloaded and waiting.
+  const resume = fixture.state.continueWatching.find(item => item.titleId === title.id && item.seasonNumber);
+  const episodeState = (season, episode) => {
+    if (!resume || season !== resume.seasonNumber) return undefined;
+    if (episode < resume.episodeNumber) return { downloadState: 'downloaded', transferState: 'idle', watchState: 'watched', positionMs: resume.durationMs, durationMs: resume.durationMs };
+    if (episode === resume.episodeNumber) return { downloadState: 'downloaded', transferState: 'idle', watchState: 'partial', positionMs: resume.positionMs, durationMs: resume.durationMs };
+    if (episode === resume.episodeNumber + 1) return { downloadState: 'downloaded', transferState: 'idle', watchState: 'unwatched' };
+    return undefined;
+  };
   const seasons = Array.from({ length: title.seasonCount }, (_, s) => {
     const number = s + 1;
     const episodes = Array.from({ length: episodesIn(title, number) }, (_, e) => {
       const sources = Array.from({ length: 2 + ((e + n) % 2) }, (_, k) => source(title, base + number * 100 + (e + 1) * 5 + k, k + (e % 2), { season: number, episode: e + 1, sizeBytes: 1.2e9 + k * 4e8 }));
-      return { number: e + 1, title: EPISODE_NAMES[e % EPISODE_NAMES.length], season: number, airDate: `${title.year + s}-0${1 + (e % 9)}-1${e % 9}`, sourceCount: sources.length, sources };
+      const libraryState = episodeState(number, e + 1);
+      return { number: e + 1, title: EPISODE_NAMES[e % EPISODE_NAMES.length], season: number, airDate: `${title.year + s}-0${1 + (e % 9)}-1${e % 9}`, sourceCount: sources.length, sources, ...(libraryState ? { libraryState } : {}) };
     });
     const packSources = number === 1 ? [source(title, base + 99, 1, { season: 1, pack: true, sizeBytes: 9.6e9 })] : [];
     return { number, title: `Season ${number}`, episodeCount: episodes.length, episodes, packSources };

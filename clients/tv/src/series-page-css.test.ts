@@ -3,9 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-// The series page's card surfaces and episode column, read as text the way chromium53-css.test.ts reads the sheet:
-// no layout engine runs here, so these pin the declarations that carry the design (translucent token surfaces so the
-// title's sharp backdrop shows, a full-width left-aligned list) and the limits of the Chromium 53 TV floor.
+// The series page in the "Series page" board's look (#57), read as text the way chromium53-css.test.ts reads the sheet:
+// no layout engine runs here, so these pin the declarations that carry the design (season pills and episode rows straight
+// on the art over a deeper bottom scrim, the still with its progress bar, the state word) and the Chromium 53 TV floor.
 const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'tv.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 // The declarations of every rule whose selector list contains exactly this selector.
@@ -17,83 +17,90 @@ function declarationsOf(selector: string): string {
   return bodies.join(';');
 }
 const value = (selector: string, property: string) => new RegExp(`(?:^|[;\\s])${property}\\s*:\\s*([^;]+)`).exec(declarationsOf(selector))?.[1].trim();
+const px = (selector: string, property: string) => Number(/^(\d+)px$/.exec(value(selector, property) ?? '')?.[1]);
 
-describe('TV series page surfaces', () => {
-  const series = ['.season-browser', '.season-panes', '.episode-column', '.episode-heading', '.episode-pane', '.episode-row', '.episode-tile'];
+describe('TV series page in the new look', () => {
+  const series = ['.season-browser', '.season-tabs', '.season-tabs button', '.season-panes', '.episode-column', '.episode-pane', '.episode-row', '.episode-tile', '.episode-tile .info-still-small', '.episode-tile .episode-progress', '.episode-state'];
 
-  it('puts the season browser on the translucent card token so the title art shows through', () => {
-    expect(value('.season-browser', 'background')).toBe('var(--tt-card-surface)');
-  });
-
-  it('puts a static dark halo behind the card text and none on text over a saffron fill', () => {
-    expect(value('.season-browser', 'text-shadow')).toBe('var(--tt-text-shade)');
-    // Buttons do not inherit text-shadow, so the transparent episode rows take it directly.
-    expect(value('.season-browser .info-stop', 'text-shadow')).toBe('var(--tt-text-shade)');
-    for (const selector of ['.season-browser button.primary', '.season-browser .source-best', '.season-browser .danger-button:focus']) {
-      expect(value(selector, 'text-shadow'), selector).toBe('none');
-    }
-    expect(css).not.toMatch(/transition[^;]*text-shadow/);
-  });
-
-  it('draws no blur and no extra shadow on the series page cards', () => {
-    for (const selector of series) {
+  it('draws no card or hairlines: the pills and rows sit on the art', () => {
+    for (const selector of ['.season-browser', '.episode-row', '.versions-head', '.season-pack-downloads', '.season-pack-card']) {
       const body = declarationsOf(selector);
-      expect(body, selector).not.toMatch(/backdrop-filter|filter\s*:/);
-      expect(body, selector).not.toMatch(/box-shadow/);
+      expect(body, selector).not.toMatch(/(?:^|[;\s])border(?:-top|-bottom)?\s*:\s*\d/);
+      expect(body, selector).not.toMatch(/background\s*:\s*var\(--tt-(card-surface|raised)\)/);
     }
   });
 
-  it('keeps the selected row\'s facts at full text colour on its saffron tint', () => {
-    expect(value('.episode-tile.selected small', 'color')).toBe('var(--tt-text)');
+  it('deepens the bottom scrim on a series page so the rows read on the ground, not on a halo', () => {
+    const scrim = value('.series-page .tv-backdrop.sharp .tv-backdrop-scrim', 'background') ?? '';
+    // Solid ground under the list, fading out above the season pills; the left scrim of the title page stays.
+    expect(scrim).toMatch(/linear-gradient\(0deg, var\(--tt-scrim-bottom\) 0, var\(--tt-scrim-bottom\) \d+%, transparent \d+%\)/);
+    expect(scrim).toMatch(/linear-gradient\(90deg/);
+    expect(css).not.toMatch(/\.season-browser[^{]*\{[^}]*text-shadow/);
   });
 
-  it('spans the card width, left-aligned like the Versions view, with no content-sized centred column', () => {
-    expect(value('.season-panes', 'justify-content')).toBeUndefined();
-    expect(value('.season-panes', 'display')).toBe('block');
-    expect(value('.episode-column', 'width')).toBe('100%');
-    expect(value('.episode-column', 'max-width')).toBeUndefined();
-    expect(declarationsOf('.episode-column')).not.toMatch(/margin\s*:[^;]*auto/);
+  it('draws the season tabs as the board\'s 64 px pills at 28 px', () => {
+    expect(px('.season-tabs button', 'height')).toBe(64);
+    expect(px('.season-tabs button', 'font-size')).toBe(28);
   });
 
-  it('gives each row a 16:9 still of at least 256x144 and keeps the list scroll within 1080p', () => {
-    const width = Number(/^(\d+)px$/.exec(value('.episode-tile .info-still-small', 'width') ?? '')?.[1]);
-    const height = Number(/^(\d+)px$/.exec(value('.episode-tile .info-still-small', 'height') ?? '')?.[1]);
-    expect(width).toBeGreaterThanOrEqual(256);
-    expect(Math.abs(width / height - 16 / 9)).toBeLessThan(0.01);
-    const cap = Number(/^(\d+)px$/.exec(value('.episode-pane', 'max-height') ?? '')?.[1]);
-    expect(cap).toBeGreaterThanOrEqual(height * 3);
-    expect(cap).toBeLessThanOrEqual(800);
+  it('gives each row the board\'s 256x144 still on a 176 px row, transparent at rest, 10 px apart', () => {
+    expect(px('.episode-tile .info-still-small', 'width')).toBe(256);
+    expect(px('.episode-tile .info-still-small', 'height')).toBe(144);
+    expect(px('.episode-tile', 'height')).toBe(176);
+    expect(value('.episode-tile', 'background')).toBe('transparent');
+    expect(px('.episode-row', 'margin-bottom')).toBe(10);
   });
 
-  it('clamps the synopsis to two muted lines, with a max-height fallback and full text colour on the selected row', () => {
-    expect(value('.episode-tile .episode-synopsis', 'color')).toBe('var(--tt-text-muted)');
-    expect(value('.episode-tile .episode-synopsis', 'overflow')).toBe('hidden');
+  it('marks the selected episode with a fill and a saffron edge, not colour alone, and the focused one with the ring', () => {
+    expect(value('.episode-tile.selected', 'background')).toBe('var(--tt-fill-quiet)');
+    expect(value('.episode-tile.selected', 'box-shadow')).toMatch(/inset \d+px 0 0 var\(--tt-accent\)/);
+    expect(value('.info-stop:focus', 'background')).toBe('var(--tt-fill-selected)');
+  });
+
+  it('puts the progress bar on the still, in the accent over a light track', () => {
+    expect(value('.episode-tile .episode-progress', 'position')).toBe('absolute');
+    expect(value('.episode-tile .episode-progress', 'bottom')).toBe('12px');
+    expect(value('.episode-tile .episode-progress', 'left')).toBe('12px');
+    expect(value('.episode-tile .episode-progress', 'right')).toBe('12px');
+    expect(value('.episode-tile .episode-progress b', 'background')).toBe('var(--tt-accent)');
+  });
+
+  it('writes the code in the quiet tone and clamps the synopsis to two lines with a max-height fallback', () => {
+    expect(value('.episode-code', 'color')).toBe('var(--tt-text-subtle)');
     expect(value('.episode-tile .episode-synopsis', '-webkit-line-clamp')).toBe('2');
-    expect(value('.episode-tile .episode-synopsis', 'max-height')).toBe('2.8em');
-    expect(value('.episode-tile .episode-synopsis', 'line-height')).toBe('1.4');
-    expect(value('.episode-tile.selected .episode-synopsis', 'color')).toBe('var(--tt-text)');
+    const lineHeight = Number(value('.episode-tile .episode-synopsis', 'line-height'));
+    expect(value('.episode-tile .episode-synopsis', 'max-height')).toBe(`${(lineHeight * 2).toFixed(1)}em`);
+    expect(value('.episode-tile .episode-synopsis', 'overflow')).toBe('hidden');
   });
 
-  it('lets the episode name and facts truncate and the progress bar shrink inside the row', () => {
+  it('colours the state word by its tone, the word always present', () => {
+    expect(value('.episode-state.progress', 'color')).toBe('var(--tt-accent)');
+    expect(value('.episode-state.ok', 'color')).toBe('var(--tt-ok)');
+    expect(value('.episode-state.danger', 'color')).toBe('var(--tt-danger)');
+    expect(value('.episode-state.quiet', 'color')).toBe('var(--tt-text-muted)');
+  });
+
+  it('keeps the list a positioned scroll area of two and a half rows, clear of the ring', () => {
+    expect(value('.episode-pane', 'position')).toBe('relative');
+    expect(value('.episode-pane', 'overflow-y')).toBe('auto');
+    const cap = px('.episode-pane', 'max-height');
+    expect(cap).toBeGreaterThanOrEqual(2 * 186);
+    expect(cap).toBeLessThan(3 * 186);
+  });
+
+  it('lets the episode name and facts truncate inside the row', () => {
     expect(value('.info-row-copy', 'min-width')).toBe('0');
     for (const selector of ['.info-row-copy b', '.info-row-copy small']) {
       expect(declarationsOf(selector), selector).toMatch(/text-overflow:\s*ellipsis/);
       expect(declarationsOf(selector), selector).toMatch(/white-space:\s*nowrap/);
     }
-    expect(value('.episode-tile .episode-progress', 'max-width')).toBe('100%');
   });
 
-  it('draws no hint beside the Versions title', () => {
-    expect(css).not.toContain('versions-hint');
+  it('draws no blur on the series page', () => {
+    for (const selector of series) expect(declarationsOf(selector), selector).not.toMatch(/backdrop-filter|filter\s*:/);
   });
 
-  it('heads the list with a heading that matches the Versions title', () => {
-    expect(value('.episode-heading', 'font-size')).toBe(value('.versions-title', 'font-size'));
-    expect(value('.episode-heading', 'font-weight')).toBe(value('.versions-title', 'font-weight'));
-    expect(value('.episode-heading-label', 'color')).toBe('var(--tt-accent)');
-  });
-
-  it('stays on flexbox: no grid, gap or aspect-ratio on the series page (Chromium 53)', () => {
-    for (const selector of series) expect(declarationsOf(selector), selector).not.toMatch(/(?:^|[;\s])(?:display\s*:\s*grid|(?:grid-|column-|row-)?gap\s*:|aspect-ratio\s*:)/);
+  it('stays on flexbox: no grid, gap, inset or aspect-ratio on the series page (Chromium 53)', () => {
+    for (const selector of series) expect(declarationsOf(selector), selector).not.toMatch(/(?:^|[;\s])(?:display\s*:\s*grid|(?:grid-|column-|row-)?gap\s*:|inset\s*:|aspect-ratio\s*:)/);
   });
 });

@@ -1,4 +1,4 @@
-import { canonicalLanguage, episodeRowLine, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogSource, type CatalogTitle, type EpisodePageView, type Download, type HouseholdItem, type Job, type MediaKind, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
+import { canonicalLanguage, formatBytes, formatEtaLeft as formatEta, prepareHint, readyLine, readyPercent, releaseLine, languageDisplayName, type CatalogSource, type CatalogTitle, type EpisodePageView, type Download, type HouseholdItem, type Job, type MediaKind, type MediaState, type ParsedRelease, type PlaybackPreferences } from '@torrent-tv/shared';
 import { formatTime } from './player';
 
 // Display decisions for the TV screens (DESIGN.md "Information priorities"), kept as pure text
@@ -22,9 +22,27 @@ export function heroFacts(title: CatalogTitle): string[] {
   return [titleKind(title), releaseLine(title)].filter(Boolean);
 }
 
-/** Episode tile second line: the shared versions-and-facts line, then watch progress. */
-export function episodeMeta(episode: { sourceCount: number }, page: EpisodePageView, progress: number): string {
-  return joined([episodeRowLine(episode, page), progress > 0 ? `${progress}% watched` : '']);
+/** Episode row facts line (the "Series page" board): air date or Upcoming, runtime and rating when known, then the version count. */
+export function episodeMeta(episode: { sourceCount: number }, page: Pick<EpisodePageView, 'meta'>): string {
+  return joined([...page.meta, `${episode.sourceCount} version${episode.sourceCount === 1 ? '' : 's'}`]);
+}
+
+export type EpisodeStateTone = 'progress' | 'ok' | 'quiet' | 'danger';
+/**
+ * The one library-state word at the right of an episode row, with its tone (never colour alone: the word is the state).
+ * A failed download needs action, so it comes first; then how far the viewer is, a finished episode, and the download.
+ */
+export function episodeState(state: MediaState | undefined, progress: number): { text: string; tone: EpisodeStateTone } | undefined {
+  if (!state) return undefined;
+  const download = state.downloadState;
+  if (download === 'error') return { text: 'Needs attention', tone: 'danger' };
+  if (state.watchState !== 'watched' && progress > 0) return { text: `${progress}% watched`, tone: 'progress' };
+  if (state.watchState === 'watched') return { text: 'Watched', tone: 'ok' };
+  if (download === 'downloading') return { text: `Downloading ${Math.round((state.progress || 0) * 100)}%`, tone: 'progress' };
+  if (download === 'downloaded') return { text: 'Downloaded', tone: 'quiet' };
+  if (download === 'partial') return { text: 'Some downloaded', tone: 'quiet' };
+  if (download === 'queued') return { text: 'Queued', tone: 'quiet' };
+  return undefined;
 }
 
 /**
