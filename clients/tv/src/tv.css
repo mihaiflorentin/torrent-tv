@@ -2311,7 +2311,7 @@ button>.tv-icon:first-child {
  color: var(--tt-text-muted)
 }
 
-/* Player: one bar layer over a bottom scrim, inside the safe area (DESIGN.md "Player controls surface"). */
+/* Player: one controls layer over the picture, inside the safe area (DESIGN.md "Player controls surface"). */
 .player-shell {
  position: fixed;
  top: 0;
@@ -2345,11 +2345,12 @@ button>.tv-icon:first-child {
  z-index: 2
 }
 
-/* OSD: the bar's surface, shown and cleared with one opacity transition. */
+/* OSD: the controls' surface, shown and cleared with one opacity transition. It sits below the heading's band so a
+   status never covers the title or the current Audio and Subtitles choice. */
 .player-message {
  position: absolute;
  z-index: 5;
- top: var(--tt-tv-safe-y);
+ top: 190px;
  left: 50%;
  max-width: 1400px;
  padding: var(--tt-space-3) var(--tt-space-6);
@@ -2370,13 +2371,15 @@ button>.tv-icon:first-child {
  transition: opacity var(--tt-dur-base), visibility 0s
 }
 
+/* The controls layer (#61, the "Player controls" board): no boxed bar. The heading reads over a top scrim and the
+   timeline and toolbar over a bottom scrim, both painted by this one layer, which fades with one opacity transition. */
 .player-controls {
  position: absolute;
+ top: 0;
  left: 0;
- right: 0;
- bottom: 0;
- padding: 200px var(--tt-tv-safe-x) var(--tt-tv-safe-y);
- background: linear-gradient(transparent, var(--tt-scrim-bottom));
+ width: 1920px;
+ height: 1080px;
+ background: linear-gradient(180deg, var(--tt-scrim-text), transparent 240px), linear-gradient(0deg, var(--tt-scrim-bottom), var(--tt-scrim-text) 240px, transparent 560px);
  opacity: 0;
  visibility: hidden;
  transition: opacity var(--tt-controls-fade), visibility 0s linear var(--tt-controls-fade);
@@ -2389,38 +2392,64 @@ button>.tv-icon:first-child {
  transition: opacity var(--tt-controls-fade), visibility 0s
 }
 
-.player-bar {
- padding: var(--tt-space-5) var(--tt-space-6) var(--tt-space-5);
- background: var(--tt-controls-surface);
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-lg)
-}
-
+/* Heading: the show and episode code (muted) over the episode name on the left, the current Audio and Subtitles
+   choice on the right. */
 .player-heading {
+ position: absolute;
+ top: var(--tt-tv-safe-y);
+ left: var(--tt-tv-safe-x);
+ right: var(--tt-tv-safe-x);
  display: flex;
- align-items: baseline;
+ align-items: flex-start;
  justify-content: space-between;
- margin-bottom: var(--tt-space-3)
+ text-shadow: var(--tt-text-shade)
 }
 
-.player-title {
- min-width: 0;
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-bold);
+.player-name {
+ min-width: 0
+}
+
+.player-kicker {
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
  white-space: nowrap;
  overflow: hidden;
  text-overflow: ellipsis
 }
 
+.player-title {
+ font-size: 40px;
+ font-weight: var(--tt-weight-black);
+ letter-spacing: var(--tt-tracking-snug);
+ line-height: var(--tt-leading-tight);
+ white-space: nowrap;
+ overflow: hidden;
+ text-overflow: ellipsis
+}
+
+.player-kicker+.player-title {
+ margin-top: 6px
+}
+
 .player-choice {
  flex: 0 0 auto;
- margin-left: var(--tt-space-5);
+ margin-left: var(--tt-space-6);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta);
  white-space: nowrap
 }
 
-/* The track is 12 px and grows to 20 px under Timeline focus; the button keeps one height, so nothing below it moves. */
+.player-bar {
+ position: absolute;
+ left: var(--tt-tv-safe-x);
+ right: var(--tt-tv-safe-x);
+ bottom: var(--tt-tv-safe-y)
+}
+
+/* Timeline: the track, the downloaded range over it, the played range on top, and a white handle at the play head.
+   The track is 12 px and grows to 20 px under Timeline focus; the button keeps one height, so nothing below it moves.
+   The handle grows by transform only. */
 .player-timeline {
  display: block;
  width: 100%;
@@ -2437,6 +2466,7 @@ button>.tv-icon:first-child {
 }
 
 .player-timeline:before,
+.player-buffered,
 .player-fill {
  position: absolute;
  left: 0;
@@ -2449,6 +2479,11 @@ button>.tv-icon:first-child {
 .player-timeline:before {
  content: "";
  right: 0;
+ background: var(--tt-fill-strong)
+}
+
+.player-buffered {
+ display: block;
  background: var(--tt-line-strong)
 }
 
@@ -2458,87 +2493,163 @@ button>.tv-icon:first-child {
 }
 
 .player-timeline:focus:before,
+.player-timeline:focus .player-buffered,
 .player-timeline:focus .player-fill {
  height: var(--tt-tv-timeline-height-focus);
  margin-top: -10px
 }
 
 .player-fill i {
- display: none;
+ display: block;
  position: absolute;
- right: -16px;
+ right: -14px;
  top: 50%;
- width: 32px;
- height: 32px;
- margin-top: -16px;
- border: 4px solid var(--tt-focus-edge);
+ width: 28px;
+ height: 28px;
+ margin-top: -14px;
  border-radius: 50%;
- background: var(--tt-accent)
+ background: var(--tt-fill-focus)
 }
 
 .player-timeline:focus .player-fill i {
- display: block
+ transform: scale(1.3)
 }
 
 .player-time {
  display: flex;
  justify-content: space-between;
- margin: var(--tt-space-1) 0 var(--tt-space-4);
+ margin-top: 10px;
  font-size: var(--tt-tv-text-body);
- font-variant-numeric: tabular-nums
+ font-weight: var(--tt-weight-semibold);
+ font-variant-numeric: tabular-nums;
+ text-shadow: var(--tt-text-shade)
 }
 
+.player-time span+span {
+ color: var(--tt-text-muted)
+}
+
+/* Toolbar: round icon buttons with their labels under them, centred; Play/Pause is larger; a wider break before
+   Audio and before Back groups transport, tracks and leaving. The button itself is a transparent 132 px column, so
+   focus draws on the circle: white with ground-coloured glyph and the halo, and the label turns white. */
 .player-toolbar {
  display: flex;
- align-items: center;
+ align-items: flex-start;
+ justify-content: center;
+ margin-top: 26px;
  white-space: nowrap
 }
 
 .player-toolbar>*+* {
- margin-left: 14px
-}
-
-.player-toolbar button,
-.player-retry {
- padding: 0 14px;
- font-size: var(--tt-tv-text-meta);
- font-weight: var(--tt-weight-bold)
-}
-
-/* The toolbar keeps its 40 px icons and tight spacing: nine labelled buttons only just fit the safe width. */
-.player-toolbar button>.tv-icon {
- width: 40px;
- height: 40px;
- flex: 0 0 40px;
- margin: 0 6px 0 0
-}
-
-.player-toolbar [data-player-control="play"] {
- padding: 0 var(--tt-space-4)
+ margin-left: 22px
 }
 
 .player-toolbar [data-player-control="audio"],
 .player-toolbar [data-player-control="back"] {
- margin-left: var(--tt-space-5)
+ margin-left: 78px
+}
+
+.player-toolbar button {
+ flex-direction: column;
+ justify-content: flex-start;
+ width: 132px;
+ min-height: 0;
+ padding: 0 0 10px;
+ border: 0;
+ background: transparent;
+ color: var(--tt-text)
+}
+
+.player-toolbar button:focus {
+ background: transparent;
+ color: var(--tt-text)
+}
+
+.player-toolbar [data-player-control]:focus {
+ outline: 0;
+ box-shadow: none
+}
+
+.player-glyph {
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ width: 80px;
+ height: 80px;
+ border-radius: 50%;
+ background: var(--tt-fill-selected)
+}
+
+.player-toolbar [data-player-control="play"] .player-glyph {
+ width: 96px;
+ height: 96px
+}
+
+.player-glyph .tv-icon {
+ width: 36px;
+ height: 36px;
+ flex: 0 0 36px
+}
+
+.player-toolbar [data-player-control="play"] .player-glyph .tv-icon {
+ width: 44px;
+ height: 44px;
+ flex: 0 0 44px
+}
+
+.player-label {
+ margin-top: 10px;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold)
+}
+
+.player-toolbar [data-player-control]:focus .player-glyph {
+ background: var(--tt-fill-focus);
+ color: var(--tt-on-fill-focus);
+ box-shadow: var(--tt-focus-shadow-tv)
+}
+
+.player-toolbar [data-player-control]:focus .player-label {
+ color: var(--tt-text)
+}
+
+/* An open Player panel's control: a lighter circle, the bold label and the saffron marker under it, focused or not. */
+.player-toolbar button.open,
+.player-toolbar button.open:focus {
+ background: linear-gradient(var(--tt-accent), var(--tt-accent)) no-repeat 50% 100% / 40px 4px
+}
+
+.player-toolbar button.open .player-glyph {
+ background: var(--tt-fill-strong)
+}
+
+.player-toolbar button.open .player-label {
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold)
 }
 
 .player-retry {
- margin-top: var(--tt-space-4)
+ display: block;
+ margin: var(--tt-space-4) auto 0;
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-bold)
 }
 
-/* Menus: solid surface on an overlay border, rows at target height, body type. */
+/* Player panels (Audio, Subtitles, Options, Playback information): a solid sheet at the top right above the
+   controls, rows at the 72 px TV target on the card radius, body type. */
 .player-dialog {
  position: absolute;
  right: var(--tt-tv-safe-x);
  top: var(--tt-tv-safe-y);
- width: 700px;
- max-height: 640px;
+ width: 760px;
+ max-height: 660px;
  overflow-y: auto;
  z-index: 10;
- padding: var(--tt-space-5);
+ padding: var(--tt-space-6);
  background: var(--tt-menu-surface);
- border: 2px solid var(--tt-overlay);
- border-radius: var(--tt-radius-lg);
+ border: 0;
+ border-radius: var(--tt-radius-xl);
  box-shadow: 0 24px 64px var(--tt-veil)
 }
 
@@ -2547,13 +2658,13 @@ button>.tv-icon:first-child {
 }
 
 .player-dialog h2 {
- margin: 0 0 var(--tt-space-3);
+ margin: 0 0 var(--tt-space-4);
  font-size: var(--tt-tv-text-lead);
  font-weight: var(--tt-weight-bold)
 }
 
 .player-dialog h3 {
- margin: var(--tt-space-4) 0 var(--tt-space-1);
+ margin: var(--tt-space-5) 0 var(--tt-space-2);
  color: var(--tt-text-muted);
  font-size: var(--tt-tv-text-meta);
  letter-spacing: .08em;
@@ -2561,18 +2672,28 @@ button>.tv-icon:first-child {
 }
 
 .player-dialog p {
- margin: 0 0 var(--tt-space-2);
+ display: flex;
+ align-items: center;
+ min-height: var(--tt-tv-target);
+ margin: 0;
+ padding: var(--tt-space-2) 0;
+ border-bottom: 1px solid var(--tt-line);
  color: var(--tt-text-muted)
 }
 
 .player-dialog button {
  display: block;
  width: 100%;
+ min-height: var(--tt-tv-target);
  margin: var(--tt-space-2) 0 0;
  padding: var(--tt-space-3) var(--tt-space-5);
- border-radius: var(--tt-radius-xl);
+ border-radius: var(--tt-radius-lg);
  background: var(--tt-fill-quiet);
  text-align: left
+}
+
+.player-dialog p+button {
+ margin-top: var(--tt-space-4)
 }
 
 .player-dialog button:focus {

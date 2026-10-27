@@ -112,14 +112,51 @@ describe('TV stylesheets use the shared tokens', () => {
     expect(scrim).toMatch(/linear-gradient\(90deg,[^;]*var\(--tt-scrim-text\)/);
   });
 
-  it('fades the player bar as one layer and hides it after the fade so it cannot take focus', () => {
+  it('fades the player controls as one layer and hides them after the fade so they cannot take focus', () => {
     const text = css('tv.css');
     const hidden = /\.player-controls\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
     expect(hidden).toMatch(/opacity:\s*0/);
     expect(hidden).toMatch(/visibility:\s*hidden/);
     expect(hidden).toMatch(/transition:\s*opacity var\(--tt-controls-fade\),\s*visibility 0s linear var\(--tt-controls-fade\)/);
-    expect(hidden).toMatch(/background:\s*linear-gradient\(transparent, var\(--tt-scrim-bottom\)\)/);
-    expect(/\.player-bar\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-controls-surface)');
+  });
+
+  // #61: no boxed bar. The heading reads over a top scrim and the controls over a bottom scrim, both in the one faded layer.
+  it('puts the heading and the controls straight on the picture over a top and a bottom scrim', () => {
+    const text = css('tv.css');
+    const layer = /\.player-controls\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(layer).toMatch(/linear-gradient\(180deg, var\(--tt-scrim-text\)/);
+    expect(layer).toMatch(/linear-gradient\(0deg, var\(--tt-scrim-bottom\)/);
+    expect(/\.player-bar\s*\{([^{}]*)\}/.exec(text)?.[1]).not.toMatch(/background|border/);
+  });
+
+  it('draws round toolbar controls, a larger Play/Pause, and turns the focused circle white', () => {
+    const text = css('tv.css');
+    const glyph = /\.player-glyph\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(glyph).toMatch(/width:\s*80px/);
+    expect(glyph).toMatch(/height:\s*80px/);
+    expect(glyph).toMatch(/border-radius:\s*50%/);
+    const play = /\.player-toolbar \[data-player-control="play"\] \.player-glyph\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(play).toMatch(/width:\s*96px/);
+    const focused = /\.player-toolbar \[data-player-control\]:focus \.player-glyph\s*\{([^{}]*)\}/.exec(text)?.[1] ?? '';
+    expect(focused).toContain('background: var(--tt-fill-focus)');
+    expect(focused).toContain('color: var(--tt-on-fill-focus)');
+    expect(focused).not.toMatch(/width|height|margin|padding/);
+  });
+
+  it('keeps the open control distinguishable: a lighter circle and the saffron marker under its label', () => {
+    const text = css('tv.css');
+    expect(/\.player-toolbar button\.open \.player-glyph\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-fill-strong)');
+    expect(/\.player-toolbar button\.open,[^{}]*\{([^{}]*)\}/.exec(text)?.[1]).toMatch(/linear-gradient\(var\(--tt-accent\), var\(--tt-accent\)\)/);
+  });
+
+  it('draws the downloaded range in a lighter tone than the track', () => {
+    const text = css('tv.css');
+    expect(/\.player-buffered\s*\{([^{}]*)\}/.exec(text)?.[1]).toContain('var(--tt-line-strong)');
+  });
+
+  it('makes every Player panel row the 72 px TV target', () => {
+    const text = css('tv.css');
+    for (const row of ['.player-dialog button', '.player-dialog p']) expect(/min-height:\s*var\(--tt-tv-target\)/.test(new RegExp(`\\n${row.replace(/[.]/g, '\\.')}\\s*\\{([^{}]*)\\}`).exec(text)?.[1] ?? ''), row).toBe(true);
   });
 
   it('puts the player menu on the solid menu surface and every control at the TV target height', () => {

@@ -107,6 +107,24 @@ export function downloadFacts(download: Download, group: { sizeBytes?: number; f
 }
 
 /** Player status line: the current Audio and Subtitles choice. Empty until preferences are known. */
+// The Player heading: the server names an episode "Show · S01E04 · Episode name"; the show and code become a muted
+// kicker over the name. A movie, an episode without a name, or a title without its code (added from the parsed
+// release) stays one line.
+const EPISODE_CODE = /^S\d+E\d+/;
+export function playerHeading(download: Pick<Download, 'displayTitle' | 'filePath' | 'parsed'>): { kicker: string; title: string } {
+  const name = download.displayTitle || download.filePath;
+  const parts = name.split(' · ');
+  const at = parts.findIndex(part => EPISODE_CODE.test(part));
+  if (at > 0 && at < parts.length - 1) return { kicker: parts.slice(0, at + 1).join(' · '), title: parts.slice(at + 1).join(' · ') };
+  const code = at < 0 ? episodeCode(download.parsed?.seasonStart, download.parsed?.episodeStart) : '';
+  return { kicker: '', title: code ? `${name} · ${code}` : name };
+}
+
+// Time left in the stream, shown at the right end of the timeline; empty until the duration is known.
+export function remainingTime(position: number, total: number): string {
+  return total > 0 ? `\u2212${formatTime(Math.max(0, total - position))}` : '';
+}
+
 export function playerChoiceLine(preferences: PlaybackPreferences | undefined): string {
   if (!preferences) return '';
   const language = (code: string) => languageDisplayName(canonicalLanguage(code)) || '';

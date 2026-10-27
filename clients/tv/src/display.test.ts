@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogTitle, Download, HouseholdItem, Job, ParsedRelease, PlaybackPreferences } from '@torrent-tv/shared';
-import { cardMeta, cardRating, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
+import { cardMeta, cardRating, prepareHint, readyLine, readyPercent, downloadFacts, downloadProgressLine, downloadStatus, episodeCode, formatEta, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, titleKind, watchProgress } from './display';
 
 // DESIGN.md "Information priorities": what each TV screen shows, decided as pure text so the
 // markup only places it. Unknown facts are omitted, never printed as a placeholder.
@@ -174,4 +174,22 @@ describe('getting ready panel', () => {
     expect(prepareHint(30)).toBe('Still looking for peers. It can take a little longer.');
     expect(prepareHint(30, 0)).toBe('Still looking for peers. It can take a little longer.');
   });
+});
+
+// The Player heading (#61): the show and episode code as a muted kicker over the episode name; a movie, or an
+// episode the server has no name for, is one line. The server sends "Show · S01E04 · Name" as displayTitle.
+describe('player heading', () => {
+  const download = (displayTitle: string | undefined, parsed?: Partial<ParsedRelease>) => ({ displayTitle, filePath: 'files/v.mkv', parsed }) as unknown as Download;
+  it('puts the show and code above the episode name', () => expect(playerHeading(download('Velvet Witness · S01E04 · The Lantern Room'))).toEqual({ kicker: 'Velvet Witness · S01E04', title: 'The Lantern Room' }));
+  it('keeps a name that itself has a middle dot whole', () => expect(playerHeading(download('Velvet Witness · S01E04 · Part one · The Fall'))).toEqual({ kicker: 'Velvet Witness · S01E04', title: 'Part one · The Fall' }));
+  it('adds the code from the parsed release when the title lacks it, on one line', () => expect(playerHeading(download('Velvet Witness', { seasonStart: 1, episodeStart: 4 }))).toEqual({ kicker: '', title: 'Velvet Witness · S01E04' }));
+  it('keeps an episode without a name on one line', () => expect(playerHeading(download('Velvet Witness · S01E04-E05'))).toEqual({ kicker: '', title: 'Velvet Witness · S01E04-E05' }));
+  it('shows a movie title alone', () => expect(playerHeading(download('Dune'))).toEqual({ kicker: '', title: 'Dune' }));
+  it('falls back to the file name', () => expect(playerHeading(download(undefined))).toEqual({ kicker: '', title: 'files/v.mkv' }));
+});
+
+describe('remaining time', () => {
+  it('counts down to the end with a minus sign', () => expect(remainingTime(17 * 60_000 + 51_000, 51 * 60_000)).toBe('\u221233:09'));
+  it('is empty while the duration is unknown', () => expect(remainingTime(5000, 0)).toBe(''));
+  it('never goes below zero', () => expect(remainingTime(70_000, 60_000)).toBe('\u22120:00'));
 });

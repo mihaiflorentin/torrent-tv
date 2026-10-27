@@ -245,11 +245,12 @@ describe('Player heading', () => {
     delete (window as unknown as { webapis?: unknown }).webapis;
   });
 
-  it('shows the title with its episode code and the current Audio and Subtitles choice, not the file path', async () => {
+  it('shows the show and episode code over the episode name, the current Audio and Subtitles choice, not the file path', async () => {
     const api = { streamURL: (p: string) => p, playbackPreferences: async () => ({ audioLanguage: 'en', audioTrackIndex: 1, subtitleLanguage: 'ro', subtitleMode: 'selected' }), downloads: async () => ({ items: [], nextCursor: null, total: 0 }), updatePlayback: async () => ({}) } as unknown as API;
     render(<Player api={api} download={download()} resumeMs={0} onClose={() => { }} onStateChanged={() => { }} onComplete={() => { }} />, container);
     await wait();
-    expect(container.querySelector('.player-title')?.textContent).toBe('Alpha · S01E02 · Pilot');
+    expect(container.querySelector('.player-kicker')?.textContent).toBe('Alpha · S01E02');
+    expect(container.querySelector('.player-title')?.textContent).toBe('Pilot');
     expect(container.querySelector('.player-choice')?.textContent).toBe('Audio English · Subtitles Romanian');
     expect(container.querySelector('.player-heading')?.textContent).not.toMatch(/\.mkv|FileList/);
   });

@@ -12,7 +12,7 @@ import { discoverServers, DiscoveredServer, normalizeServerURL } from './discove
 import { Backdrop } from './backdrop';
 import { captureNav, type NavSnapshot } from './nav-snapshot';
 import { Icon, AppMark } from './icons';
-import { cardMeta, cardRating, episodeMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
+import { cardMeta, cardRating, episodeMeta, downloadFacts, episodeCode, prepareHint, readyLine, readyPercent, downloadProgressLine, downloadStatus, heroFacts, jobKindLabel, jobStatusLine, libraryCardLine, playerChoiceLine, playerHeading, remainingTime, resumeLine, sourceChips, sourceHeadline, watchProgress } from './display';
 import { appIdentity } from './app-name';
 import { exitApplication, getNetworkInfo, onAppVisibilityChange, openExternalURL, registerMediaKeys } from './platform';
 import { applyGraphicsClass, detectCapabilities } from './capability';
@@ -58,6 +58,15 @@ function subtitleMenuRows(candidates: SubtitleCandidate[], firstRow: number, key
 }
 
 const defaultPlayerPreferences: PlaybackPreferences = { audioLanguage: 'en', audioTrackIndex: -1, subtitleLanguage: 'ro', subtitleMode: 'auto' };
+
+// One Player toolbar control: a round icon button with its label under the circle. The label is the accessible
+// name unless `name` adds a detail the screen does not print (the track count). Row 1 and the column are the pinned
+// Control focus order (DESIGN.md "TV interaction").
+function PlayerControl({ control, col, icon, label, name, primary, open, onClick }: { control: string; col: number; icon: string; label: string; name?: string; primary?: boolean; open?: boolean; onClick: () => void }) {
+ const menu = open !== undefined;
+ return <button data-player-control={control} data-focus-region="player-controls" data-focus-row="1" data-focus-col={String(col)} data-focus-key={`player-${control}`} class={primary ? 'primary' : open ? 'open' : undefined} aria-label={name} aria-haspopup={menu ? 'true' : undefined} aria-expanded={menu ? open : undefined} onClick={onClick}><span class="player-glyph"><Icon name={icon} /></span><span class="player-label">{label}</span></button>;
+}
+const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 
 export function Player({ api, download, resumeMs, preferences, onClose, onStateChanged, onComplete, onEpisode }: { api: API; download: Download; resumeMs: number; preferences?: PlaybackPreferences; onClose: () => void; onStateChanged: () => void; onComplete: (preferences: PlaybackPreferences) => void; onEpisode?: (next: Download, preferences: PlaybackPreferences) => void }) {
  const [message, setMessage] = useState('Opening stream…');
@@ -431,6 +440,9 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
  function changeDelay(delta: number) { const next = Math.max(-10_000, Math.min(10_000, subtitleDelay + delta)); setSubtitleDelay(next); try { window.webapis?.avplay.setSubtitlePosition(next); } catch { } }
  function changeAspect(value: string) { setAspect(value); try { window.webapis?.avplay.setDisplayMethod(value); } catch { } }
  const percent = total > 0 ? Math.min(100, position / total * 100) : liveDownload.progress * 100;
+ // The downloaded share of the file, drawn under the played range; the latest record the Player polled (getting ready, waiting) wins.
+ const buffered = Math.max(percent, Math.min(100, Math.max(liveDownload.progress, readyDownload?.progress ?? 0) * 100));
+ const heading = playerHeading(download);
  const audioTracks = tracks.filter(track => track.type === 'AUDIO');
  const subtitleTracks = tracks.filter(track => track.type === 'TEXT');
  // The server lists every embedded text track already; the device's own list stays only when it has none (picture subtitles or a failed probe), so one physical track is never offered twice.
@@ -443,15 +455,21 @@ export function Player({ api, download, resumeMs, preferences, onClose, onStateC
   {externalSubtitle && <div class="external-subtitle">{externalSubtitle}</div>}
   {gettingReady && readyDownload && <div class="player-ready" aria-live="polite"><strong class="player-ready-title">{readyTitle(download)}</strong><div class="player-ready-bar"><span class="player-ready-fill" style={{ width: `${readyPercent(readyDownload)}%` }} /></div><div class="player-ready-facts"><b>{readyPercent(readyDownload)}%</b>{readyLine(readyDownload) && <span>{readyLine(readyDownload)}</span>}</div></div>}
   {osd && <div class={`player-message${message ? ' on' : ''}`} aria-live="polite">{osd}</div>}
-  <div class="player-controls"><div class="player-bar">
-   <div class="player-heading"><div class="player-title">{download.displayTitle || download.filePath}</div>{choice && <div class="player-choice">{choice}</div>}</div>
-   <button class="player-timeline" data-player-control="timeline" data-focus-region="player-controls" data-focus-row="0" data-focus-col="0" data-focus-key="player-timeline" onClick={() => { revealControls(); focusControl('timeline') }} aria-label="Playback timeline; use left and right to seek"><span class="player-fill" style={{ width: `${percent}%` }}><i /></span></button>
-   <div class="player-time"><span>{formatTime(position)}</span><span>{formatTime(total)}</span></div>
+  <div class="player-controls">
+   <div class="player-heading"><div class="player-name">{heading.kicker && <div class="player-kicker">{heading.kicker}</div>}<div class="player-title">{heading.title}</div></div>{choice && <div class="player-choice">{choice}</div>}</div>
+   <div class="player-bar">
+   <button class="player-timeline" data-player-control="timeline" data-focus-region="player-controls" data-focus-row="0" data-focus-col="0" data-focus-key="player-timeline" onClick={() => { revealControls(); focusControl('timeline') }} aria-label="Playback timeline; use left and right to seek"><span class="player-buffered" style={{ width: `${buffered}%` }} /><span class="player-fill" style={{ width: `${percent}%` }}><i /></span></button>
+   <div class="player-time"><span>{formatTime(position)}</span><span>{remainingTime(position, total)}</span></div>
    <div class="player-toolbar">
-    <button data-player-control="restart" data-focus-region="player-controls" data-focus-row="1" data-focus-col="0" data-focus-key="player-restart" onClick={() => keepControl('restart', () => keysRef.current?.seekTo(0))}><Icon name="restart" />Restart</button><button data-player-control="back-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="1" data-focus-key="player-back-10" onClick={() => keepControl('back-10', () => keysRef.current?.seekBy(-10_000))}><Icon name="back-10" />−10s</button>
-    <button data-player-control="play" data-focus-region="player-controls" data-focus-row="1" data-focus-col="2" data-focus-key="player-play" class="primary" onClick={() => keepControl('play', () => togglePlayback())}><Icon name={playing.current ? 'pause' : 'play'} />{playing.current ? 'Pause' : 'Play'}</button><button data-player-control="forward-10" data-focus-region="player-controls" data-focus-row="1" data-focus-col="3" data-focus-key="player-forward-10" onClick={() => keepControl('forward-10', () => keysRef.current?.seekBy(10_000))}><Icon name="forward-10" />+10s</button>
-    <button data-player-control="audio" data-focus-region="player-controls" data-focus-row="1" data-focus-col="4" data-focus-key="player-audio" class={menu === 'audio' ? 'open' : ''} aria-haspopup="true" aria-expanded={menu === 'audio'} onClick={() => openMenu('audio', 'audio')}><Icon name="audio" />Audio ({audioTracks.length})</button><button data-player-control="subtitles" data-focus-region="player-controls" data-focus-row="1" data-focus-col="5" data-focus-key="player-subtitles" class={menu === 'subtitles' || menu === 'find-subtitles' ? 'open' : ''} aria-haspopup="true" aria-expanded={menu === 'subtitles' || menu === 'find-subtitles'} onClick={() => { openMenu('subtitles', 'subtitles'); void findSubtitles(false, 'local') }}><Icon name="subtitles" />Subtitles ({nativeSubtitleTracks.length + subtitleCandidates.length})</button>
-    <button data-player-control="options" data-focus-region="player-controls" data-focus-row="1" data-focus-col="6" data-focus-key="player-options" class={menu === 'options' || menu === 'info' ? 'open' : ''} aria-haspopup="true" aria-expanded={menu === 'options' || menu === 'info'} onClick={() => openMenu('options', 'options')}><Icon name="options" />Options</button><button data-player-control="back" data-focus-region="player-controls" data-focus-row="1" data-focus-col="7" data-focus-key="player-back" onClick={() => { save(); onClose(); }}><Icon name="back" />Back</button><button data-player-control="hide" data-focus-region="player-controls" data-focus-row="1" data-focus-col="8" data-focus-key="player-hide" onClick={hideControls}><Icon name="hide" />Hide</button>
+    <PlayerControl control="restart" col={0} icon="restart" label="Restart" onClick={() => keepControl('restart', () => keysRef.current?.seekTo(0))} />
+    <PlayerControl control="back-10" col={1} icon="back-10" label="−10 s" onClick={() => keepControl('back-10', () => keysRef.current?.seekBy(-10_000))} />
+    <PlayerControl control="play" col={2} icon={playing.current ? 'pause' : 'play'} label={playing.current ? 'Pause' : 'Play'} primary onClick={() => keepControl('play', () => togglePlayback())} />
+    <PlayerControl control="forward-10" col={3} icon="forward-10" label="+10 s" onClick={() => keepControl('forward-10', () => keysRef.current?.seekBy(10_000))} />
+    <PlayerControl control="audio" col={4} icon="audio" label="Audio" name={`Audio, ${trackCount(audioTracks.length)}`} open={menu === 'audio'} onClick={() => openMenu('audio', 'audio')} />
+    <PlayerControl control="subtitles" col={5} icon="subtitles" label="Subtitles" name={`Subtitles, ${trackCount(nativeSubtitleTracks.length + subtitleCandidates.length)}`} open={menu === 'subtitles' || menu === 'find-subtitles'} onClick={() => { openMenu('subtitles', 'subtitles'); void findSubtitles(false, 'local') }} />
+    <PlayerControl control="options" col={6} icon="options" label="Options" open={menu === 'options' || menu === 'info'} onClick={() => openMenu('options', 'options')} />
+    <PlayerControl control="back" col={7} icon="back" label="Back" onClick={() => { save(); onClose(); }} />
+    <PlayerControl control="hide" col={8} icon="hide" label="Hide" onClick={hideControls} />
    </div>
    {phase === 'failed' && <button class="player-retry primary" data-player-control="retry" data-focus-region="player-controls" data-focus-row="2" data-focus-col="2" data-focus-key="player-retry" onClick={() => { completedRetryUsed.current = false; openPlayer(current.current); }}>Retry playback</button>}
   </div></div>
