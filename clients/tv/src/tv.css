@@ -1656,14 +1656,6 @@ button>.tv-icon:first-child {
  color: var(--tt-text-muted)
 }
 
-.season-browser {
- width: 1500px;
- box-sizing: border-box;
- padding: var(--tt-space-5) var(--tt-space-6);
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-lg)
-}
-
 /* The movie versions sit on the art like the copy above them: a heading with the count, then the rows. */
 .source-list {
  width: 1728px
@@ -1686,46 +1678,77 @@ button>.tv-icon:first-child {
  font-size: var(--tt-tv-text-meta)
 }
 
-/* The series card is translucent (a token, no blur) so the title's sharp backdrop shows through it. Its text carries
-   a dark halo (--tt-text-shade: two static layers, never animated) so it stays readable over a bright picture.
-   A button does not inherit text-shadow, so the transparent episode rows take it directly; text on a saffron fill
-   (--tt-on-accent) and the filled danger focus stay crisp. */
+/* Series page (#57, board "Series page"): the movie page's header without the overview (Info carries it), then the
+   season pills and the episode rows straight on the art, no card. The bottom scrim is deeper than the movie page's:
+   solid ground under the list, fading out above the pills, so the rows need no translucent card and no text halo. */
+.series-page .tv-backdrop.sharp .tv-backdrop-scrim {
+ background: linear-gradient(0deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-bottom) 40%, transparent 72%), linear-gradient(90deg, var(--tt-scrim-bottom) 0, var(--tt-scrim-text) 38%, transparent 72%)
+}
+
+/* The board's compact header: the 80 px title, the row of 76 px actions 28 px under the copy, tighter steps between,
+   so the pills and two and a half rows of episodes share the first screen with it. */
+.series-page .detail-copy {
+ margin: var(--tt-space-3) 0 var(--tt-space-5)
+}
+
+.series-page .detail-copy h1 {
+ font-size: var(--tt-tv-text-title-compact)
+}
+
+.series-page .detail-facts {
+ margin-top: var(--tt-space-4)
+}
+
+.series-page .detail-actions {
+ margin-top: 28px
+}
+
+.series-page .detail-actions button {
+ height: 76px
+}
+
+.series-page .detail-actions button.detail-icon {
+ width: 76px
+}
+
+.series-page .detail-plays {
+ margin-top: var(--tt-space-4)
+}
+
 .season-browser {
- width: 100%;
- background: var(--tt-card-surface);
- text-shadow: var(--tt-text-shade)
+ width: 1728px
 }
 
-.season-browser .info-stop {
- text-shadow: var(--tt-text-shade)
-}
-
-.season-browser button.primary,
-.season-browser .source-best,
-.season-browser .danger-button:focus {
- text-shadow: none
-}
-
-/* Old engines repaint a scrolling episode list on every frame: one tight layer keeps the shade at a fraction of the cost. */
-.lean-graphics .season-browser,
-.lean-graphics .season-browser .info-stop {
- text-shadow: 0 0 4px var(--tt-text-shade-core)
-}
-
-.season-browser h2,
 .source-list h2 {
  font-size: var(--tt-tv-text-lead);
  font-weight: var(--tt-weight-bold)
 }
 
+/* Season pills, 12 px apart (margins, not gap). Rest: the quiet word on the fill; selected: the lighter fill, the bold
+   word in full white and the saffron marker (white is the cursor's); focused: the white pill. */
 .season-tabs {
  display: flex;
  flex-wrap: wrap;
- margin: var(--tt-space-4) 0 var(--tt-space-4)
+ margin: 0 0 var(--tt-space-3)
 }
 
 .season-tabs button {
- margin: 0 var(--tt-space-3) var(--tt-space-3) 0
+ height: 64px;
+ min-height: 0;
+ margin: 0 12px 12px 0;
+ padding: 0 28px;
+ color: var(--tt-text-muted);
+ font-size: 28px;
+ font-weight: var(--tt-weight-semibold)
+}
+
+.season-tabs button.active {
+ color: var(--tt-text);
+ font-weight: var(--tt-weight-bold)
+}
+
+.season-tabs button:focus {
+ color: var(--tt-on-fill-focus)
 }
 
 .season-tabs button>*+* {
@@ -1757,12 +1780,14 @@ button>.tv-icon:first-child {
 }
 
 .episode-row {
- padding: var(--tt-space-2) 0;
- border-top: 1px solid var(--tt-line)
+ margin-bottom: 10px
 }
 
-/* One column under the season bar: an "Episodes" heading over the list, left-aligned and as wide as the card, the same
-   edge as the Versions view. The list scrolls on its own; flexbox only (no grid, no gap) for Chromium 53. */
+.episode-row:last-child {
+ margin-bottom: 0
+}
+
+/* One column under the pills, as wide as the page's content. Flexbox only (no grid, no gap) for Chromium 53. */
 .season-panes {
  display: block
 }
@@ -1773,33 +1798,27 @@ button>.tv-icon:first-child {
  min-width: 0
 }
 
-.episode-heading {
- margin: var(--tt-space-3) 0 var(--tt-space-3);
- padding: 0 var(--tt-space-2);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-lead);
- font-weight: var(--tt-weight-black);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis
-}
-
-.episode-heading-label {
- color: var(--tt-accent)
-}
-
+/* The list scrolls on its own, two and a half rows high, and keeps the focused row in its middle (main.tsx), so a
+   piece of the row above and below always shows. It is the rows' offset parent for that, and its 12 px padding (the
+   negative margin keeps the rows on the page's edge) leaves room for the focus ring. */
 .episode-pane {
+ position: relative;
  box-sizing: border-box;
- max-height: 720px;
- overflow-y: auto;
- padding: var(--tt-space-1) var(--tt-space-4) var(--tt-space-1) var(--tt-space-2)
+ max-height: 456px;
+ margin: 0 -12px;
+ padding: 12px;
+ overflow-y: auto
+}
+
+.episode-pane::-webkit-scrollbar {
+ display: none
 }
 
 /* Versions view: after OK on an episode the list steps aside and that episode's versions take the whole width.
    Flexbox only; the page scrolls, so the view adds no scroll area of its own. */
 .versions-view {
  display: block;
- padding: var(--tt-space-1) var(--tt-space-2) var(--tt-space-3)
+ padding: var(--tt-space-1) 0 var(--tt-space-3)
 }
 
 .versions-head {
@@ -1807,8 +1826,7 @@ button>.tv-icon:first-child {
  display: flex;
  align-items: baseline;
  justify-content: space-between;
- padding-bottom: var(--tt-space-3);
- border-bottom: 1px solid var(--tt-line)
+ padding-bottom: var(--tt-space-1)
 }
 
 .versions-title {
@@ -1826,7 +1844,7 @@ button>.tv-icon:first-child {
 }
 
 .versions-list {
-  padding: var(--tt-space-1) var(--tt-space-3) var(--tt-space-3)
+ padding: var(--tt-space-1) 0 var(--tt-space-3)
 }
 
 /* The episode block is the Info panel's episode level: its still, facts line, title and synopsis, then the versions below.
@@ -1877,89 +1895,130 @@ button>.tv-icon:first-child {
  color: var(--tt-text-muted)
 }
 
-/* The selected episode stays marked in the list: a tint plus a bar, never colour alone. */
+/* An episode row (the board's): transparent at rest; the selected episode keeps a quiet fill and a saffron edge
+   (never colour alone: the edge is a shape); focused, the lighter fill inside the white ring, never the white pill. */
 .episode-tile.selected {
- background: var(--tt-fill-selected);
- box-shadow: inset 8px 0 0 var(--tt-accent)
-}
-
-/* The tint lifts the surface under the facts line, so it takes the full text colour, not the muted one. */
-.episode-tile.selected small {
- color: var(--tt-text)
+ background: var(--tt-fill-quiet);
+ box-shadow: inset 6px 0 0 var(--tt-accent)
 }
 
 .episode-tile.selected:focus {
- background: var(--tt-fill-strong);
- border-color: var(--tt-focus-edge);
- box-shadow: inset 8px 0 0 var(--tt-accent), var(--tt-focus-shadow-tv)
+ background: var(--tt-fill-selected);
+ box-shadow: inset 6px 0 0 var(--tt-accent), var(--tt-focus-shadow-tv)
 }
 
 .episode-tile {
  display: flex;
+ box-sizing: border-box;
  width: 100%;
+ height: 176px;
  align-items: center;
- justify-content: space-between;
+ justify-content: flex-start;
+ background: transparent;
  text-align: left
 }
 
-/* The full-width row: a 16:9 still, then name, facts and a short synopsis, with the badges and the chevron at the right edge.
-   The still is bigger than the Info panel's 160x90 (the row has the room); the synopsis clamps to two lines, with a
-   max-height fallback for engines without -webkit-line-clamp. */
+.info-stop.episode-tile {
+ margin: 0;
+ padding: 0 26px 0 14px;
+ border-radius: var(--tt-radius-xl)
+}
+
+/* The 16:9 still (the Info panel keeps its 160x90) carries the progress bar of an episode under way. */
 .episode-tile .info-still-small {
  width: 256px;
- height: 144px
+ height: 144px;
+ flex: 0 0 256px;
+ margin-right: 28px;
+ border-radius: 12px
 }
 
-.episode-tile .episode-synopsis {
- display: -webkit-box;
- max-height: 2.8em;
- margin-top: var(--tt-space-2);
- color: var(--tt-text-muted);
- font-size: var(--tt-tv-text-meta);
- line-height: 1.4;
- overflow: hidden;
- -webkit-box-orient: vertical;
- -webkit-line-clamp: 2
-}
-
-.episode-tile.selected .episode-synopsis {
- color: var(--tt-text)
-}
-
-/* Episode progress: a static bar whose width is set by state, never animated. */
 .episode-tile .episode-progress {
- display: block;
- width: 360px;
- max-width: 100%;
- margin-top: var(--tt-space-2);
- height: 10px;
- background: var(--tt-scrim-text);
+ position: absolute;
+ left: 12px;
+ right: 12px;
+ bottom: 12px;
+ height: 6px;
+ border-radius: 3px;
+ background: var(--tt-fill-strong);
  overflow: hidden
 }
 
 .episode-tile .episode-progress b {
  display: block;
  height: 100%;
+ border-radius: 3px;
  background: var(--tt-accent)
 }
 
-.episode-tile .tv-state-badges {
+/* Code and name, the facts line, then the synopsis clamped to two lines (max-height backs the clamp on old engines).
+   The lines are set tight so all four fit the 144 px still. */
+.episode-tile .info-row-copy b {
+ line-height: 1.15
+}
+
+.episode-code {
+ color: var(--tt-text-subtle);
+ font-weight: var(--tt-weight-semibold)
+}
+
+.episode-tile .info-row-copy small {
+ margin-top: 4px;
+ color: var(--tt-text-subtle);
+ line-height: 1.15
+}
+
+.episode-tile .episode-synopsis {
+ display: -webkit-box;
+ max-height: 2.7em;
+ margin-top: 6px;
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-meta);
+ line-height: 1.35;
+ overflow: hidden;
+ -webkit-box-orient: vertical;
+ -webkit-line-clamp: 2
+}
+
+/* The one library-state word, its tone beside the word, never instead of it. */
+.episode-state {
  flex: 0 0 auto;
- flex-wrap: nowrap;
- justify-content: flex-end;
- margin: 0 0 0 var(--tt-space-4)
+ margin-left: var(--tt-space-5);
+ font-size: var(--tt-tv-text-meta);
+ font-weight: var(--tt-weight-semibold);
+ white-space: nowrap
 }
 
-.episode-tile .tv-state-badges>* {
- margin: 0 0 0 var(--tt-space-2)
+.episode-state.progress {
+ color: var(--tt-accent)
 }
 
-.episode-loading {
- margin-top: var(--tt-space-3);
- padding: var(--tt-space-5);
- border: 2px dashed var(--tt-line-strong);
- border-radius: var(--tt-radius-md);
+.episode-state.ok {
+ color: var(--tt-ok)
+}
+
+.episode-state.danger {
+ color: var(--tt-danger)
+}
+
+.episode-state.quiet {
  color: var(--tt-text-muted)
+}
+
+.episode-tile .info-chevron {
+ width: 34px;
+ height: 34px;
+ flex: 0 0 34px;
+ margin-left: var(--tt-space-5);
+ color: var(--tt-text-subtle)
+}
+
+/* A season whose episode list is still being prepared: one sentence in the empty states' voice (#62), no box. */
+.episode-loading {
+ max-width: 1100px;
+ margin-top: var(--tt-space-3);
+ color: var(--tt-text-muted);
+ font-size: var(--tt-tv-text-body)
 }
 
 /* Version row, the decision point, shared by the movie list and an episode's Versions view: one line of fixed columns
@@ -2111,14 +2170,13 @@ button>.tv-icon:first-child {
  opacity: 1
 }
 
-/* Season packs: plain cards in the Versions view, controls always visible. */
+/* Season packs: after the versions, rows on the quiet fill like the version rows, controls always visible. */
 .season-pack-downloads {
- margin: var(--tt-space-5) 0 var(--tt-space-3);
- padding-top: var(--tt-space-4);
- border-top: 1px solid var(--tt-line)
+ margin: var(--tt-space-7) 0 var(--tt-space-3)
 }
 
 .season-pack-downloads h4 {
+ margin: 0;
  font-size: var(--tt-tv-text-lead);
  font-weight: var(--tt-weight-bold)
 }
@@ -2131,11 +2189,10 @@ button>.tv-icon:first-child {
 
 .season-pack-card {
  min-width: 0;
- margin-top: var(--tt-space-3);
- padding: var(--tt-space-4) var(--tt-space-5);
- border: 1px solid var(--tt-line);
- border-radius: var(--tt-radius-md);
- background: var(--tt-raised)
+ margin-top: 10px;
+ padding: var(--tt-space-4) 28px;
+ border-radius: 18px;
+ background: var(--tt-fill-quiet)
 }
 
 .season-pack-head {
@@ -2176,7 +2233,7 @@ button>.tv-icon:first-child {
 }
 
 .season-pack-action>b {
- color: var(--tt-accent);
+ color: var(--tt-text-muted);
  font-weight: var(--tt-weight-bold)
 }
 

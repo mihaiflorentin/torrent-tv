@@ -10,6 +10,7 @@ import { Settings } from './settings';
 import { TrackerBadge, trackerSourceKey } from './tracker-badge';
 import { AppMark, Icon } from './icons';
 import { MoreMenu } from './more-menu';
+import { HUBS, hubDestination, hubOf, loadHubMemory, pageHeading, rememberTab, saveHubMemory, tabLabel, type Hub } from './hubs';
 import { BackdropLayer, backdropArtFor, setBackdropArt } from './backdrop';
 import { PlayerReady, PrepareElapsed } from './getting-ready';
 import { cardFacts, episodeCode, formatClock as formatPlaybackTime, libraryProgress, playerTitle, resumeLine, sourceSpec, titleFacts } from './presentation';
@@ -64,17 +65,28 @@ function permanentPersistenceFailure(error: unknown): boolean {
   return error.status === 404 || error.status === 409;
 }
 const MAX_RECOVER_ATTEMPTS = 3;
-type NavItem = { id?: View; label: string; icon: string; href?: string };
-const navGroups: { label?: string; items: NavItem[] }[] = [
-  { items: [{ id: 'home', label: 'Home', icon: 'home' }, { id: 'search', label: 'Search', icon: 'search' }] },
-  { label: 'My Library', items: [{ id: 'library', label: 'Dashboard', icon: 'library' }, { id: 'continue', label: 'Continue watching', icon: 'continue' }, { id: 'favorites', label: 'My List', icon: 'my-list' }, { id: 'watched', label: 'Watched', icon: 'watched' }, { id: 'downloads', label: 'Downloads', icon: 'download' }, { id: 'library-categories', label: 'Categories', icon: 'categories' }] },
-  { label: 'Tracker', items: [{ id: 'tracker', label: 'Dashboard', icon: 'discover' }, { id: 'browse', label: 'Browse', icon: 'browse' }, { id: 'categories', label: 'Categories', icon: 'categories' }] },
-  { items: [{ id: 'jobs', label: 'Jobs', icon: 'jobs' }, { id: 'projects', label: 'Projects', icon: 'external' }, { label: 'Bug Report', icon: 'bug', href: 'https://github.com/mihaiflorentin/torrent-tv/issues' }, { id: 'settings', label: 'Settings', icon: 'settings' }] },
-];
+const BUG_REPORT_URL = 'https://github.com/mihaiflorentin/torrent-tv/issues';
 
+// The rail holds the six hubs (web/hubs.ts); the current hub is the one holding the view on screen.
+function Sidebar({ view, onHub, dock }: { view: View; onHub: (hub: Hub) => void; dock?: ComponentChild }) {
+  const current = hubOf(view).id;
+  return <aside class="sidebar"><div class="brand"><AppMark /><strong>Torrent TV</strong></div><nav aria-label="Main navigation"><div class="nav-items">{HUBS.map(hub => <button type="button" key={hub.id} title={hub.label} class={current === hub.id ? 'selected' : ''} onClick={() => onHub(hub)} aria-current={current === hub.id ? 'page' : undefined}><Icon name={hub.icon} /><span class="nav-label">{hub.label}</span></button>)}</div></nav>{dock}</aside>;
+}
 
-function Sidebar({ view, onView, dock }: { view: View; onView: (view: View) => void; dock?: ComponentChild }) {
-  return <aside class="sidebar"><div class="brand"><AppMark /><strong>Torrent TV</strong></div><nav aria-label="Main navigation">{navGroups.map((group, index) => <div class="nav-group" key={index}>{group.label && <p>{group.label}</p>}{group.items.map(item => <button type="button" title={item.label} class={view === item.id ? 'selected' : ''} onClick={() => { if (item.href) { window.open(item.href, '_blank', 'noopener,noreferrer') } else if (item.id) { onView(item.id) } }} aria-current={view === item.id ? 'page' : undefined}><Icon name={item.icon} /><span class="nav-label">{item.label}</span></button>)}</div>)}</nav>{dock}</aside>;
+// Library and Discover: their views as tabs under the heading. Each tab is a view with its own URL.
+function HubTabs({ view, onView }: { view: View; onView: (view: View) => void }) {
+  const hub = hubOf(view);
+  const strip = useRef<HTMLElement>(null);
+  // On a phone the strip scrolls: keep the selected tab in sight (a shared link may open on the last one).
+  useEffect(() => { const selected = strip.current?.querySelector<HTMLElement>('[aria-current="page"]'); if (selected && typeof selected.scrollIntoView === 'function') selected.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }, [view]);
+  if (!hub.tabs) return null;
+  return <nav class="hub-tabs" ref={strip} aria-label={`${hub.label} sections`}>{hub.tabs.map(tab => <button type="button" key={tab.view} class={tab.view === view ? 'selected' : ''} aria-current={tab.view === view ? 'page' : undefined} onClick={() => onView(tab.view)}>{tab.label}</button>)}</nav>;
+}
+
+// Settings leads to the screens that left the rail, from its heading line: Background jobs, Other projects
+// (when the server publishes any) and the bug report. Those screens lead back to Settings from theirs.
+function SettingsLinks({ hasProjects, onView }: { hasProjects: boolean; onView: (view: View) => void }) {
+  return <nav class="settings-links" aria-label="More in Settings"><button type="button" onClick={() => onView('jobs')}><Icon name="jobs" />Background jobs</button>{hasProjects && <button type="button" onClick={() => onView('projects')}><Icon name="external" />Other projects</button>}<a href={BUG_REPORT_URL} target="_blank" rel="noopener noreferrer"><Icon name="bug" />Report a bug</a></nav>;
 }
 
 function Artwork({ title, kind = 'poster' }: { title: CatalogTitle; kind?: 'poster' | 'backdrop' }) {
@@ -110,7 +122,8 @@ function LegacyCard({ item, onOpen }: { item: HouseholdItem; onOpen: (item: Hous
 function MediaBadges({ state }: { state?: MediaState }) { if (!state?.downloadState || !state.watchState) return null; const download = state.downloadState; const watch = state.watchState; return <span class="media-badges">{download !== 'none' && <span class={`media-badge download ${download}`} title={download === 'downloaded' ? 'Downloaded' : download === 'partial' ? 'Some episodes downloaded' : download === 'error' ? 'Download needs attention' : `Downloading ${Math.round((state.progress || 0) * 100)}%`}><Icon name={download === 'downloaded' ? 'check' : 'download'} /><span>{download === 'downloaded' ? 'Downloaded' : download === 'partial' ? 'Partial' : download === 'error' ? 'Error' : `${Math.round((state.progress || 0) * 100)}%`}</span></span>}{watch !== 'unwatched' && <span class={`media-badge watch ${watch}`} title={watch === 'watched' ? 'Watched' : watch === 'partial' ? 'Some episodes watched' : 'In progress'}><Icon name={watch === 'watched' ? 'check' : 'clock'} /><span>{watch === 'watched' ? 'Watched' : watch === 'partial' ? 'Part watched' : 'In progress'}</span></span>}</span> }
 
 
-export function Rail({ title, children, empty, landscape = false, onNearEnd }: { title: string; children: ComponentChildren; empty?: string; landscape?: boolean; onNearEnd?: () => void }) {
+// headingHidden: the shelf is the whole page and its tab already names it (a single-shelf Library tab); the heading stays for screen readers.
+export function Rail({ title, children, empty, landscape = false, onNearEnd, headingHidden = false }: { title: string; children: ComponentChildren; empty?: string; landscape?: boolean; onNearEnd?: () => void; headingHidden?: boolean }) {
   const railRef = useRef<HTMLDivElement>(null);
   // A single child arrives unwrapped; normalizing here keeps the empty check
   // and the render identical to the array case.
@@ -167,7 +180,7 @@ export function Rail({ title, children, empty, landscape = false, onNearEnd }: {
     const el = railRef.current;
     if (el) el.scrollBy({ left: direction * el.clientWidth, behavior: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   };
-  return <section class="rail-section"><div class="section-heading"><h2>{title}</h2></div>{!hasRail ? <p class="empty">{empty || 'Nothing here yet.'}</p> : <div class="rail-wrap"><div ref={railRef} class={`rail ${landscape ? 'landscape' : ''}`}>{list}</div>{arrows.left && <button type="button" class="rail-arrow left" aria-label={`Scroll ${title} back`} onClick={() => page(-1)}><Icon name="chevron-left" /></button>}{arrows.right && <button type="button" class="rail-arrow right" aria-label={`Scroll ${title} forward`} onClick={() => page(1)}><Icon name="chevron-right" /></button>}</div>}</section>;
+  return <section class="rail-section"><div class={headingHidden ? 'section-heading visually-hidden' : 'section-heading'}><h2>{title}</h2></div>{!hasRail ? <p class="empty">{empty || 'Nothing here yet.'}</p> : <div class="rail-wrap"><div ref={railRef} class={`rail ${landscape ? 'landscape' : ''}`}>{list}</div>{arrows.left && <button type="button" class="rail-arrow left" aria-label={`Scroll ${title} back`} onClick={() => page(-1)}><Icon name="chevron-left" /></button>}{arrows.right && <button type="button" class="rail-arrow right" aria-label={`Scroll ${title} forward`} onClick={() => page(1)}><Icon name="chevron-right" /></button>}</div>}</section>;
 }
 
 // Shared modal focus machinery: inert the page background, move focus into
@@ -653,6 +666,9 @@ export function BrowserPlayer({ active, onClose, onStateChanged, onAdvance, onSk
 export function App() {
   const initialRoute = parsePath(location.pathname, location.search);
   const [view, setView] = useState<View>(initialRoute.view === 'title' || initialRoute.view === 'watch' ? 'home' : initialRoute.view); const [titles, setTitles] = useState<CatalogTitle[]>([]); const [nextCursor, setNextCursor] = useState<string | null>(null); const [household, setHousehold] = useState<HouseholdState>(emptyState); const [downloads, setDownloads] = useState<Download[]>([]); const [hero, setHero] = useState<CatalogTitle | null>(null); const [detail, setDetail] = useState<CatalogDetail | null>(null); const [detailTarget, setDetailTarget] = useState<DetailTarget>({}); const [picker, setPicker] = useState<CatalogSource[] | null>(null); const [info, setInfo] = useState<CatalogTitle | null>(null); const infoTrigger = useRef<HTMLElement | null>(null); const [player, setPlayer] = useState<ActivePlayer | null>(null); const [draftQuery, setDraftQuery] = useState(initialRoute.query || ''); const [query, setQuery] = useState(initialRoute.query || ''); const [searching, setSearching] = useState(false); const [updatesAvailable, setUpdatesAvailable] = useState(false); const [category, setCategory] = useState(''); const [kind, setKind] = useState(''); const [resolution, setResolution] = useState(''); const [sort, setSort] = useState('newest'); const [facets, setFacets] = useState<{ categories: string[]; resolutions: string[] }>({ categories: [], resolutions: [] }); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [settings, setSettings] = useState<Record<string, unknown> | null>(null); const [settingsFields, setSettingsFields] = useState<SettingsField[]>([]); const loadMore = useRef<HTMLDivElement>(null); const requestGeneration = useRef(0); const inFlightCursor = useRef(''); const viewportInput = useRef(0); const catalogParams = useRef({ query, category, kind, resolution, sort }); catalogParams.current = { query, category, kind, resolution, sort };
+  // Each hub with tabs reopens on its last-used tab; the tab on screen is always the view itself.
+  const hubMemory = useRef(loadHubMemory());
+  useEffect(() => { const next = rememberTab(hubMemory.current, view); if (next !== hubMemory.current) { hubMemory.current = next; saveHubMemory(next) } }, [view]);
   const [jobDeepId, setJobDeepId] = useState<string | undefined>(initialRoute.view === 'jobs' ? initialRoute.id : undefined);
   const [portal, setPortal] = useState<PortalState | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
@@ -850,7 +866,7 @@ export function App() {
   async function applyUpdates() { setUpdatesAvailable(false); await loadTitles(false, '') }
   // The backdrop rests on the featured title (Home, catalog views) or the first library title, and follows focus from there.
   useEffect(() => { setBackdropArt(undefined) }, [view]);
-  const pageTitle = navGroups.flatMap(g => g.items).find(i => i.id === view)?.label || 'Home';
+  const pageTitle = pageHeading(view);
   const continueWatching = canonicalHouseholdItems(household.continueWatching); const favorites = canonicalHouseholdItems(household.favorites); const recent = canonicalHouseholdItems(household.recent); const watched = canonicalHouseholdItems(household.watched);
   const libraryItems = view === 'continue' ? continueWatching : view === 'favorites' ? favorites : view === 'watched' ? watched : [];
   const loadMoreTitles = () => { if (nextCursor && !loading) void loadTitles(true, nextCursor) };
@@ -860,10 +876,10 @@ export function App() {
   const restingArt = view === 'home' ? backdropArtFor(homeTop.title ?? null) : showCatalog ? backdropArtFor(hero) : view === 'library' || view === 'continue' ? backdropArtFor(continueWatching.find(item => item.catalog)?.catalog) : view === 'favorites' ? backdropArtFor(favorites.find(item => item.catalog)?.catalog) : view === 'watched' ? backdropArtFor(watched.find(item => item.catalog)?.catalog) : '';
   const libraryEmpty: Record<string, string> = { continue: 'Nothing in progress. Start a movie or episode and it will appear here.', favorites: 'Your list is empty. Open a title and choose Add to My List to keep it close.', watched: 'Nothing watched yet. Titles you finish appear here.' };
   const catalogEmpty = !loading && !searching && titles.length === 0;
-  return <div class="app-shell"><a class="skip-link" href="#content">Skip to content</a><BackdropLayer fallback={restingArt} /><Sidebar view={view} onView={guardedNavigate} dock={<PortalSidebarDock snapshot={portal} client={api} identity={identity} onOpenAccount={() => setAccountOpen(true)} openExternal={openExternal} />} /><main class="content" id="content"><header class="topbar"><h1>{pageTitle}</h1></header>{updateStatus?.available && <UpdateNotice status={updateStatus} controller={updates} openExternal={openExternal} />}
+  return <div class="app-shell"><a class="skip-link" href="#content">Skip to content</a><BackdropLayer fallback={restingArt} /><Sidebar view={view} onHub={hub => guardedNavigate(hubDestination(hub, hubMemory.current))} dock={<PortalSidebarDock snapshot={portal} client={api} identity={identity} onOpenAccount={() => setAccountOpen(true)} openExternal={openExternal} />} /><main class="content" id="content"><header class="topbar">{(view === 'jobs' || view === 'projects') && <button type="button" class="ghost topbar-back" onClick={() => navigate('settings')}><Icon name="chevron-left" />Settings</button>}<h1>{pageTitle}</h1><HubTabs view={view} onView={guardedNavigate} />{view === 'settings' && <SettingsLinks hasProjects={(portal?.links || []).length > 0} onView={guardedNavigate} />}</header>{updateStatus?.available && <UpdateNotice status={updateStatus} controller={updates} openExternal={openExternal} />}
     {view === 'home' && <><Hero title={homeTop.title ?? null} resume={homeTop.resume} loading={loading} onOpen={openTitle} onResume={item => void playLegacy(item)} onSettings={() => navigate('settings')} onInfo={openInfo} /><Rail title="Continue watching" empty={libraryEmpty.continue} landscape>{continueWatching.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail><Rail title="Recently added" empty={loading ? 'Loading titles…' : 'The catalog has no titles yet. Enable a tracker in Settings, then run Fetch latest from Maintenance.'} onNearEnd={loadMoreTitles}>{titles.map(t => <MediaCard title={t} onOpen={openTitle} />)}</Rail><HomeDiscovery onOpen={openTitle} /><Rail title="My List" empty={libraryEmpty.favorites} landscape>{favorites.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail></>}
     {view === 'library' && <><Rail title="Continue watching" empty={libraryEmpty.continue} landscape>{continueWatching.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail><Rail title="Recently viewed" empty="Titles you open appear here." landscape>{recent.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail><Rail title="Watched" empty={libraryEmpty.watched} landscape>{watched.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail></>}
-    {['continue', 'favorites', 'watched'].includes(view) && <Rail title={pageTitle} empty={libraryEmpty[view]} landscape>{libraryItems.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail>}
+    {['continue', 'favorites', 'watched'].includes(view) && <Rail title={tabLabel(view)} empty={libraryEmpty[view]} landscape headingHidden>{libraryItems.map(i => <LegacyCard item={i} onOpen={openLibraryItem} />)}</Rail>}
     {showCatalog && <>{view !== 'categories' && <CatalogTools draftQuery={draftQuery} setDraftQuery={setDraftQuery} query={query} searching={searching} onSubmit={submitSearch} category={category} setCategory={setCategory} kind={kind} setKind={setKind} resolution={resolution} setResolution={setResolution} sort={sort} setSort={setSort} facets={facets} trackers={searchTrackers} recent={view === 'search' && !draftQuery ? recentSearches : []} onRecent={runRecentSearch} onClearRecent={forgetRecentSearches} />}{updatesAvailable && <button class="catalog-update" onClick={() => void applyUpdates()}>Catalog updates available · Refresh</button>}{view === 'categories' ? <FamilyBrowser mode="catalog" onOpenTitle={openTitle} onOpenItem={openLibraryItem} /> : view === 'tracker' ? <><Rail title="Recently added" empty={loading ? 'Loading titles…' : 'No titles yet. Enable a tracker in Settings, then run Fetch latest from Maintenance.'} onNearEnd={loadMoreTitles}>{titles.map(t => <MediaCard title={t} onOpen={openTitle} />)}</Rail><Rail title="Strong swarms" empty="Titles with the most seeders appear here." onNearEnd={loadMoreTitles}>{[...titles].sort((a, b) => b.bestSeeders - a.bestSeeders).map(t => <MediaCard title={t} onOpen={openTitle} showSeeders />)}</Rail></> : <><section class="poster-grid" aria-busy={loading}>{titles.map(t => <MediaCard title={t} onOpen={openTitle} />)}</section>{loading && <section class="poster-grid">{Array.from({ length: 12 }, (_, i) => <div class="skeleton" key={i} />)}</section>}{catalogEmpty && <CatalogEmpty query={query} filtered={Boolean(category || kind || resolution)} onSettings={() => navigate('settings')} onClear={() => { setDraftQuery(''); void submitSearch(undefined, '') }} />}<div ref={loadMore} class="load-more" aria-hidden="true" /></>}</>}
     {view === 'downloads' &&
       <Downloads items={downloads} onRefresh={loadDownloads} onPlay={d => void playDownload(d)} onRemove={remove} onRemoveFile={removeDownloadFile} onAction={manageDownload} />

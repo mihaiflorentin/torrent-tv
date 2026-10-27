@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sleep } from './test-wait';
 import { episodePageView } from '@torrent-tv/shared';
 import { withETag } from './test-api';
-import type { API, CatalogDetail, CatalogFacets, CatalogTitle, HouseholdState } from '@torrent-tv/shared';
-import { cardMeta, episodeMeta, heroFacts } from './display';
+import type { API, CatalogDetail, CatalogFacets, CatalogTitle, HouseholdState, MediaState } from '@torrent-tv/shared';
+import { cardMeta, episodeMeta, episodeState, heroFacts } from './display';
 
 // Release dates on the TV listing surfaces: cards stay one short line (month and year), the hero and the
 // title page carry the full date, series say 'Since <year>', and episode tiles show their air date.
@@ -28,14 +28,39 @@ describe('card and hero release lines', () => {
 describe('episodeMeta', () => {
   const now = new Date(2026, 5, 15);
   const page = (airDate?: string) => episodePageView(1, { number: 2, title: 'Two', airDate }, undefined, '', now);
-  it('adds the air date after the version count', () => {
-    expect(episodeMeta({ sourceCount: 2 }, page('2017-05-06'), 0)).toBe('2 versions · May 6, 2017');
+  // The series board's facts line: the air date (and runtime, rating when known) first, the version count last;
+  // watch progress moved to the row's state word.
+  it('puts the air date first and the version count last', () => {
+    expect(episodeMeta({ sourceCount: 2 }, page('2017-05-06'))).toBe('May 6, 2017 · 2 versions');
   });
-  it('marks a future air date Upcoming and keeps watch progress last', () => {
-    expect(episodeMeta({ sourceCount: 1 }, page('2026-07-01'), 40)).toBe('1 version · Upcoming · Jul 1, 2026 · 40% watched');
+  it('marks a future air date Upcoming', () => {
+    expect(episodeMeta({ sourceCount: 1 }, page('2026-07-01'))).toBe('Upcoming · Jul 1, 2026 · 1 version');
   });
   it('omits an unknown date', () => {
-    expect(episodeMeta({ sourceCount: 1 }, page(), 0)).toBe('1 version');
+    expect(episodeMeta({ sourceCount: 1 }, page())).toBe('1 version');
+  });
+});
+
+describe('episodeState', () => {
+  const state = (over: Partial<MediaState> = {}): MediaState => ({ downloadState: 'none', watchState: 'unwatched', ...over });
+  it('says how far an episode in progress is, in the progress tone', () => {
+    expect(episodeState(state({ downloadState: 'downloaded', watchState: 'partial' }), 35)).toEqual({ text: '35% watched', tone: 'progress' });
+  });
+  it('says Watched in the ok tone, before Downloaded', () => {
+    expect(episodeState(state({ downloadState: 'downloaded', watchState: 'watched' }), 0)).toEqual({ text: 'Watched', tone: 'ok' });
+  });
+  it('names the download state of an episode not started', () => {
+    expect(episodeState(state({ downloadState: 'downloaded' }), 0)).toEqual({ text: 'Downloaded', tone: 'quiet' });
+    expect(episodeState(state({ downloadState: 'partial' }), 0)).toEqual({ text: 'Some downloaded', tone: 'quiet' });
+    expect(episodeState(state({ downloadState: 'downloading', progress: 0.42 }), 0)).toEqual({ text: 'Downloading 42%', tone: 'progress' });
+    expect(episodeState(state({ downloadState: 'queued' }), 0)).toEqual({ text: 'Queued', tone: 'quiet' });
+  });
+  it('puts a failed download first, in the danger tone with its word', () => {
+    expect(episodeState(state({ downloadState: 'error', watchState: 'watched' }), 0)).toEqual({ text: 'Needs attention', tone: 'danger' });
+  });
+  it('says nothing for an episode with no library state', () => {
+    expect(episodeState(undefined, 0)).toBeUndefined();
+    expect(episodeState(state(), 0)).toBeUndefined();
   });
 });
 
@@ -71,7 +96,7 @@ describe('TV title page episode air dates', () => {
     await wait();
     container.querySelector<HTMLElement>('[data-focus-key="hero-a"]')!.click();
     await wait();
-    expect(container.querySelector('.episode-tile small')!.textContent).toBe('1 version · Jan 2, 2019');
+    expect(container.querySelector('.episode-tile small')!.textContent).toBe('Jan 2, 2019 · 1 version');
     expect(container.querySelector('.detail-kind')!.textContent).toBe('Series');
     expect(container.querySelector('.detail-facts')!.textContent).toBe('Since 2019');
   });
