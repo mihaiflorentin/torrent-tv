@@ -4,12 +4,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildFixture, serve } from './fixture.mjs';
+import { buildFixture, scenarioReleases, serve } from './fixture.mjs';
 
-async function withServer(run, { spa = false } = {}) {
+async function withServer(run, { spa = false, scenarios = false } = {}) {
   const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'fixture-test-'));
   fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><title>app</title>');
-  const fixture = buildFixture();
+  const fixture = buildFixture({ scenarios });
   const server = await serve({ dist, fixture, spa });
   try { await run(server, fixture); } finally { server.close(); fs.rmSync(dist, { recursive: true, force: true }); }
 }
@@ -132,3 +132,33 @@ test('the household the perf harness measures is unchanged by the richer detail 
   assert.equal(fixture.state.continueWatching.length, 8);
   assert.equal(fixture.downloads.length, 24);
 });
+
+// The D-pad audit's scenarios (dpad.mjs): opt-in, so the perf harness and the screen capture see the plain household.
+const prepare = (server, id) => fetch(`${server.url}/api/v1/releases/${id}/prepare`, { method: 'POST', body: '{}', signal: AbortSignal.timeout(400) }).then(r => r.status, error => error.name);
+
+test('without scenarios: no update to install, the season pack is not downloaded, every prepare answers', () => withServer(async (server, fixture) => {
+  const update = await json(server, '/updates/current');
+  assert.equal(update.available, false);
+  const series = fixture.titles.find(title => title.kind === 'series' && title.seasonCount > 1);
+  const detail = await json(server, `/catalog/titles/${series.id}`);
+  assert.equal(detail.seasons[0].packSources[0].libraryState, undefined);
+  const { held, refused } = scenarioReleases(fixture);
+  assert.equal(await prepare(server, held), 200);
+  assert.equal(await prepare(server, refused), 200);
+}));
+
+test('with scenarios: an installable update, a downloaded season pack, one prepare held open and one refused', () => withServer(async (server, fixture) => {
+  const update = await json(server, '/updates/current');
+  assert.equal(update.available, true);
+  assert.equal(update.selfUpdate, true);
+  assert.ok(update.latest);
+  const series = fixture.titles.find(title => title.kind === 'series' && title.seasonCount > 1);
+  const pack = (await json(server, `/catalog/titles/${series.id}`)).seasons[0].packSources[0];
+  assert.equal(pack.libraryState.downloadState, 'downloaded');
+  assert.ok(pack.libraryState.downloadId);
+  // The preparing-dialog maps (clients/tv/src/dpad/maps/title.mjs) focus these versions by key.
+  assert.deepEqual(scenarioReleases(fixture), { held: '1000000', refused: '1000001' });
+  assert.equal(await prepare(server, '1000000'), 'TimeoutError');
+  assert.equal(await prepare(server, '1000001'), 409);
+  assert.equal(await prepare(server, (await json(server, `/catalog/titles/${fixture.titles[0].id}`)).sources[2].release.id), 200);
+}, { scenarios: true }));

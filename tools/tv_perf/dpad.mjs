@@ -99,7 +99,7 @@ function signature() {
   return JSON.stringify({ menu: !!document.querySelector('.tv-app.menu-open'), info: seen('.info-panel'), dialogs: document.querySelectorAll('[role="dialog"]').length,
     detail: !!document.querySelector('.detail-screen'), versions: !!document.querySelector('.versions-view'), player: !!document.querySelector('.player-shell'),
     setup: !!document.querySelector('main.setup'), route: app ? app.getAttribute('data-route') : '', family: !!document.querySelector('[data-focus-key="family-back"]'),
-    job: !!document.querySelector('[data-focus-key="job-detail-back"]'), panel: (document.querySelector('.player-dialog') || {}).className || '',
+    job: !!document.querySelector('[data-focus-key="job-detail-back"]'), panel: (function () { var dialog = document.querySelector('.player-dialog'); return dialog ? dialog.className + ':' + (dialog.getAttribute('data-player-menu') || '') : ''; })(),
     infoLevel: (function () { var first = document.querySelector('.info-panel .info-scroll [data-focus-key]'); return first ? first.getAttribute('data-focus-key') : ''; })(),
     controls: !!document.querySelector('.player.controls-visible'),
     settings: (function () { var pane = document.querySelector('[data-settings-pane]'); return pane ? pane.getAttribute('data-settings-pane') : ''; })() });
@@ -110,10 +110,12 @@ function observe(slack) {
   var list = focusables();
   return { signature: signature(), elements: list.map(describe), body: body, active: body ? null : describe(a), listed: !body && list.indexOf(a) >= 0, reveal: body ? '' : revealed(a, slack) };
 }`;
+// A prepare is one request held open while the server works (the fixture holds one open for the preparing dialog's
+// map), so it is not counted as in flight: the dialog is the quiet state.
 const QUIET_PROBE = `(function () {
   window.__dpadInflight = 0; window.__dpadMutated = Date.now();
   var original = window.fetch;
-  if (original) window.fetch = function () { window.__dpadInflight++; var done = function () { window.__dpadInflight--; window.__dpadMutated = Date.now(); }; var p = original.apply(this, arguments); p.then(done, done); return p; };
+  if (original) window.fetch = function (input) { if (/\\/prepare(-season)?$/.test(String(input && input.url || input))) return original.apply(this, arguments); window.__dpadInflight++; var done = function () { window.__dpadInflight--; window.__dpadMutated = Date.now(); }; var p = original.apply(this, arguments); p.then(done, done); return p; };
   document.addEventListener('DOMContentLoaded', function () { new MutationObserver(function () { window.__dpadMutated = Date.now(); }).observe(document.body, { childList: true, subtree: true }); });
 })();`;
 const QUIET = `(window.__dpadInflight === 0 && Date.now() - window.__dpadMutated >= 120)`;
@@ -130,7 +132,7 @@ async function main() {
   const outDir = path.resolve(args.out || path.join(here, '.out/dpad'));
   fs.mkdirSync(outDir, { recursive: true });
 
-  const fixture = buildFixture();
+  const fixture = buildFixture({ scenarios: true });
   const picks = pickTitles(fixture);
   const server = await serve({ dist, fixture, video: VIDEO, smallBackdrops: true });
   const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-dpad-'));

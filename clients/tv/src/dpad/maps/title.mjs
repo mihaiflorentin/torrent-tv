@@ -114,6 +114,47 @@ export const infoSeason = drillLevel({
   back: 'info-seasons:info-season-1',
 });
 
+export const infoEpisode = drillLevel({
+  name: 'info-episode',
+  notes: 'Info > Seasons > a season > an episode: its summary (code, meta, title, overview, credits), then its guest stars when it has any.',
+  detect: '[data-focus-key="info-episode-summary"]',
+  reach: [...toSeriesInfo, { focus: '[data-focus-key="info-seasons"]' }, { press: 'enter' }, { wait: 600 }, { focus: '[data-focus-key="info-season-1"]' }, { press: 'enter' }, { wait: 600 }, { focus: '[data-focus-key="info-episode-1"]' }, { press: 'enter' }],
+  rows: '^info-(episode-summary$|guest-)',
+  back: 'info-season:info-episode-1',
+});
+
+// The preparing dialog (main.tsx), over the title page whose version was chosen. The audit's fixture (scenarios)
+// holds the prepare of the first movie's first version open and refuses its second (tools/tv_perf/fixture.mjs,
+// scenarioReleases: releases 1000000 and 1000001, file 0). Back cancels and returns to the version.
+const prepareVersion = release => [{ openTitle: 'movie' }, { pressUntil: 'down', focused: '.source-list .source-button', max: 3 }, { focus: `[data-focus-key="source-${release}-0"]` }, { press: 'enter' }];
+
+export const prepareWait = {
+  name: 'prepare-wait',
+  notes: 'Preparing a version: the elapsed seconds and Cancel, the only control. Every arrow stays on Cancel; OK on Cancel and Back cancel and return to the version.',
+  detect: ['.tv-prepare-confirm', '[data-focus-key="prepare-cancel"]'],
+  regions: ['prepare-dialog'],
+  reach: prepareVersion('1000000'),
+  // Ranked third on the movie page.
+  opener: 'movie-title:versions[2]',
+  landing: 'prepare-cancel',
+  stops: { 'prepare-cancel': { up: 'stay', down: 'stay', left: 'stay', right: 'stay', ok: 'return', back: 'return' } },
+};
+
+export const prepareError = {
+  name: 'prepare-error',
+  notes: 'A prepare the tracker refused: the reason, then Retry and Close on one row (Left and Right move and stop at its ends, Up and Down stay). Lands on Retry; Close and Back return to the version.',
+  detect: ['.tv-prepare-confirm', '[data-focus-key="prepare-retry"]'],
+  regions: ['prepare-dialog'],
+  reach: prepareVersion('1000001'),
+  // Ranked first (the Best match) on the movie page.
+  opener: 'movie-title:versions[first]',
+  landing: 'prepare-retry',
+  stops: {
+    'prepare-retry': { up: 'stay', down: 'stay', left: 'stay', right: 'prepare-close', back: 'return' },
+    'prepare-close': { up: 'stay', down: 'stay', left: 'prepare-retry', right: 'stay', ok: 'return', back: 'return' },
+  },
+};
+
 const seriesStops = back => ({
   'detail-back': { up: 'stay', down: 'actions[first]', left: 'stay', right: 'stay', back },
 });
@@ -152,4 +193,20 @@ export const seriesVersions = {
   bursts: [{ from: 'versions[first]', key: 'down', expect: 'versions[last]' }],
 };
 
-export const TITLE_MAPS = [infoSeason, infoSeasons, movieInfo, seriesInfo, movieMore, seriesMore, movieTitle, seriesVersions, seriesTitle];
+// The season-pack delete confirmation, from Delete download on a downloaded pack in an episode's Versions view (the
+// audit's fixture downloads season 1's pack). Cancel first, the delete below it; Back cancels onto Delete download.
+export const seasonPackDelete = {
+  name: 'season-pack-delete',
+  notes: 'Delete season download? Cancel, then Delete download below it. Lands on Cancel; OK on Cancel and Back return to the pack\'s Delete download.',
+  detect: '.tv-season-pack-confirm',
+  regions: ['season-pack-dialog'],
+  reach: [...seriesVersions.reach, { focus: '[data-focus-key^="season-pack-"][data-focus-key$="-delete"]' }, { press: 'enter' }],
+  opener: 'series-versions:versions[last]',
+  landing: 'season-pack-delete-cancel',
+  stops: {
+    'season-pack-delete-cancel': { up: 'stay', down: 'season-pack-delete-confirm', left: 'stay', right: 'stay', ok: 'return', back: 'return' },
+    'season-pack-delete-confirm': { up: 'season-pack-delete-cancel', down: 'stay', left: 'stay', right: 'stay', back: 'return' },
+  },
+};
+
+export const TITLE_MAPS = [prepareWait, prepareError, seasonPackDelete, infoEpisode, infoSeason, infoSeasons, movieInfo, seriesInfo, movieMore, seriesMore, movieTitle, seriesVersions, seriesTitle];

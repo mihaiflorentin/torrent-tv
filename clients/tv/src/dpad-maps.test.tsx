@@ -76,9 +76,9 @@ describe('declared D-pad maps', () => {
     expect(checkMaps(MAPS as DpadMap[])).toEqual([]);
   });
 
-  it('cover every screen and overlay of the capture journey', () => {
+  it('cover every screen and overlay of the capture journey, and the dialogs the audit\'s fixture scenarios reach', () => {
     const names = MAPS.map(map => map.name);
-    for (const wanted of ['rail', 'home', 'search', 'search-results', 'library', 'continue', 'favorites', 'watched', 'downloads', 'download-delete', 'library-categories', 'library-family', 'tracker', 'browse', 'categories', 'catalog-family', 'jobs', 'job-detail', 'settings', 'settings-diagnostics', 'rebuild-dialog', 'projects', 'movie-title', 'movie-info', 'movie-more', 'series-title', 'series-more', 'series-versions', 'series-info', 'player'])
+    for (const wanted of ['rail', 'home', 'search', 'search-results', 'library', 'continue', 'favorites', 'watched', 'downloads', 'download-delete', 'library-categories', 'library-family', 'tracker', 'browse', 'categories', 'catalog-family', 'jobs', 'job-detail', 'settings', 'settings-diagnostics', 'rebuild-dialog', 'projects', 'movie-title', 'movie-info', 'movie-more', 'series-title', 'series-more', 'series-versions', 'series-info', 'info-episode', 'player', 'player-info', 'player-find-subtitles', 'prepare-wait', 'prepare-error', 'season-pack-delete', 'update-dialog'])
       expect(names).toContain(wanted);
   });
 });

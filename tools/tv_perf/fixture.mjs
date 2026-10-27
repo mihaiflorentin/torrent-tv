@@ -22,7 +22,11 @@ const WORDS = ['Lantern', 'Harbor', 'Velvet', 'Orbit', 'Cinder', 'Meridian', 'At
 const NOUNS = ['Kingdom', 'Garden', 'Archive', 'Frontier', 'Letters', 'Station', 'Orchard', 'Witness', 'Voyage', 'Crossing', 'Engine', 'Season', 'Promise', 'Echo', 'Winter', 'Machine'];
 const FAMILIES = [['movies', 'Movies'], ['series', 'Series'], ['animation', 'Animation'], ['documentaries', 'Documentaries'], ['anime', 'Anime'], ['sports', 'Sports'], ['kids', 'Kids'], ['music', 'Music'], ['other', 'Other']];
 
-export function buildFixture({ titles: count = 60, seed = 45 } = {}) {
+// `scenarios` (the D-pad audit's household, off for the perf harness and the screen capture so their numbers and
+// pictures stay put) adds what only some screens need: a server update that can be installed, a downloaded season
+// pack on every series' season 1, and two versions of the first movie whose prepare is held open or refused
+// (scenarioReleases), so the update, season-pack delete and preparing dialogs can be reached.
+export function buildFixture({ titles: count = 60, seed = 45, scenarios = false } = {}) {
   const rand = rng(seed);
   const pick = list => list[Math.floor(rand() * list.length)];
   const titles = [];
@@ -68,8 +72,19 @@ export function buildFixture({ titles: count = 60, seed = 45 } = {}) {
   const familyArt = index => ({ url: `/api/v1/artwork/${titles[index].id}/backdrop`, source: 'catalog', titleId: titles[index].id });
   const families = FAMILIES.map(([key, name], i) => ({ key, name, count: 50 + i * 313, newestTitle: titles[i].title, newestTitleId: titles[i].id, categories: CATEGORIES.slice(0, 2 + (i % 4)), art: familyArt(i) }));
   const libraryFamilies = families.slice(0, 4).map((family, i) => ({ ...family, count: 3 + i * 4 }));
-  return { titles, state, downloads, jobs, facets, families, libraryFamilies };
+  return { titles, state, downloads, jobs, facets, families, libraryFamilies, scenarios };
 }
+
+/** With scenarios on: the release ids (of the first movie's first two versions) whose prepare is held open and refused. */
+export function scenarioReleases(fixture) {
+  const movie = fixture.titles.find(title => title.kind === 'movie');
+  const [held, refused] = titleDetail(fixture, movie).sources.map(item => item.release.id);
+  return { held, refused };
+}
+// A prepare the server is still working on (the response never comes; the app's Cancel aborts it) and a refusal.
+const HELD = Symbol('held');
+const REFUSED = Symbol('refused');
+const refusal = (status, detail) => ({ [REFUSED]: status, detail });
 
 // Posters and backdrops are generated PNGs (gradient with a diagonal pattern) so the page decodes real raster images of TV-realistic sizes.
 const artCache = new Map();
@@ -145,7 +160,8 @@ export function titleDetail(fixture, title) {
       const libraryState = episodeState(number, e + 1);
       return { number: e + 1, title: EPISODE_NAMES[e % EPISODE_NAMES.length], season: number, airDate: `${title.year + s}-0${1 + (e % 9)}-1${e % 9}`, sourceCount: sources.length, sources, ...(libraryState ? { libraryState } : {}) };
     });
-    const packSources = number === 1 ? [source(title, base + 99, 1, { season: 1, pack: true, sizeBytes: 9.6e9 })] : [];
+    const pack = () => ({ ...source(title, base + 99, 1, { season: 1, pack: true, sizeBytes: 9.6e9 }), ...(fixture.scenarios ? { libraryState: { downloadId: `PACK${n}`, downloadState: 'downloaded', transferState: 'idle', watchState: 'unwatched' } } : {}) });
+    const packSources = number === 1 ? [pack()] : [];
     return { number, title: `Season ${number}`, episodeCount: episodes.length, episodes, packSources };
   });
   return { title, seasons, sources: [] };
@@ -246,12 +262,22 @@ function api(fixture, req, url, sent) {
   if (route === '/trackers') return [{ id: 'filelist', name: 'FileList', enabled: true, configured: true, capabilities: { imdbSearch: true, seasonFilter: true, episodeFilter: true, categories: true } }];
   if (route === '/portal/state') return { accountsEnabled: false, adsEnabled: false, donor: false, links: [{ id: 1, title: 'Project site', url: 'https://example.invalid/', description: 'A published project.' }] };
   if (route === '/portal/promotions') return [];
-  if (route === '/updates/current') return { currentVersion: '0.0.0-fixture', available: false, releasesUrl: 'https://example.invalid/releases', selfUpdate: false, applying: false };
+  if (route === '/updates/current') return fixture.scenarios
+    ? { currentVersion: '0.0.0-fixture', latest: '0.0.1-fixture', available: true, releasesUrl: 'https://example.invalid/releases', selfUpdate: true, applying: false }
+    : { currentVersion: '0.0.0-fixture', available: false, releasesUrl: 'https://example.invalid/releases', selfUpdate: false, applying: false };
   if (route === '/settings') return SETTINGS;
   if (route === '/settings/schema') return { items: SETTINGS_SCHEMA };
   if (route === '/catalog/status') return { observedReleases: 41250, discoverableReleases: 52800 };
   const prepare = route.match(/^\/releases\/([^/]+)\/prepare$/);
-  if (prepare && req.method === 'POST') return prepared(fixture, decodeURIComponent(prepare[1]));
+  if (prepare && req.method === 'POST') {
+    const id = decodeURIComponent(prepare[1]);
+    if (fixture.scenarios) {
+      const { held, refused } = scenarioReleases(fixture);
+      if (id === held) return HELD;
+      if (id === refused) return refusal(409, 'the tracker refused this release (fixture)');
+    }
+    return prepared(fixture, id);
+  }
   const playback = route.match(/^\/playback\/([^/]+)(\/preferences)?$/);
   if (playback) return playback[2] ? { audioLanguage: 'en', audioTrackIndex: -1, subtitleLanguage: 'ro', subtitleMode: 'auto' } : { profileId: 'household', sourceId: playback[1], releaseId: '', fileIndex: 0, filePath: '', positionMs: 0, durationMs: 0, watched: false, updatedAt: '2026-10-16T20:00:00Z' };
   if (/^\/downloads\/[^/]+\/media-info$/.test(route)) return { durationMs: 6_000_000, audioTracks: [{ streamIndex: 1, language: 'en', codec: 'aac', channels: 6, default: true }] };
@@ -293,6 +319,8 @@ export function serve({ dist, fixture, port = 0, spa = false, video = '', smallB
         let sent = {};
         try { sent = raw ? JSON.parse(raw) : {}; } catch { }
         const body = api(fixture, req, url, sent);
+        if (body === HELD) return;
+        if (body && body[REFUSED]) { res.writeHead(body[REFUSED], { 'Content-Type': 'application/json' }).end(JSON.stringify({ detail: body.detail })); return; }
         if (body === null) misses.push(`${req.method} ${url.pathname}`);
         if (body === undefined) res.writeHead(204).end();
         else if (body === null) res.writeHead(404, { 'Content-Type': 'application/json' }).end(JSON.stringify({ detail: 'not found in fixture' }));

@@ -142,6 +142,20 @@ export const rebuildDialog = {
   },
 };
 
+export const updateDialog = {
+  name: 'update-dialog',
+  notes: 'Install server update confirmation (Settings > Updates > Install server update, while an installable update is published; the audit\'s fixture publishes one): Cancel first, Install and restart beside it. Back and Cancel return to Install server update.',
+  detect: '.tv-update-confirm',
+  regions: ['update-dialog'],
+  reach: [...openPane('updates'), { focus: '[data-focus-key="update-apply"]' }, { press: 'enter' }],
+  opener: 'settings-updates:rows[last]',
+  landing: 'update-confirm-cancel',
+  stops: {
+    'update-confirm-cancel': { up: 'stay', down: 'stay', left: 'stay', right: 'update-confirm-apply', ok: 'return', back: 'return' },
+    'update-confirm-apply': { up: 'stay', down: 'stay', left: 'update-confirm-cancel', right: 'stay', back: 'return' },
+  },
+};
+
 export const projects = {
   name: 'projects',
   route: 'projects',
@@ -171,4 +185,4 @@ export const setup = {
 };
 
 // The panes come before "settings" and Diagnostics before the Server pane: the more specific screen is told apart first.
-export const SYSTEM_MAPS = [jobDetail, jobs, rebuildDialog, settingsDiagnostics, settingsTrackers, settingsCatalog, settingsServer, settingsBackgroundJobs, settingsUpdates, settingsOtherProjects, settingsDangerZone, settings, projects, setup];
+export const SYSTEM_MAPS = [jobDetail, jobs, rebuildDialog, updateDialog, settingsDiagnostics, settingsTrackers, settingsCatalog, settingsServer, settingsBackgroundJobs, settingsUpdates, settingsOtherProjects, settingsDangerZone, settings, projects, setup];

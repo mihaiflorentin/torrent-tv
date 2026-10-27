@@ -48,6 +48,17 @@ describe('Prepare modal elapsed counter', () => {
     expect(dialog().querySelector('[data-focus-key="prepare-cancel"]')).not.toBeNull();
   });
 
+  it('walks a failed prepare like a row of two buttons: Left and Right move and stop at the ends, Up and Down stay', async () => {
+    render(catalog({ trackerName: 'FileList', label: 'Alpha.1080p', error: 'tracker said no' } as { trackerName: string; label: string }), container);
+    await tick(50);
+    const focused = () => (document.activeElement as HTMLElement | null)?.dataset.focusKey;
+    const press = (key: string, keyCode: number) => document.dispatchEvent(new KeyboardEvent('keydown', { key, keyCode, bubbles: true, cancelable: true }));
+    expect(focused()).toBe('prepare-retry');
+    const moves: string[] = [];
+    for (const [key, code] of [['ArrowLeft', 37], ['ArrowUp', 38], ['ArrowDown', 40], ['ArrowRight', 39], ['ArrowRight', 39], ['ArrowUp', 38], ['ArrowDown', 40], ['ArrowLeft', 37]] as const) { press(key, code); moves.push(`${key}:${focused()}`); }
+    expect(moves).toEqual(['ArrowLeft:prepare-retry', 'ArrowUp:prepare-retry', 'ArrowDown:prepare-retry', 'ArrowRight:prepare-close', 'ArrowRight:prepare-close', 'ArrowUp:prepare-close', 'ArrowDown:prepare-close', 'ArrowLeft:prepare-retry']);
+  });
+
   it('stops its interval when the modal goes away', async () => {
     vi.useFakeTimers();
     render(catalog({ trackerName: 'FileList', label: 'Alpha.1080p' }), container);
