@@ -1,4 +1,4 @@
-/* Torrent TV television stylesheet: the Velvet Booth direction (DESIGN.md) on a fixed 1920x1080 canvas read at 3 m.
+/* Torrent TV television stylesheet: the Night Screen direction (DESIGN.md) on a fixed 1920x1080 canvas read at 3 m.
    Every colour, size and radius comes from the shared tokens in @torrent-tv/shared/design/tokens.css; this file holds layout only.
    Support floor is Chromium 53 (webOS 4) and 63 (Tizen 5): no grid (Chromium 57), flex gap is off-limits (ADR-0006) so siblings
    take margins, and focus uses the :focus pseudo-class because TV focus is never pointer-driven. */
@@ -489,7 +489,8 @@ button.primary.active {
  font-size: var(--tt-tv-text-title);
  font-weight: var(--tt-weight-black);
  line-height: 1.08;
- max-height: 140px;
+ /* Two lines at any title size (2 x 1.08). */
+ max-height: 2.16em;
  overflow: hidden
 }
 
